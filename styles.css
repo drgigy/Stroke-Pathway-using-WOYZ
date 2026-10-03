@@ -160,6 +160,17 @@ textarea {
   color: var(--ink);
 }
 
+.icon-button {
+  width: 38px;
+  min-height: 38px;
+  padding: 0;
+  display: inline-grid;
+  place-items: center;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink);
+}
+
 .chip.active,
 .segmented button.active {
   border-color: var(--green);
@@ -385,6 +396,13 @@ textarea {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+  cursor: grab;
+  user-select: none;
+  touch-action: none;
+}
+
+.woyz-dock.dragging .woyz-dock-head {
+  cursor: grabbing;
 }
 
 .woyz-dock-title {
@@ -420,7 +438,7 @@ textarea {
 
 .woyz-dock-body {
   display: grid;
-  grid-template-rows: auto auto auto auto minmax(34px, auto) auto auto;
+  grid-template-rows: auto auto auto auto minmax(34px, auto) auto;
   justify-items: center;
   align-content: center;
   gap: 12px;
@@ -541,29 +559,46 @@ textarea {
   color: #85858d;
 }
 
-.woyz-prompt-box {
-  width: 100%;
-  border: 1px solid #313136;
-  border-radius: 10px;
-  background: #111113;
-  color: #f7f7fb;
-  padding: 8px 10px;
-  font-size: 12px;
+.settings-dialog {
+  border: 0;
+  border-radius: var(--radius);
+  padding: 0;
+  box-shadow: 0 24px 70px rgb(0 0 0 / 28%);
 }
 
-.woyz-prompt-box summary {
-  cursor: pointer;
-  color: #c9c9cf;
-  font-weight: 800;
+.settings-dialog::backdrop {
+  background: rgb(20 35 26 / 35%);
 }
 
-.woyz-prompt-box pre {
-  max-height: 150px;
-  overflow: auto;
-  white-space: pre-wrap;
-  margin: 8px 0 0;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  line-height: 1.35;
+.settings-panel {
+  width: min(420px, calc(100vw - 32px));
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+  background: var(--surface);
+  color: var(--ink);
+}
+
+.settings-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.settings-note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.settings-panel menu {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
 }
 
 .stage-body {

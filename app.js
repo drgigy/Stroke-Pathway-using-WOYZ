@@ -200,6 +200,7 @@ const defaultEpisodes = [
 ];
 
 const storeKey = "woyz-stroke-local-v1";
+const geminiKeyStorage = "woyz-stroke-gemini-api-key";
 let state = loadState();
 let activeEpisodeId = state.activeEpisodeId || state.episodes[0].episodeId;
 let activeStageId = state.activeStageId || "registration";
@@ -215,6 +216,8 @@ let woyzAnalyser = null;
 let woyzAudioData = null;
 let woyzMediaStream = null;
 let woyzAnimationFrame = null;
+let woyzDragging = false;
+let woyzDragOffset = { x: 0, y: 0 };
 
 const $ = (selector) => document.querySelector(selector);
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -283,7 +286,6 @@ function render() {
   renderKpis(episode);
   $("#episodeContext").textContent = `${episode.episodeId} / ${episode.patientId}`;
   $("#episodeTitle").textContent = episode.patient?.name || "Unknown patient";
-  updateStagePromptPreview();
   updateMode(mode);
   updateVoiceUi();
 }
@@ -569,7 +571,7 @@ function setupWoyzPlugin() {
   $("#woyzLevel").innerHTML = Array.from({ length: 28 }, () => "<span></span>").join("");
   updateWoyzTimer();
   renderFlatWoyzLevel();
-  updateStagePromptPreview();
+  setupWoyzDragging();
 }
 
 function openWoyzDock() {
@@ -582,7 +584,6 @@ function openWoyzDock() {
       updateWoyzTimer();
     }, 1000);
   }
-  updateStagePromptPreview();
   $("#woyzStatus").textContent = SpeechRecognition
     ? "Press play to start browser transcription"
     : "Speech recognition is unavailable in this browser";
@@ -599,6 +600,36 @@ function closeWoyzDock() {
   stopAudioLevel();
   renderFlatWoyzLevel();
   updateVoiceUi();
+}
+
+function setupWoyzDragging() {
+  const dock = $("#woyzDock");
+  const handle = $("#woyzDragHandle");
+  handle.addEventListener("pointerdown", (event) => {
+    if (event.target.closest("button")) return;
+    const rect = dock.getBoundingClientRect();
+    woyzDragging = true;
+    woyzDragOffset = { x: event.clientX - rect.left, y: event.clientY - rect.top };
+    dock.classList.add("dragging");
+    handle.setPointerCapture(event.pointerId);
+  });
+  handle.addEventListener("pointermove", (event) => {
+    if (!woyzDragging) return;
+    const dockRect = dock.getBoundingClientRect();
+    const maxLeft = window.innerWidth - dockRect.width - 8;
+    const maxTop = window.innerHeight - dockRect.height - 8;
+    const left = Math.min(Math.max(8, event.clientX - woyzDragOffset.x), Math.max(8, maxLeft));
+    const top = Math.min(Math.max(8, event.clientY - woyzDragOffset.y), Math.max(8, maxTop));
+    dock.style.left = `${left}px`;
+    dock.style.top = `${top}px`;
+    dock.style.bottom = "auto";
+  });
+  handle.addEventListener("pointerup", (event) => {
+    if (!woyzDragging) return;
+    woyzDragging = false;
+    dock.classList.remove("dragging");
+    handle.releasePointerCapture(event.pointerId);
+  });
 }
 
 function updateWoyzTimer() {
@@ -727,7 +758,6 @@ function startRecognition() {
       }
       if (finalText) woyzTranscriptText = `${woyzTranscriptText} ${finalText}`.trim();
       $("#woyzTranscript").textContent = [woyzTranscriptText, interimText].filter(Boolean).join("\n");
-      $("#woyzOutput").textContent = JSON.stringify(buildStageOutput(activeStageId, [woyzTranscriptText, interimText].filter(Boolean).join(" ")), null, 2);
     };
     woyzRecognition.onerror = (event) => {
       $("#woyzStatus").textContent = `Speech recognition ${event.error}`;
@@ -758,41 +788,38 @@ function stopRecognitionOnly() {
   }
 }
 
-function finishWoyzSegment() {
+async function finishWoyzSegment() {
   if (!$("#woyzDock").classList.contains("visible")) return;
   stopRecognitionOnly();
   stopAudioLevel();
   woyzRecording = false;
   voice = "ready";
   $("#woyzDock").classList.remove("recording");
-  $("#woyzStatus").textContent = "Voice segment saved for review";
+  $("#woyzStatus").textContent = woyzTranscriptText ? "Structuring transcript..." : "No voice captured; saved as NIL";
   const episode = getEpisode();
+  const structuredOutput = await structureTranscriptWithGemini(activeStageId, woyzTranscriptText);
   episode.voiceSegments = episode.voiceSegments || [];
   episode.voiceSegments.push({
     stage: activeStageId,
     time: new Date().toLocaleString("sv-SE").slice(0, 16),
     transcript: woyzTranscriptText || "",
     prompt: buildStagePrompt(activeStageId),
-    structuredOutput: buildStageOutput(activeStageId, woyzTranscriptText)
+    structuredOutput
   });
+  applyStructuredOutput(episode, structuredOutput);
   addAudit(
     episode,
     woyzTranscriptText
-      ? `WOYZ transcript saved for ${stageLabel(activeStageId)} review.`
+      ? `WOYZ transcript structured for ${stageLabel(activeStageId)} review.`
       : `WOYZ voice segment ended for ${stageLabel(activeStageId)} with no transcript text.`,
     "System"
   );
   woyzTranscriptText = "";
   $("#woyzTranscript").textContent = "";
-  $("#woyzOutput").textContent = JSON.stringify(buildStageOutput(activeStageId, ""), null, 2);
+  $("#woyzStatus").textContent = "Voice segment saved for review";
   saveState();
-  renderSummary(episode);
+  render();
   updateVoiceUi();
-}
-
-function updateStagePromptPreview() {
-  $("#woyzPrompt").textContent = buildStagePrompt(activeStageId);
-  $("#woyzOutput").textContent = JSON.stringify(buildStageOutput(activeStageId, ""), null, 2);
 }
 
 function buildStagePrompt(stageId) {
@@ -842,6 +869,42 @@ function buildStageOutput(stageId, transcript) {
   return output;
 }
 
+async function structureTranscriptWithGemini(stageId, transcript) {
+  const localOutput = buildStageOutput(stageId, transcript);
+  if (!String(transcript || "").trim()) return localOutput;
+  const apiKey = localStorage.getItem(geminiKeyStorage);
+  if (!apiKey) return localOutput;
+  try {
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(apiKey)}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        generationConfig: { responseMimeType: "application/json", temperature: 0 },
+        contents: [{
+          role: "user",
+          parts: [{ text: `${buildStagePrompt(stageId)}\n\nTranscript:\n${transcript}` }]
+        }]
+      })
+    });
+    if (!response.ok) throw new Error("Gemini request failed");
+    const data = await response.json();
+    const text = data?.candidates?.[0]?.content?.parts?.map((part) => part.text || "").join("").trim();
+    if (!text) return localOutput;
+    return { ...localOutput, ...JSON.parse(text), rawTranscript: transcript.trim() };
+  } catch {
+    $("#woyzStatus").textContent = "Could not structure with Gemini; saved transcript for review";
+    return localOutput;
+  }
+}
+
+function applyStructuredOutput(episode, output) {
+  Object.entries(output || {}).forEach(([path, value]) => {
+    if (!path.includes(".") || ["uncertainItems", "corrections", "reviewRequired", "rawTranscript"].includes(path)) return;
+    if (typeof value !== "string" || value === "NIL" || value === "") return;
+    setPathValue(episode, path, value);
+  });
+}
+
 function stageLabel(id) {
   return stages.find((stage) => stage.id === id)?.label || "Registration";
 }
@@ -863,6 +926,19 @@ function escapeAttribute(value) {
 $("#searchInput").addEventListener("input", renderEpisodes);
 $("#mobileModeBtn").addEventListener("click", () => updateMode("mobile"));
 $("#desktopModeBtn").addEventListener("click", () => updateMode("desktop"));
+$("#settingsBtn").addEventListener("click", () => {
+  $("#woyzApiKey").value = localStorage.getItem(geminiKeyStorage) || "";
+  $("#settingsDialog").showModal();
+});
+$("#settingsDialog").addEventListener("close", () => {
+  if ($("#settingsDialog").returnValue === "save") {
+    localStorage.setItem(geminiKeyStorage, $("#woyzApiKey").value.trim());
+  }
+});
+$("#clearApiKeyBtn").addEventListener("click", () => {
+  $("#woyzApiKey").value = "";
+  localStorage.removeItem(geminiKeyStorage);
+});
 
 $("#newEpisodeBtn").addEventListener("click", () => {
   const suffix = String(state.episodes.length + 1).padStart(3, "0");

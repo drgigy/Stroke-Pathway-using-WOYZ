@@ -50,6 +50,12 @@
           </div>
           <button id="exportBtn" class="secondary">Export JSON</button>
           <button id="printBtn" class="secondary desktop-only">Print pathway</button>
+          <button id="settingsBtn" class="icon-button" aria-label="Settings" title="Settings">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z"/>
+              <path d="M19.4 15a1.8 1.8 0 0 0 .36 1.98l.04.04a2.1 2.1 0 0 1-2.97 2.97l-.04-.04A1.8 1.8 0 0 0 14.8 19.6a1.8 1.8 0 0 0-1 .55 1.8 1.8 0 0 0-.52 1.27V21.5a2.1 2.1 0 0 1-4.2 0v-.08a1.8 1.8 0 0 0-.52-1.27 1.8 1.8 0 0 0-1-.55 1.8 1.8 0 0 0-1.98.36l-.04.04a2.1 2.1 0 0 1-2.97-2.97l.04-.04A1.8 1.8 0 0 0 4 15a1.8 1.8 0 0 0-.55-1 1.8 1.8 0 0 0-1.27-.52H2.1a2.1 2.1 0 0 1 0-4.2h.08A1.8 1.8 0 0 0 3.45 8.8 1.8 1.8 0 0 0 4 7.8a1.8 1.8 0 0 0-.36-1.98l-.04-.04a2.1 2.1 0 0 1 2.97-2.97l.04.04A1.8 1.8 0 0 0 8.6 4a1.8 1.8 0 0 0 1-.55 1.8 1.8 0 0 0 .52-1.27V2.1a2.1 2.1 0 0 1 4.2 0v.08a1.8 1.8 0 0 0 .52 1.27 1.8 1.8 0 0 0 1 .55 1.8 1.8 0 0 0 1.98-.36l.04-.04a2.1 2.1 0 0 1 2.97 2.97l-.04.04A1.8 1.8 0 0 0 20 8.6a1.8 1.8 0 0 0 .55 1 1.8 1.8 0 0 0 1.27.52h.08a2.1 2.1 0 0 1 0 4.2h-.08a1.8 1.8 0 0 0-1.27.52 1.8 1.8 0 0 0-.55 1Z"/>
+            </svg>
+          </button>
         </div>
       </header>
 
@@ -95,7 +101,7 @@
   </div>
 
   <div class="woyz-dock" id="woyzDock" aria-live="polite">
-    <div class="woyz-dock-head">
+    <div class="woyz-dock-head" id="woyzDragHandle">
       <div class="woyz-dock-title">Stroke voice segment</div>
       <button class="woyz-close" id="woyzCloseBtn" aria-label="Close voice panel">&times;</button>
     </div>
@@ -113,16 +119,26 @@
       </div>
       <div class="woyz-status" id="woyzStatus">Press play to start recording</div>
       <div class="woyz-transcript" id="woyzTranscript" aria-label="Live transcript"></div>
-      <details class="woyz-prompt-box">
-        <summary>Stage prompt</summary>
-        <pre id="woyzPrompt"></pre>
-      </details>
-      <details class="woyz-prompt-box">
-        <summary>Structured output</summary>
-        <pre id="woyzOutput"></pre>
-      </details>
     </div>
   </div>
+
+  <dialog class="settings-dialog" id="settingsDialog">
+    <form method="dialog" class="settings-panel">
+      <div class="settings-head">
+        <h3>Settings</h3>
+        <button class="icon-button" value="close" aria-label="Close settings">&times;</button>
+      </div>
+      <label class="field">
+        <span>Gemini API key</span>
+        <input id="woyzApiKey" type="password" autocomplete="off" placeholder="Paste API key here">
+      </label>
+      <p class="settings-note">Stored only in this browser. No Firestore is used.</p>
+      <menu>
+        <button id="clearApiKeyBtn" class="secondary" type="button">Clear</button>
+        <button class="primary" value="save">Done</button>
+      </menu>
+    </form>
+  </dialog>
 
   <template id="fieldTemplate">
     <label class="field">
