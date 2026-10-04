@@ -315,7 +315,7 @@ const page = `<!doctype html>
     <span>Private prototype · Saved fields sync across devices in this workspace. Verify clinical entries before use.</span>
     <span id="syncNote"></span>
   </div>
-  <iframe id="workspaceFrame" title="mobile stroke workspace" sandbox="allow-scripts" allow="microphone" referrerpolicy="no-referrer"></iframe>
+  <iframe id="workspaceFrame" title="mobile stroke workspace" sandbox="allow-scripts allow-same-origin" allow="microphone" referrerpolicy="no-referrer"></iframe>
 </div>
 <dialog id="settingsDialog">
   <form method="dialog" class="settings-panel">
