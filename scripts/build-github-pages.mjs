@@ -29,6 +29,7 @@ const sharedCaseControls = `<script>
   let selectedStageIndex=null;
   let selectedStageName='';
   let selectedVoiceKind='stage';
+  let openedDefaultList=false;
   const voiceStages=['Registration','Initial Assessment','Scan','NIH Stroke Scale','Decision','Checklist','IVT','Thrombectomy','Timings','Inpatient review','Discharge','Follow-up'];
   const esc=value=>String(value??'').replace(/[&<>"']/g,match=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[match]));
   function post(message){parent.postMessage({channel:'woyz-case-v1',...message},'*');}
@@ -37,13 +38,13 @@ const sharedCaseControls = `<script>
     if(document.querySelector('#registrationVoiceDock'))return;
     root.style.position='relative';
     const style=document.createElement('style');
-    style.textContent='.registration-voice-dock{display:none;position:absolute;left:14px;top:14px;z-index:999;width:calc(100% - 28px);max-width:340px;min-height:5.7cm;padding:13px 16px;border-radius:18px;background:#1b1b1d;color:#f7f7fb;box-shadow:0 20px 46px rgba(16,24,43,.28);touch-action:none}.registration-voice-dock.visible{display:grid;grid-template-rows:auto 1fr;gap:8px}.registration-voice-head{display:flex;align-items:center;justify-content:space-between;gap:12px;cursor:grab}.registration-voice-title{display:inline-flex;align-items:center;gap:8px;color:#ff514a;font-size:13px;font-weight:800}.registration-voice-title:before{content:"";width:7px;height:7px;border-radius:999px;background:#ff514a;box-shadow:0 0 0 4px rgba(255,81,74,.1)}.registration-voice-close{width:28px;height:28px;border:0;border-radius:8px;background:#2f2f32;color:#f7f7fb;font-size:18px;line-height:1;cursor:pointer}.registration-voice-body{display:grid;grid-template-rows:auto auto auto auto;justify-items:center;align-content:center;gap:12px}.registration-voice-level{width:76%;height:34px;display:grid;grid-template-columns:repeat(28,1fr);gap:3px;align-items:end}.registration-voice-level span{height:4px;border-radius:999px 999px 3px 3px;background:rgba(255,81,74,.18);opacity:.45;transition:height .06s linear,background .06s linear,opacity .06s linear}.registration-voice-level span.active{background:#ff514a;opacity:1}.registration-voice-timer{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:34px;line-height:1;font-weight:800;letter-spacing:0}.registration-voice-actions{display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap}.registration-voice-action{min-height:38px;border:0;border-radius:999px;color:#fff;background:#2f2f32;padding:0 13px;display:grid;place-items:center;box-shadow:0 12px 26px rgba(0,0,0,.22);font-weight:900;font-size:12px;white-space:nowrap}.registration-voice-action.start{background:#ff514a}.registration-voice-action.stop{background:#ff514a;color:#fff;min-width:132px}.registration-voice-action:disabled{opacity:.38;cursor:not-allowed}.registration-voice-status{width:100%;min-height:18px;color:#c9c9cf;text-align:center;font-size:12px;font-weight:750}.woyz-guide-value{display:block;margin-top:8px;color:#10271f;font-weight:900}.woyz-guide-value.empty{color:#91a098;font-weight:700}';
+    style.textContent='.registration-voice-dock{display:none;position:absolute;left:14px;top:14px;z-index:999;width:calc(100% - 28px);max-width:none;min-height:232px;padding:22px 24px 28px;border-radius:26px;background:#1b1b1d;color:#f7f7fb;box-shadow:0 24px 56px rgba(16,24,43,.24);touch-action:none}.registration-voice-dock.visible{display:grid;grid-template-rows:auto 1fr;gap:12px}.registration-voice-head{display:flex;align-items:center;justify-content:space-between;gap:12px;cursor:grab}.registration-voice-title{display:inline-flex;align-items:center;gap:12px;color:#ff514a;font-size:22px;font-weight:900;letter-spacing:0}.registration-voice-title:before{content:"";width:12px;height:12px;border-radius:999px;background:#ff514a;box-shadow:0 0 0 8px rgba(255,81,74,.12)}.registration-voice-close{width:28px;height:28px;border:0;border-radius:999px;background:transparent;color:#76767d;font-size:18px;line-height:1;cursor:pointer}.registration-voice-close:hover{background:#2f2f32;color:#fff}.registration-voice-body{display:grid;grid-template-rows:auto auto auto auto;justify-items:center;align-content:center;gap:14px}.registration-voice-level{width:78%;height:28px;display:grid;grid-template-columns:repeat(28,1fr);gap:6px;align-items:end}.registration-voice-level span{height:7px;border-radius:999px 999px 3px 3px;background:rgba(255,81,74,.18);opacity:.75;transition:height .06s linear,background .06s linear,opacity .06s linear}.registration-voice-level span.active{background:#ff514a;opacity:1}.registration-voice-timer{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:56px;line-height:1;font-weight:900;letter-spacing:0;color:#f7f7fb}.registration-voice-actions{display:flex;align-items:center;justify-content:center;gap:20px;flex-wrap:nowrap}.registration-voice-action{width:86px;height:86px;border:0;border-radius:999px;color:#fff;background:#303033;padding:0;display:none;place-items:center;box-shadow:0 18px 36px rgba(0,0,0,.24);font-weight:900;font-size:28px;white-space:nowrap}.registration-voice-action.start{display:grid;width:92px;height:92px;background:#ff514a;color:white;font-size:0}.registration-voice-action.start:before{content:"🎙";font-size:42px;line-height:1}.registration-voice-action.pause,.registration-voice-action.resume{background:#f7f7fb;color:#1b1b1d;font-size:0}.registration-voice-action.pause:before{content:"Ⅱ";font-size:38px;letter-spacing:-8px}.registration-voice-action.resume:before{content:"▶";font-size:34px}.registration-voice-action.extend{background:#303033;color:#f7f7fb}.registration-voice-action.stop{background:#303033;color:#ff514a;font-size:0}.registration-voice-action.stop:before{content:"■";font-size:34px;line-height:1}.registration-voice-dock.recording .registration-voice-action.start{display:none}.registration-voice-dock.recording .registration-voice-action.pause,.registration-voice-dock.recording .registration-voice-action.extend,.registration-voice-dock.recording .registration-voice-action.stop{display:grid}.registration-voice-dock.paused .registration-voice-action.pause{display:none}.registration-voice-dock.paused .registration-voice-action.resume{display:grid}.registration-voice-action:disabled{opacity:.45;cursor:not-allowed}.registration-voice-status{width:100%;min-height:22px;color:#d7d7dd;text-align:center;font-size:20px;font-weight:850}.woyz-guide-value{display:block;margin-top:8px;color:#10271f;font-weight:900}.woyz-guide-value.empty{color:#91a098;font-weight:700}';
     document.head.append(style);
     const dock=document.createElement('div');
     dock.id='registrationVoiceDock';
     dock.className='registration-voice-dock';
     dock.setAttribute('aria-live','polite');
-    dock.innerHTML='<div class="registration-voice-head" id="registrationVoiceHead"><div class="registration-voice-title">Patient registration</div><button class="registration-voice-close" id="registrationVoiceClose" aria-label="Close voice panel" type="button">&times;</button></div><div class="registration-voice-body"><div class="registration-voice-level" id="registrationVoiceLevel" aria-label="Voice activity"></div><div class="registration-voice-timer" id="registrationVoiceTimer">05:00</div><div class="registration-voice-actions"><button class="registration-voice-action start" id="registrationVoiceStart" type="button">Start</button><button class="registration-voice-action" id="registrationVoicePause" type="button" disabled>Pause</button><button class="registration-voice-action" id="registrationVoiceResume" type="button" disabled>Resume</button><button class="registration-voice-action" id="registrationVoiceExtend" type="button">+5 min</button><button class="registration-voice-action stop" id="registrationVoiceStop" type="button" disabled>Stop & transcribe</button></div><div class="registration-voice-status" id="registrationVoiceStatus">Open, then start recording registration</div></div>';
+    dock.innerHTML='<div class="registration-voice-head" id="registrationVoiceHead"><div class="registration-voice-title">Voice note draft</div><button class="registration-voice-close" id="registrationVoiceClose" aria-label="Close voice panel" type="button">&times;</button></div><div class="registration-voice-body"><div class="registration-voice-level" id="registrationVoiceLevel" aria-label="Voice activity"></div><div class="registration-voice-timer" id="registrationVoiceTimer">05:00</div><div class="registration-voice-actions"><button class="registration-voice-action start" id="registrationVoiceStart" aria-label="Start recording" type="button">Start</button><button class="registration-voice-action pause" id="registrationVoicePause" aria-label="Pause recording" type="button" disabled>Pause</button><button class="registration-voice-action resume" id="registrationVoiceResume" aria-label="Resume recording" type="button" disabled>Resume</button><button class="registration-voice-action extend" id="registrationVoiceExtend" aria-label="Extend five minutes" type="button">+5</button><button class="registration-voice-action stop" id="registrationVoiceStop" aria-label="Stop and transcribe" type="button" disabled>Stop & transcribe</button></div><div class="registration-voice-status" id="registrationVoiceStatus">Ready to record new voice note</div></div>';
     root.append(dock);
     voiceState.dock=dock;voiceState.status=dock.querySelector('#registrationVoiceStatus');voiceState.start=dock.querySelector('#registrationVoiceStart');voiceState.pause=dock.querySelector('#registrationVoicePause');voiceState.resume=dock.querySelector('#registrationVoiceResume');voiceState.extend=dock.querySelector('#registrationVoiceExtend');voiceState.stop=dock.querySelector('#registrationVoiceStop');voiceState.level=dock.querySelector('#registrationVoiceLevel');
     voiceState.bars=Array.from({length:28},()=>{const bar=document.createElement('span');voiceState.level.append(bar);return bar;});
@@ -67,10 +68,10 @@ const sharedCaseControls = `<script>
     selectedStageName=stage.name;
     selectedVoiceKind=stage.kind||'stage';
     const title=voiceState.dock?.querySelector('.registration-voice-title');
-    if(title)title.textContent=selectedStageName;
+    if(title)title.textContent='Voice note draft';
     voiceState.dock?.classList.add('visible');
     requestAnimationFrame(positionVoiceDockInsideMobile);
-    setVoiceStatus('Ready for '+selectedStageName);
+    setVoiceStatus('Ready to record new voice note');
   }
   function closeVoiceDock(){
     if(voiceState.recording&&voiceState.recorder&&voiceState.recorder.state!=='inactive'){
@@ -90,6 +91,8 @@ const sharedCaseControls = `<script>
   }
   function updateVoiceButtons(){
     if(!voiceState.start)return;
+    voiceState.dock?.classList.toggle('recording',voiceState.recording);
+    voiceState.dock?.classList.toggle('paused',voiceState.recording&&voiceState.paused);
     voiceState.start.disabled=voiceState.recording;
     voiceState.pause.disabled=!voiceState.recording||voiceState.paused;
     voiceState.resume.disabled=!voiceState.recording||!voiceState.paused;
@@ -130,7 +133,7 @@ const sharedCaseControls = `<script>
       clearInterval(voiceState.timer);
       voiceState.timer=setInterval(()=>{if(!voiceState.paused){voiceState.remaining=Math.max(0,voiceState.remaining-1);setVoiceTimer();if(voiceState.remaining===0)finishVoiceRecording();}},1000);
       setVoiceTimer();
-      setVoiceStatus('Recording registration');
+      setVoiceStatus('Recording in progress...');
     }catch(error){setVoiceStatus(error.message||'Microphone permission was not granted');}
   }
   function pauseVoiceRecording(){
@@ -145,7 +148,7 @@ const sharedCaseControls = `<script>
     voiceState.recorder.resume();
     voiceState.paused=false;
     updateVoiceButtons();
-    setVoiceStatus('Recording registration');
+    setVoiceStatus('Recording in progress...');
   }
   function extendVoiceRecording(){
     voiceState.remaining+=300;
@@ -200,6 +203,13 @@ const sharedCaseControls = `<script>
     button.style.cssText='width:100%;margin:10px 0 4px;padding:12px;border:0;border-radius:8px;background:#0f8a5f;color:white;font-weight:800';
     list.before(button);
   }
+  function openPatientListByDefault(){
+    if(openedDefaultList)return;
+    const button=root.querySelector('#mh-list');
+    if(!button)return;
+    openedDefaultList=true;
+    button.click();
+  }
   function currentStageFromContent(){
     const heading=root.querySelector('#mh-content h2')?.textContent?.trim()||'';
     if(heading==='All 24 KPIs')return {index:100,name:'KPI missing details',kind:'kpi'};
@@ -214,7 +224,7 @@ const sharedCaseControls = `<script>
       selectedStageName=stage.name;
       selectedVoiceKind=stage.kind||'stage';
       const title=root.querySelector('.registration-voice-title');
-      if(title)title.textContent=stage.name;
+      if(title)title.textContent='Voice note draft';
       return;
     }
     selectedStageIndex=null;
@@ -311,12 +321,14 @@ const sharedCaseControls = `<script>
     if(event.data.type==='voiceRegistrationSaved'){setVoiceStatus('Saved to Firestore');setTimeout(closeVoiceDock,450);}
     if(event.data.type==='voiceRegistrationError')setVoiceStatus(event.data.error||'Voice registration failed');
     setTimeout(()=>{renderMobileCases();renderDesktopCases();renderCaseIdentity();renderRegistrationValues();replaceRecorderCopy();updateVoiceAvailability();},0);
+    setTimeout(openPatientListByDefault,80);
   });
   ensureMobileControls();
   ensureVoicePlugin();
   renderCaseIdentity();
   replaceRecorderCopy();
   updateVoiceAvailability();
+  setTimeout(openPatientListByDefault,250);
   setInterval(()=>{renderMobileCases();renderCaseIdentity();renderRegistrationValues();replaceRecorderCopy();updateVoiceAvailability();},1000);
 })();
 </script>`;
@@ -425,8 +437,8 @@ const geminiKeyInput=document.getElementById("geminiKey");
 const geminiStoreKey="woyz-stroke-gemini-key";
 const defaultWorkspaceId="WOYZ-STROKE-SHARED";
 let mode=location.pathname.endsWith("/admin")||location.hash==="#admin"?"desktop":"mobile";
-let caseId="ST-024";
 let workspaceId=initialWorkspaceId();
+let caseId=initialCaseId();
 let currentUser=null;
 let unsubscribeCase=null;
 let unsubscribeList=null;
@@ -437,7 +449,9 @@ let saving=false;
 function nowText(){return new Date().toLocaleTimeString();}
 function randomId(prefix){const bytes=new Uint8Array(12);crypto.getRandomValues(bytes);return prefix+Array.from(bytes,b=>b.toString(36).padStart(2,"0")).join("").slice(0,22);}
 function cleanId(value,fallback){return String(value||fallback).replace(/[^A-Za-z0-9_-]/g,"-").slice(0,64);}
-function initialWorkspaceId(){const url=new URL(location.href);let id=cleanId(url.searchParams.get("w"),"");if(id.length<16||id.startsWith("WS-")){id=defaultWorkspaceId;url.searchParams.set("w",id);history.replaceState(null,"",url.pathname+"?"+url.searchParams.toString()+url.hash);}return id;}
+function writeUrlState(){const url=new URL(location.href);url.searchParams.set("w",defaultWorkspaceId);url.searchParams.set("c",caseId);history.replaceState(null,"",url.pathname+"?"+url.searchParams.toString()+url.hash);}
+function initialWorkspaceId(){const url=new URL(location.href);if(url.searchParams.get("w")!==defaultWorkspaceId){url.searchParams.set("w",defaultWorkspaceId);history.replaceState(null,"",url.pathname+"?"+url.searchParams.toString()+url.hash);}return defaultWorkspaceId;}
+function initialCaseId(){const url=new URL(location.href);const id=cleanId(url.searchParams.get("c"),"ST-024");return id.startsWith("ST-")?id:"ST-024";}
 function caseCollection(){return collection(db,"strokeWorkspaces",workspaceId,"strokeCases");}
 function ref(){return doc(db,"strokeWorkspaces",workspaceId,"strokeCases",caseId);}
 function cleanSnapshot(raw){return {data:{...(raw?.data||{})},version:Number(raw?.version||0),updatedAt:raw?.updatedAt||null,updatedAtText:raw?.updatedAtText||null};}
@@ -452,9 +466,9 @@ function renderFrame(){frame.srcdoc=mode==="desktop"?desktopDocument:mobileDocum
 function switchMode(next){if(next===mode)return;if(!confirm("Switch views? Save any open draft first. Unsaved text will be discarded."))return;mode=next;history.replaceState(null,"",next==="desktop"?"#admin":"#mobile");renderFrame();setTimeout(()=>sendSnapshot(),150);}
 function newCaseId(){const stamp=new Date().toISOString().replace(/[-:TZ.]/g,"").slice(0,14);return "ST-"+stamp+"-"+Math.random().toString(36).slice(2,6).toUpperCase();}
 function connect(){if(unsubscribeCase){unsubscribeCase();unsubscribeCase=null;}document.getElementById("caseTitle").textContent="WOYZ · Case "+caseId;if(!currentUser){setStatus("Creating user…");sendSnapshot();return;}setStatus("Connecting…");unsubscribeCase=onSnapshot(ref(),docSnap=>{if(docSnap.exists()){writeSnapshot(docSnap.data());setStatus(snapshot.version?"Synced · v"+snapshot.version:"Firestore ready");}else{writeSnapshot({data:{},version:0,updatedAt:null});setStatus("Firestore ready");}sendSnapshot();},error=>{setStatus("Firestore unavailable",true,error.code||error.message);sendSnapshot();});}
-function connectList(){if(unsubscribeList){unsubscribeList();unsubscribeList=null;}if(!currentUser)return;unsubscribeList=onSnapshot(caseCollection(),listSnap=>{cases=listSnap.docs.map(item=>({id:item.id,...cleanSnapshot(item.data())})).sort((a,b)=>String(b.updatedAtText||"").localeCompare(String(a.updatedAtText||"")));if(cases.length&&!cases.some(item=>item.id===caseId)){caseId=cases[0].id;connect();}sendSnapshot();},error=>{setStatus("Case list unavailable",true,error.code||error.message);sendSnapshot();});}
-async function createCase(){if(!currentUser){post({type:"error",error:"Firestore user is not ready yet. Retry in a moment."});return;}if(saving)return;const nextId=newCaseId();saving=true;setStatus("Creating patient…");try{await runTransaction(db,async tx=>{tx.set(doc(db,"strokeWorkspaces",workspaceId,"strokeCases",nextId),{sharedApp:"woyz-stroke",createdByUid:currentUser.uid,updatedByUid:currentUser.uid,episode:nextId,data:{},version:0,createdAt:serverTimestamp(),updatedAt:serverTimestamp(),updatedAtText:new Date().toISOString(),mutationId:crypto.randomUUID()});});caseId=nextId;writeSnapshot({data:{},version:0,updatedAt:null,updatedAtText:new Date().toISOString()});rememberCurrentCase();connect();sendSnapshot("created");}catch(error){setStatus("Not created",true,error.code||error.message);post({type:"error",error:error.message||"Create patient failed"});}finally{saving=false;}}
-function selectCase(nextId){const cleaned=String(nextId||"").replace(/[^A-Za-z0-9_-]/g,"-");if(!cleaned||cleaned===caseId)return;caseId=cleaned;writeSnapshot({data:{},version:0,updatedAt:null});connect();}
+function connectList(){if(unsubscribeList){unsubscribeList();unsubscribeList=null;}if(!currentUser)return;unsubscribeList=onSnapshot(caseCollection(),listSnap=>{cases=listSnap.docs.map(item=>({id:item.id,...cleanSnapshot(item.data())})).sort((a,b)=>String(b.updatedAtText||"").localeCompare(String(a.updatedAtText||"")));if(cases.length&&!cases.some(item=>item.id===caseId)){caseId=cases[0].id;writeUrlState();connect();}sendSnapshot();},error=>{setStatus("Case list unavailable",true,error.code||error.message);sendSnapshot();});}
+async function createCase(){if(!currentUser){post({type:"error",error:"Firestore user is not ready yet. Retry in a moment."});return;}if(saving)return;const nextId=newCaseId();saving=true;setStatus("Creating patient…");try{await runTransaction(db,async tx=>{tx.set(doc(db,"strokeWorkspaces",workspaceId,"strokeCases",nextId),{sharedApp:"woyz-stroke",createdByUid:currentUser.uid,updatedByUid:currentUser.uid,episode:nextId,data:{},version:0,createdAt:serverTimestamp(),updatedAt:serverTimestamp(),updatedAtText:new Date().toISOString(),mutationId:crypto.randomUUID()});});caseId=nextId;writeUrlState();writeSnapshot({data:{},version:0,updatedAt:null,updatedAtText:new Date().toISOString()});rememberCurrentCase();connect();sendSnapshot("created");}catch(error){setStatus("Not created",true,error.code||error.message);post({type:"error",error:error.message||"Create patient failed"});}finally{saving=false;}}
+function selectCase(nextId){const cleaned=String(nextId||"").replace(/[^A-Za-z0-9_-]/g,"-");if(!cleaned||cleaned===caseId)return;caseId=cleaned;writeUrlState();writeSnapshot({data:{},version:0,updatedAt:null});connect();}
 async function saveField(message){if(!currentUser){setStatus("Creating user…",true,"Firestore user is not ready yet");post({type:"error",error:"Firestore user is not ready yet. Retry in a moment."});return;}if(saving)return;saving=true;setStatus("Saving…");try{let result=null;await runTransaction(db,async tx=>{const snap=await tx.get(ref());const current=snap.exists()?cleanSnapshot(snap.data()):{data:{},version:0};if(current.version!==message.version){result={conflict:true,...current};return;}const next={sharedApp:"woyz-stroke",data:{...current.data,[message.key]:message.value},version:current.version+1,createdByUid:snap.data()?.createdByUid||currentUser.uid,updatedByUid:currentUser.uid,episode:caseId,updatedAt:serverTimestamp(),updatedAtText:new Date().toISOString(),mutationId:message.mutationId};tx.set(ref(),next,{merge:true});result={conflict:false,...next,updatedAt:null};});if(result?.conflict){writeSnapshot(result);setStatus("Conflict",true,"Review retained draft");post({type:"conflict",key:message.key,error:"Another device saved changes. Your draft is retained; compare it with the latest value before saving again.",...snapshot});}else{writeSnapshot(result);rememberCurrentCase();setStatus("Synced · v"+snapshot.version);post({type:"saved",key:message.key,...snapshot,caseId,cases:visibleCaseLabels()});}}catch(error){setStatus("Not saved",true,error.code||error.message);post({type:"error",error:error.message||"Save failed"});}finally{saving=false;}}
 async function savePatch(patch,mutationId){if(!currentUser){post({type:"voiceRegistrationError",error:"Firestore user is not ready yet. Retry in a moment."});return;}if(saving){post({type:"voiceRegistrationError",error:"Another save is running. Retry in a moment."});return;}saving=true;setStatus("Saving registration…");try{let result=null;await runTransaction(db,async tx=>{const snap=await tx.get(ref());const current=snap.exists()?cleanSnapshot(snap.data()):{data:{},version:0};const next={sharedApp:"woyz-stroke",data:{...current.data,...patch},version:current.version+1,createdByUid:snap.data()?.createdByUid||currentUser.uid,updatedByUid:currentUser.uid,episode:caseId,updatedAt:serverTimestamp(),updatedAtText:new Date().toISOString(),mutationId};tx.set(ref(),next,{merge:true});result={...next,updatedAt:null};});writeSnapshot(result);rememberCurrentCase();setStatus("Synced · v"+snapshot.version);post({type:"voiceRegistrationSaved",patch,...snapshot,caseId,cases:visibleCaseLabels()});}catch(error){setStatus("Registration not saved",true,error.code||error.message);post({type:"voiceRegistrationError",error:error.message||"Registration save failed"});}finally{saving=false;}}
 function cleanGeminiText(value){const fence=String.fromCharCode(96)+String.fromCharCode(96)+String.fromCharCode(96);return String(value??"").replace(new RegExp("^"+fence+"(?:json)?","i"),"").replace(new RegExp(fence+"$"),"").trim();}
@@ -498,8 +512,8 @@ async function generateRegistrationFromAudio(message){
 window.addEventListener("message",event=>{if(event.source!==frame.contentWindow||event.data?.channel!=="woyz-case-v1")return;const message=event.data;if(message.type==="ready")sendSnapshot();if(message.type==="save")saveField(message);if(message.type==="createCase")createCase();if(message.type==="selectCase")selectCase(message.caseId);if(message.type==="voiceRegistration")generateRegistrationFromAudio(message);});
 mobileBtn.addEventListener("click",()=>switchMode("mobile"));
 desktopBtn.addEventListener("click",()=>switchMode("desktop"));
-document.getElementById("settingsBtn").addEventListener("click",()=>{caseDocId.value=caseId;workspaceCodeInput.value=workspaceId;geminiKeyInput.value=localStorage.getItem(geminiStoreKey)||"";settingsDialog.showModal();});
-settingsDialog.addEventListener("close",()=>{if(settingsDialog.returnValue!=="save")return;caseId=cleanId(caseDocId.value.trim(),"ST-024");const nextWorkspace=cleanId(workspaceCodeInput.value.trim(),workspaceId);if(nextWorkspace.length>=16&&nextWorkspace!==workspaceId){workspaceId=nextWorkspace;const url=new URL(location.href);url.searchParams.set("w",workspaceId);history.replaceState(null,"",url.pathname+"?"+url.searchParams.toString()+url.hash);cases=[];writeSnapshot({data:{},version:0,updatedAt:null});connectList();}localStorage.setItem(geminiStoreKey,geminiKeyInput.value.trim());connect();});
+document.getElementById("settingsBtn").addEventListener("click",()=>{caseDocId.value=caseId;workspaceCodeInput.value=defaultWorkspaceId;geminiKeyInput.value=localStorage.getItem(geminiStoreKey)||"";settingsDialog.showModal();});
+settingsDialog.addEventListener("close",()=>{if(settingsDialog.returnValue!=="save")return;caseId=cleanId(caseDocId.value.trim(),"ST-024");workspaceId=defaultWorkspaceId;workspaceCodeInput.value=defaultWorkspaceId;writeUrlState();localStorage.setItem(geminiStoreKey,geminiKeyInput.value.trim());connectList();connect();});
 document.getElementById("clearGeminiBtn").addEventListener("click",()=>{geminiKeyInput.value="";localStorage.removeItem(geminiStoreKey);});
 onAuthStateChanged(auth,user=>{currentUser=user;if(user){connectList();connect();return;}setStatus("Creating user…");signInAnonymously(auth).catch(error=>{setStatus("Auth setup needed",true,error.code||error.message);sendSnapshot();});});
 renderFrame();
