@@ -32,16 +32,10 @@ const sharedCaseControls = `<script>
   function post(message){parent.postMessage({channel:'woyz-case-v1',...message},'*');}
   const voiceState={recorder:null,stream:null,context:null,analyser:null,source:null,chunks:[],bars:[],raf:0,remaining:300,timer:0,recording:false,paused:false,dock:null,status:null,start:null,pause:null,resume:null,extend:null,stop:null,level:null};
   function ensureVoicePlugin(){
-    if(root.querySelector('#registration-voice-plugin'))return;
+    if(document.querySelector('#registrationVoiceDock'))return;
     const style=document.createElement('style');
-    style.textContent='.registration-voice{display:none;align-items:center;gap:10px;margin:12px 16px 0}.registration-voice.visible{display:flex}.registration-voice-btn{display:inline-flex;align-items:center;gap:10px;border:0;border-radius:999px;background:#1b1b1d;color:#fff;padding:8px 18px;font:800 18px/1 system-ui;box-shadow:0 0 0 4px #ff514a}.registration-voice-dot{width:18px;height:18px;border-radius:999px;background:#ff514a;box-shadow:0 0 0 5px rgba(255,81,74,.22)}.registration-voice small{color:#5d7067;font-weight:750}.registration-voice-dock{display:none;position:fixed;left:18px;bottom:22px;z-index:999;width:min(9cm,calc(100vw - 28px));min-height:5.7cm;padding:13px 16px;border-radius:18px;background:#1b1b1d;color:#f7f7fb;box-shadow:0 20px 46px rgba(16,24,43,.28);touch-action:none}.registration-voice-dock.visible{display:grid;grid-template-rows:auto 1fr;gap:8px}.registration-voice-head{display:flex;align-items:center;justify-content:space-between;gap:12px;cursor:grab}.registration-voice-title{display:inline-flex;align-items:center;gap:8px;color:#ff514a;font-size:13px;font-weight:800}.registration-voice-title:before{content:"";width:7px;height:7px;border-radius:999px;background:#ff514a;box-shadow:0 0 0 4px rgba(255,81,74,.1)}.registration-voice-close{width:28px;height:28px;border:0;border-radius:8px;background:#2f2f32;color:#f7f7fb;font-size:18px;line-height:1}.registration-voice-body{display:grid;grid-template-rows:auto auto auto auto;justify-items:center;align-content:center;gap:12px}.registration-voice-level{width:76%;height:34px;display:grid;grid-template-columns:repeat(28,1fr);gap:3px;align-items:end}.registration-voice-level span{height:4px;border-radius:999px 999px 3px 3px;background:rgba(255,81,74,.18);opacity:.45;transition:height .06s linear,background .06s linear,opacity .06s linear}.registration-voice-level span.active{background:#ff514a;opacity:1}.registration-voice-timer{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:34px;line-height:1;font-weight:800;letter-spacing:0}.registration-voice-actions{display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap}.registration-voice-action{min-height:38px;border:0;border-radius:999px;color:#fff;background:#2f2f32;padding:0 13px;display:grid;place-items:center;box-shadow:0 12px 26px rgba(0,0,0,.22);font-weight:900;font-size:12px;white-space:nowrap}.registration-voice-action.start{background:#ff514a}.registration-voice-action.stop{background:#ff514a;color:#fff;min-width:132px}.registration-voice-action:disabled{opacity:.38;cursor:not-allowed}.registration-voice-status{width:100%;min-height:18px;color:#c9c9cf;text-align:center;font-size:12px;font-weight:750}';
+    style.textContent='.registration-voice-dock{display:none;position:fixed;left:18px;bottom:22px;z-index:999;width:min(9cm,calc(100vw - 28px));min-height:5.7cm;padding:13px 16px;border-radius:18px;background:#1b1b1d;color:#f7f7fb;box-shadow:0 20px 46px rgba(16,24,43,.28);touch-action:none}.registration-voice-dock.visible{display:grid;grid-template-rows:auto 1fr;gap:8px}.registration-voice-head{display:flex;align-items:center;justify-content:space-between;gap:12px;cursor:grab}.registration-voice-title{display:inline-flex;align-items:center;gap:8px;color:#ff514a;font-size:13px;font-weight:800}.registration-voice-title:before{content:"";width:7px;height:7px;border-radius:999px;background:#ff514a;box-shadow:0 0 0 4px rgba(255,81,74,.1)}.registration-voice-close{width:28px;height:28px;border:0;border-radius:8px;background:#2f2f32;color:#f7f7fb;font-size:18px;line-height:1}.registration-voice-body{display:grid;grid-template-rows:auto auto auto auto;justify-items:center;align-content:center;gap:12px}.registration-voice-level{width:76%;height:34px;display:grid;grid-template-columns:repeat(28,1fr);gap:3px;align-items:end}.registration-voice-level span{height:4px;border-radius:999px 999px 3px 3px;background:rgba(255,81,74,.18);opacity:.45;transition:height .06s linear,background .06s linear,opacity .06s linear}.registration-voice-level span.active{background:#ff514a;opacity:1}.registration-voice-timer{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:34px;line-height:1;font-weight:800;letter-spacing:0}.registration-voice-actions{display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap}.registration-voice-action{min-height:38px;border:0;border-radius:999px;color:#fff;background:#2f2f32;padding:0 13px;display:grid;place-items:center;box-shadow:0 12px 26px rgba(0,0,0,.22);font-weight:900;font-size:12px;white-space:nowrap}.registration-voice-action.start{background:#ff514a}.registration-voice-action.stop{background:#ff514a;color:#fff;min-width:132px}.registration-voice-action:disabled{opacity:.38;cursor:not-allowed}.registration-voice-status{width:100%;min-height:18px;color:#c9c9cf;text-align:center;font-size:12px;font-weight:750}';
     document.head.append(style);
-    const row=document.createElement('div');
-    row.id='registration-voice-plugin';
-    row.className='registration-voice';
-    row.innerHTML='<button id="registrationVoiceOpen" class="registration-voice-btn" type="button" aria-label="Start WOYZ voice plugin"><span class="registration-voice-dot"></span><span>Start WOYZ</span></button><small id="registrationVoiceScope">Select a pathway section</small>';
-    const editor=root.querySelector('.shared-editor');
-    if(editor)editor.before(row);else root.querySelector('header')?.after(row);
     const dock=document.createElement('div');
     dock.id='registrationVoiceDock';
     dock.className='registration-voice-dock';
@@ -50,7 +44,6 @@ const sharedCaseControls = `<script>
     document.body.append(dock);
     voiceState.dock=dock;voiceState.status=dock.querySelector('#registrationVoiceStatus');voiceState.start=dock.querySelector('#registrationVoiceStart');voiceState.pause=dock.querySelector('#registrationVoicePause');voiceState.resume=dock.querySelector('#registrationVoiceResume');voiceState.extend=dock.querySelector('#registrationVoiceExtend');voiceState.stop=dock.querySelector('#registrationVoiceStop');voiceState.level=dock.querySelector('#registrationVoiceLevel');
     voiceState.bars=Array.from({length:28},()=>{const bar=document.createElement('span');voiceState.level.append(bar);return bar;});
-    row.querySelector('#registrationVoiceOpen').addEventListener('click',()=>{if(selectedStageIndex==null){setVoiceStatus('Select a pathway section first');return;}const title=dock.querySelector('.registration-voice-title');if(title)title.textContent=selectedStageName;dock.classList.add('visible');setVoiceStatus('Ready for '+selectedStageName);});
     dock.querySelector('#registrationVoiceClose').addEventListener('click',()=>dock.classList.remove('visible'));
     voiceState.start.addEventListener('click',startVoiceRecording);
     voiceState.pause.addEventListener('click',pauseVoiceRecording);
@@ -59,6 +52,17 @@ const sharedCaseControls = `<script>
     voiceState.stop.addEventListener('click',finishVoiceRecording);
     makeVoiceDockMovable(dock,dock.querySelector('#registrationVoiceHead'));
     drawVoiceBars();
+  }
+  function openVoiceDockForStage(){
+    ensureVoicePlugin();
+    const stage=currentStageFromContent();
+    if(!stage){setVoiceStatus('Select a pathway section first');return;}
+    selectedStageIndex=stage.index;
+    selectedStageName=stage.name;
+    const title=voiceState.dock?.querySelector('.registration-voice-title');
+    if(title)title.textContent=selectedStageName;
+    voiceState.dock?.classList.add('visible');
+    setVoiceStatus('Ready for '+selectedStageName);
   }
   function setVoiceStatus(text){if(voiceState.status)voiceState.status.textContent=text;}
   function setVoiceTimer(){
@@ -178,21 +182,16 @@ const sharedCaseControls = `<script>
   }
   function updateVoiceAvailability(){
     ensureVoicePlugin();
-    const row=root.querySelector('#registration-voice-plugin');
-    const scope=root.querySelector('#registrationVoiceScope');
     const stage=currentStageFromContent();
     if(stage){
       selectedStageIndex=stage.index;
       selectedStageName=stage.name;
-      row?.classList.add('visible');
-      if(scope)scope.textContent=stage.name+' voice';
       const title=root.querySelector('.registration-voice-title');
       if(title)title.textContent=stage.name;
       return;
     }
     selectedStageIndex=null;
     selectedStageName='';
-    row?.classList.remove('visible');
     voiceState.dock?.classList.remove('visible');
   }
   function renderMobileCases(){
@@ -227,6 +226,8 @@ const sharedCaseControls = `<script>
     }
   }
   root.addEventListener('click',event=>{
+    const recorder=event.target.closest?.('#mh-record');
+    if(recorder){event.preventDefault();event.stopImmediatePropagation();setTimeout(openVoiceDockForStage,0);return;}
     const create=event.target.closest?.('#mh-new-firestore');
     if(create){event.preventDefault();event.stopImmediatePropagation();post({type:'createCase'});return;}
     const select=event.target.closest?.('[data-firestore-case]');
