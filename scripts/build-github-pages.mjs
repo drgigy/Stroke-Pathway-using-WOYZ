@@ -25,18 +25,21 @@ const sharedCaseControls = `<script>
   if(!root)return;
   let caseId='ST-024';
   let cases=[];
+  let selectedStageIndex=null;
+  let selectedStageName='';
+  const voiceStages=['Registration','Initial Assessment','Scan','NIH Stroke Scale','Decision','Checklist','IVT','Thrombectomy','Timings','Inpatient review','Discharge','Follow-up'];
   const esc=value=>String(value??'').replace(/[&<>"']/g,match=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[match]));
   function post(message){parent.postMessage({channel:'woyz-case-v1',...message},'*');}
   const voiceState={recorder:null,stream:null,context:null,analyser:null,source:null,chunks:[],bars:[],raf:0,remaining:300,timer:0,recording:false,paused:false,dock:null,status:null,start:null,pause:null,resume:null,extend:null,stop:null,level:null};
   function ensureVoicePlugin(){
     if(root.querySelector('#registration-voice-plugin'))return;
     const style=document.createElement('style');
-    style.textContent='.registration-voice{display:flex;align-items:center;gap:10px;margin:12px 16px 0}.registration-voice-btn{display:inline-flex;align-items:center;gap:10px;border:0;border-radius:999px;background:#1b1b1d;color:#fff;padding:8px 18px;font:800 20px/1 system-ui;box-shadow:0 0 0 4px #ff514a}.registration-voice-dot{width:18px;height:18px;border-radius:999px;background:#ff514a;box-shadow:0 0 0 5px rgba(255,81,74,.22)}.registration-voice small{color:#5d7067;font-weight:750}.registration-voice-dock{display:none;position:fixed;left:18px;bottom:22px;z-index:999;width:min(9cm,calc(100vw - 28px));min-height:5.7cm;padding:13px 16px;border-radius:18px;background:#1b1b1d;color:#f7f7fb;box-shadow:0 20px 46px rgba(16,24,43,.28);touch-action:none}.registration-voice-dock.visible{display:grid;grid-template-rows:auto 1fr;gap:8px}.registration-voice-head{display:flex;align-items:center;justify-content:space-between;gap:12px;cursor:grab}.registration-voice-title{display:inline-flex;align-items:center;gap:8px;color:#ff514a;font-size:13px;font-weight:800}.registration-voice-title:before{content:"";width:7px;height:7px;border-radius:999px;background:#ff514a;box-shadow:0 0 0 4px rgba(255,81,74,.1)}.registration-voice-close{width:28px;height:28px;border:0;border-radius:8px;background:#2f2f32;color:#f7f7fb;font-size:18px;line-height:1}.registration-voice-body{display:grid;grid-template-rows:auto auto auto auto;justify-items:center;align-content:center;gap:12px}.registration-voice-level{width:76%;height:34px;display:grid;grid-template-columns:repeat(28,1fr);gap:3px;align-items:end}.registration-voice-level span{height:4px;border-radius:999px 999px 3px 3px;background:rgba(255,81,74,.18);opacity:.45;transition:height .06s linear,background .06s linear,opacity .06s linear}.registration-voice-level span.active{background:#ff514a;opacity:1}.registration-voice-timer{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:34px;line-height:1;font-weight:800;letter-spacing:0}.registration-voice-actions{display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap}.registration-voice-action{min-height:38px;border:0;border-radius:999px;color:#fff;background:#2f2f32;padding:0 13px;display:grid;place-items:center;box-shadow:0 12px 26px rgba(0,0,0,.22);font-weight:900;font-size:12px;white-space:nowrap}.registration-voice-action.start{background:#ff514a}.registration-voice-action.stop{background:#ff514a;color:#fff;min-width:132px}.registration-voice-action:disabled{opacity:.38;cursor:not-allowed}.registration-voice-status{width:100%;min-height:18px;color:#c9c9cf;text-align:center;font-size:12px;font-weight:750}';
+    style.textContent='.registration-voice{display:none;align-items:center;gap:10px;margin:12px 16px 0}.registration-voice.visible{display:flex}.registration-voice-btn{display:inline-flex;align-items:center;gap:10px;border:0;border-radius:999px;background:#1b1b1d;color:#fff;padding:8px 18px;font:800 18px/1 system-ui;box-shadow:0 0 0 4px #ff514a}.registration-voice-dot{width:18px;height:18px;border-radius:999px;background:#ff514a;box-shadow:0 0 0 5px rgba(255,81,74,.22)}.registration-voice small{color:#5d7067;font-weight:750}.registration-voice-dock{display:none;position:fixed;left:18px;bottom:22px;z-index:999;width:min(9cm,calc(100vw - 28px));min-height:5.7cm;padding:13px 16px;border-radius:18px;background:#1b1b1d;color:#f7f7fb;box-shadow:0 20px 46px rgba(16,24,43,.28);touch-action:none}.registration-voice-dock.visible{display:grid;grid-template-rows:auto 1fr;gap:8px}.registration-voice-head{display:flex;align-items:center;justify-content:space-between;gap:12px;cursor:grab}.registration-voice-title{display:inline-flex;align-items:center;gap:8px;color:#ff514a;font-size:13px;font-weight:800}.registration-voice-title:before{content:"";width:7px;height:7px;border-radius:999px;background:#ff514a;box-shadow:0 0 0 4px rgba(255,81,74,.1)}.registration-voice-close{width:28px;height:28px;border:0;border-radius:8px;background:#2f2f32;color:#f7f7fb;font-size:18px;line-height:1}.registration-voice-body{display:grid;grid-template-rows:auto auto auto auto;justify-items:center;align-content:center;gap:12px}.registration-voice-level{width:76%;height:34px;display:grid;grid-template-columns:repeat(28,1fr);gap:3px;align-items:end}.registration-voice-level span{height:4px;border-radius:999px 999px 3px 3px;background:rgba(255,81,74,.18);opacity:.45;transition:height .06s linear,background .06s linear,opacity .06s linear}.registration-voice-level span.active{background:#ff514a;opacity:1}.registration-voice-timer{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:34px;line-height:1;font-weight:800;letter-spacing:0}.registration-voice-actions{display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap}.registration-voice-action{min-height:38px;border:0;border-radius:999px;color:#fff;background:#2f2f32;padding:0 13px;display:grid;place-items:center;box-shadow:0 12px 26px rgba(0,0,0,.22);font-weight:900;font-size:12px;white-space:nowrap}.registration-voice-action.start{background:#ff514a}.registration-voice-action.stop{background:#ff514a;color:#fff;min-width:132px}.registration-voice-action:disabled{opacity:.38;cursor:not-allowed}.registration-voice-status{width:100%;min-height:18px;color:#c9c9cf;text-align:center;font-size:12px;font-weight:750}';
     document.head.append(style);
     const row=document.createElement('div');
     row.id='registration-voice-plugin';
     row.className='registration-voice';
-    row.innerHTML='<button id="registrationVoiceOpen" class="registration-voice-btn" type="button" aria-label="Open registration voice plugin"><span class="registration-voice-dot"></span><span>WOYZ</span></button><small>Registration voice</small>';
+    row.innerHTML='<button id="registrationVoiceOpen" class="registration-voice-btn" type="button" aria-label="Start WOYZ voice plugin"><span class="registration-voice-dot"></span><span>Start WOYZ</span></button><small id="registrationVoiceScope">Select a pathway section</small>';
     const editor=root.querySelector('.shared-editor');
     if(editor)editor.before(row);else root.querySelector('header')?.after(row);
     const dock=document.createElement('div');
@@ -47,7 +50,7 @@ const sharedCaseControls = `<script>
     document.body.append(dock);
     voiceState.dock=dock;voiceState.status=dock.querySelector('#registrationVoiceStatus');voiceState.start=dock.querySelector('#registrationVoiceStart');voiceState.pause=dock.querySelector('#registrationVoicePause');voiceState.resume=dock.querySelector('#registrationVoiceResume');voiceState.extend=dock.querySelector('#registrationVoiceExtend');voiceState.stop=dock.querySelector('#registrationVoiceStop');voiceState.level=dock.querySelector('#registrationVoiceLevel');
     voiceState.bars=Array.from({length:28},()=>{const bar=document.createElement('span');voiceState.level.append(bar);return bar;});
-    row.querySelector('#registrationVoiceOpen').addEventListener('click',()=>{dock.classList.add('visible');setVoiceStatus('Ready for patient registration');});
+    row.querySelector('#registrationVoiceOpen').addEventListener('click',()=>{if(selectedStageIndex==null){setVoiceStatus('Select a pathway section first');return;}const title=dock.querySelector('.registration-voice-title');if(title)title.textContent=selectedStageName;dock.classList.add('visible');setVoiceStatus('Ready for '+selectedStageName);});
     dock.querySelector('#registrationVoiceClose').addEventListener('click',()=>dock.classList.remove('visible'));
     voiceState.start.addEventListener('click',startVoiceRecording);
     voiceState.pause.addEventListener('click',pauseVoiceRecording);
@@ -146,7 +149,7 @@ const sharedCaseControls = `<script>
     stopVoiceTracks();
     if(!blob.size){setVoiceStatus('No voice was captured');return;}
     const reader=new FileReader();
-    reader.onload=()=>{const data=String(reader.result||'').split(',')[1]||'';post({type:'voiceRegistration',caseId,audioData:data,mimeType:blob.type,mutationId:crypto.randomUUID()});setVoiceStatus('Sending to Gemini for registration output…');};
+    reader.onload=()=>{const data=String(reader.result||'').split(',')[1]||'';post({type:'voiceRegistration',caseId,audioData:data,mimeType:blob.type,mutationId:crypto.randomUUID(),stageIndex:selectedStageIndex,stageName:selectedStageName});setVoiceStatus('Sending '+(selectedStageName||'selected section')+' audio to Gemini…');};
     reader.onerror=()=>setVoiceStatus('Could not read the recording');
     reader.readAsDataURL(blob);
   }
@@ -167,6 +170,30 @@ const sharedCaseControls = `<script>
     button.textContent='New patient';
     button.style.cssText='width:100%;margin:10px 0 4px;padding:12px;border:0;border-radius:8px;background:#0f8a5f;color:white;font-weight:800';
     list.before(button);
+  }
+  function currentStageFromContent(){
+    const heading=root.querySelector('#mh-content h2')?.textContent?.trim()||'';
+    const index=voiceStages.indexOf(heading);
+    return index>=0?{index,name:voiceStages[index]}:null;
+  }
+  function updateVoiceAvailability(){
+    ensureVoicePlugin();
+    const row=root.querySelector('#registration-voice-plugin');
+    const scope=root.querySelector('#registrationVoiceScope');
+    const stage=currentStageFromContent();
+    if(stage){
+      selectedStageIndex=stage.index;
+      selectedStageName=stage.name;
+      row?.classList.add('visible');
+      if(scope)scope.textContent=stage.name+' voice';
+      const title=root.querySelector('.registration-voice-title');
+      if(title)title.textContent=stage.name;
+      return;
+    }
+    selectedStageIndex=null;
+    selectedStageName='';
+    row?.classList.remove('visible');
+    voiceState.dock?.classList.remove('visible');
   }
   function renderMobileCases(){
     ensureMobileControls();
@@ -204,8 +231,8 @@ const sharedCaseControls = `<script>
     if(create){event.preventDefault();event.stopImmediatePropagation();post({type:'createCase'});return;}
     const select=event.target.closest?.('[data-firestore-case]');
     if(select){event.preventDefault();event.stopImmediatePropagation();post({type:'selectCase',caseId:select.getAttribute('data-firestore-case')});const drawer=root.querySelector('#mh-drawer');if(drawer)drawer.hidden=true;}
-    setTimeout(renderCaseIdentity,0);
-    setTimeout(renderCaseIdentity,120);
+    setTimeout(()=>{renderCaseIdentity();updateVoiceAvailability();},0);
+    setTimeout(()=>{renderCaseIdentity();updateVoiceAvailability();},120);
   },true);
   window.addEventListener('message',event=>{
     if(event.source!==parent||event.data?.channel!=='woyz-case-v1')return;
@@ -219,13 +246,14 @@ const sharedCaseControls = `<script>
     }
     if(event.data.type==='voiceRegistrationSaved')setVoiceStatus('Registration saved to Firestore');
     if(event.data.type==='voiceRegistrationError')setVoiceStatus(event.data.error||'Voice registration failed');
-    setTimeout(()=>{renderMobileCases();renderDesktopCases();renderCaseIdentity();replaceRecorderCopy();},0);
+    setTimeout(()=>{renderMobileCases();renderDesktopCases();renderCaseIdentity();replaceRecorderCopy();updateVoiceAvailability();},0);
   });
   ensureMobileControls();
   ensureVoicePlugin();
   renderCaseIdentity();
   replaceRecorderCopy();
-  setInterval(()=>{renderCaseIdentity();replaceRecorderCopy();},1000);
+  updateVoiceAvailability();
+  setInterval(()=>{renderCaseIdentity();replaceRecorderCopy();updateVoiceAvailability();},1000);
 })();
 </script>`;
 
@@ -368,16 +396,19 @@ async function generateRegistrationFromAudio(message){
   const apiKey=localStorage.getItem(geminiStoreKey)||"";
   if(!apiKey.trim()){post({type:"voiceRegistrationError",error:"Add Gemini API key in Settings first."});document.getElementById("settingsBtn").click();return;}
   if(!message.audioData){post({type:"voiceRegistrationError",error:"No audio was received from the voice plugin."});return;}
-  setStatus("Gemini registration…");
+  const stageIndex=Number.isInteger(message.stageIndex)?message.stageIndex:0;
+  const stageName=String(message.stageName||"Registration");
+  setStatus("Gemini · "+stageName);
   try{
-    const schema={type:"object",properties:{name:{type:"string"},uhid:{type:"string"},age:{type:"string"},sex:{type:"string"},mobile:{type:"string"},contact:{type:"string"},diagnosis:{type:"string"},registrationNote:{type:"string"}},required:["name","uhid","age","sex","mobile","contact","diagnosis","registrationNote"]};
-    const prompt="You are WOYZ Stroke registration extraction assistant. Listen to the audio and return strict JSON only for these registration columns: name, uhid, age, sex, mobile, contact, diagnosis, registrationNote. Extract only explicitly stated information; never invent, infer or complete missing demographics. Use NIL for any column that is not supported by the audio. Keep each column concise and clinically usable. registrationNote should be a short registration-stage note containing presenting complaint, onset or last-known-well if stated, examination findings, provisional diagnosis, and any scan/decision/IVT/thrombectomy-relevant statement only when the speaker says it. Do not include advice, explanations, markdown or extra keys.";
+    const registrationMode=stageIndex===0;
+    const schema=registrationMode?{type:"object",properties:{name:{type:"string"},uhid:{type:"string"},age:{type:"string"},sex:{type:"string"},mobile:{type:"string"},contact:{type:"string"},diagnosis:{type:"string"},registrationNote:{type:"string"}},required:["name","uhid","age","sex","mobile","contact","diagnosis","registrationNote"]}:{type:"object",properties:{stageNote:{type:"string"}},required:["stageNote"]};
+    const prompt=registrationMode?"You are WOYZ Stroke registration extraction assistant. Listen to the audio and return strict JSON only for these registration columns: name, uhid, age, sex, mobile, contact, diagnosis, registrationNote. Extract only explicitly stated information; never invent, infer or complete missing demographics. Use NIL for any column that is not supported by the audio. Keep each column concise and clinically usable. registrationNote should be a short registration-stage note containing presenting complaint, onset or last-known-well if stated, examination findings, provisional diagnosis, and any scan/decision/IVT/thrombectomy-relevant statement only when the speaker says it. Do not include advice, explanations, markdown or extra keys.":"You are WOYZ Stroke pathway extraction assistant. The selected section is "+stageName+". Listen to the audio and return strict JSON only with stageNote. Generate the note for this selected pathway section only. Include explicit times, findings, decisions, reasons, drugs, scores and outcomes only if stated. Use NIL if the audio does not contain information for this section. Keep it concise, clinically usable, and do not add advice, markdown or extra keys.";
     const response=await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key="+encodeURIComponent(apiKey.trim()),{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({contents:[{role:"user",parts:[{text:prompt},{inline_data:{mime_type:message.mimeType||"audio/webm",data:message.audioData}}]}],generationConfig:{temperature:0,responseMimeType:"application/json",responseSchema:schema}})});
     if(!response.ok)throw new Error("Gemini request failed: "+response.status+" "+await response.text());
     const data=await response.json();
     const text=cleanGeminiText((data.candidates?.[0]?.content?.parts||[]).map(part=>part.text||"").join(""));
     const parsed=JSON.parse(text);
-    const patch={name:fieldValue(parsed.name),uhid:fieldValue(parsed.uhid),age:fieldValue(parsed.age),sex:fieldValue(parsed.sex),mobile:fieldValue(parsed.mobile),contact:fieldValue(parsed.contact),diagnosis:fieldValue(parsed.diagnosis),stage_0:fieldValue(parsed.registrationNote)};
+    const patch=registrationMode?{name:fieldValue(parsed.name),uhid:fieldValue(parsed.uhid),age:fieldValue(parsed.age),sex:fieldValue(parsed.sex),mobile:fieldValue(parsed.mobile),contact:fieldValue(parsed.contact),diagnosis:fieldValue(parsed.diagnosis),stage_0:fieldValue(parsed.registrationNote)}:{["stage_"+stageIndex]:fieldValue(parsed.stageNote)};
     await savePatch(patch,message.mutationId||crypto.randomUUID());
   }catch(error){setStatus("Gemini failed",true,error.message||String(error));post({type:"voiceRegistrationError",error:error.message||"Gemini registration failed"});}
 }
