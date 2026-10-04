@@ -93,6 +93,7 @@ const caseDocId=document.getElementById("caseDocId");
 const workspaceCodeInput=document.getElementById("workspaceCode");
 const geminiKeyInput=document.getElementById("geminiKey");
 const geminiStoreKey="woyz-stroke-gemini-key";
+const defaultWorkspaceId="WOYZ-STROKE-SHARED";
 let mode=location.pathname.endsWith("/admin")||location.hash==="#admin"?"desktop":"mobile";
 let caseId="ST-024";
 let workspaceId=initialWorkspaceId();
@@ -106,7 +107,7 @@ let saving=false;
 function nowText(){return new Date().toLocaleTimeString();}
 function randomId(prefix){const bytes=new Uint8Array(12);crypto.getRandomValues(bytes);return prefix+Array.from(bytes,b=>b.toString(36).padStart(2,"0")).join("").slice(0,22);}
 function cleanId(value,fallback){return String(value||fallback).replace(/[^A-Za-z0-9_-]/g,"-").slice(0,64);}
-function initialWorkspaceId(){const url=new URL(location.href);let id=cleanId(url.searchParams.get("w"),"");if(id.length<16){id=randomId("WS-");url.searchParams.set("w",id);history.replaceState(null,"",url.pathname+"?"+url.searchParams.toString()+url.hash);}return id;}
+function initialWorkspaceId(){const url=new URL(location.href);let id=cleanId(url.searchParams.get("w"),"");if(id.length<16){id=defaultWorkspaceId;url.searchParams.set("w",id);history.replaceState(null,"",url.pathname+"?"+url.searchParams.toString()+url.hash);}return id;}
 function caseCollection(){return collection(db,"strokeWorkspaces",workspaceId,"strokeCases");}
 function ref(){return doc(db,"strokeWorkspaces",workspaceId,"strokeCases",caseId);}
 function cleanSnapshot(raw){return {data:{...(raw?.data||{})},version:Number(raw?.version||0),updatedAt:raw?.updatedAt||null,updatedAtText:raw?.updatedAtText||null};}
