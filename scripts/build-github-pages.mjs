@@ -25,6 +25,7 @@ const sharedCaseControls = `<script>
   if(!root)return;
   let caseId='ST-024';
   let cases=[];
+  let caseData={};
   let selectedStageIndex=null;
   let selectedStageName='';
   let selectedVoiceKind='stage';
@@ -34,19 +35,21 @@ const sharedCaseControls = `<script>
   const voiceState={recorder:null,stream:null,context:null,analyser:null,source:null,chunks:[],bars:[],raf:0,remaining:300,timer:0,recording:false,paused:false,dock:null,status:null,start:null,pause:null,resume:null,extend:null,stop:null,level:null};
   function ensureVoicePlugin(){
     if(document.querySelector('#registrationVoiceDock'))return;
+    root.style.position='relative';
     const style=document.createElement('style');
-    style.textContent='.registration-voice-dock{display:none;position:fixed;left:18px;bottom:22px;z-index:999;width:min(9cm,calc(100vw - 28px));min-height:5.7cm;padding:13px 16px;border-radius:18px;background:#1b1b1d;color:#f7f7fb;box-shadow:0 20px 46px rgba(16,24,43,.28);touch-action:none}.registration-voice-dock.visible{display:grid;grid-template-rows:auto 1fr;gap:8px}.registration-voice-head{display:flex;align-items:center;justify-content:space-between;gap:12px;cursor:grab}.registration-voice-title{display:inline-flex;align-items:center;gap:8px;color:#ff514a;font-size:13px;font-weight:800}.registration-voice-title:before{content:"";width:7px;height:7px;border-radius:999px;background:#ff514a;box-shadow:0 0 0 4px rgba(255,81,74,.1)}.registration-voice-close{width:28px;height:28px;border:0;border-radius:8px;background:#2f2f32;color:#f7f7fb;font-size:18px;line-height:1}.registration-voice-body{display:grid;grid-template-rows:auto auto auto auto;justify-items:center;align-content:center;gap:12px}.registration-voice-level{width:76%;height:34px;display:grid;grid-template-columns:repeat(28,1fr);gap:3px;align-items:end}.registration-voice-level span{height:4px;border-radius:999px 999px 3px 3px;background:rgba(255,81,74,.18);opacity:.45;transition:height .06s linear,background .06s linear,opacity .06s linear}.registration-voice-level span.active{background:#ff514a;opacity:1}.registration-voice-timer{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:34px;line-height:1;font-weight:800;letter-spacing:0}.registration-voice-actions{display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap}.registration-voice-action{min-height:38px;border:0;border-radius:999px;color:#fff;background:#2f2f32;padding:0 13px;display:grid;place-items:center;box-shadow:0 12px 26px rgba(0,0,0,.22);font-weight:900;font-size:12px;white-space:nowrap}.registration-voice-action.start{background:#ff514a}.registration-voice-action.stop{background:#ff514a;color:#fff;min-width:132px}.registration-voice-action:disabled{opacity:.38;cursor:not-allowed}.registration-voice-status{width:100%;min-height:18px;color:#c9c9cf;text-align:center;font-size:12px;font-weight:750}';
+    style.textContent='.registration-voice-dock{display:none;position:absolute;left:14px;top:14px;z-index:999;width:calc(100% - 28px);max-width:340px;min-height:5.7cm;padding:13px 16px;border-radius:18px;background:#1b1b1d;color:#f7f7fb;box-shadow:0 20px 46px rgba(16,24,43,.28);touch-action:none}.registration-voice-dock.visible{display:grid;grid-template-rows:auto 1fr;gap:8px}.registration-voice-head{display:flex;align-items:center;justify-content:space-between;gap:12px;cursor:grab}.registration-voice-title{display:inline-flex;align-items:center;gap:8px;color:#ff514a;font-size:13px;font-weight:800}.registration-voice-title:before{content:"";width:7px;height:7px;border-radius:999px;background:#ff514a;box-shadow:0 0 0 4px rgba(255,81,74,.1)}.registration-voice-close{width:28px;height:28px;border:0;border-radius:8px;background:#2f2f32;color:#f7f7fb;font-size:18px;line-height:1;cursor:pointer}.registration-voice-body{display:grid;grid-template-rows:auto auto auto auto;justify-items:center;align-content:center;gap:12px}.registration-voice-level{width:76%;height:34px;display:grid;grid-template-columns:repeat(28,1fr);gap:3px;align-items:end}.registration-voice-level span{height:4px;border-radius:999px 999px 3px 3px;background:rgba(255,81,74,.18);opacity:.45;transition:height .06s linear,background .06s linear,opacity .06s linear}.registration-voice-level span.active{background:#ff514a;opacity:1}.registration-voice-timer{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:34px;line-height:1;font-weight:800;letter-spacing:0}.registration-voice-actions{display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap}.registration-voice-action{min-height:38px;border:0;border-radius:999px;color:#fff;background:#2f2f32;padding:0 13px;display:grid;place-items:center;box-shadow:0 12px 26px rgba(0,0,0,.22);font-weight:900;font-size:12px;white-space:nowrap}.registration-voice-action.start{background:#ff514a}.registration-voice-action.stop{background:#ff514a;color:#fff;min-width:132px}.registration-voice-action:disabled{opacity:.38;cursor:not-allowed}.registration-voice-status{width:100%;min-height:18px;color:#c9c9cf;text-align:center;font-size:12px;font-weight:750}';
     document.head.append(style);
     const dock=document.createElement('div');
     dock.id='registrationVoiceDock';
     dock.className='registration-voice-dock';
     dock.setAttribute('aria-live','polite');
     dock.innerHTML='<div class="registration-voice-head" id="registrationVoiceHead"><div class="registration-voice-title">Patient registration</div><button class="registration-voice-close" id="registrationVoiceClose" aria-label="Close voice panel" type="button">&times;</button></div><div class="registration-voice-body"><div class="registration-voice-level" id="registrationVoiceLevel" aria-label="Voice activity"></div><div class="registration-voice-timer" id="registrationVoiceTimer">05:00</div><div class="registration-voice-actions"><button class="registration-voice-action start" id="registrationVoiceStart" type="button">Start</button><button class="registration-voice-action" id="registrationVoicePause" type="button" disabled>Pause</button><button class="registration-voice-action" id="registrationVoiceResume" type="button" disabled>Resume</button><button class="registration-voice-action" id="registrationVoiceExtend" type="button">+5 min</button><button class="registration-voice-action stop" id="registrationVoiceStop" type="button" disabled>Stop & transcribe</button></div><div class="registration-voice-status" id="registrationVoiceStatus">Open, then start recording registration</div></div>';
-    document.body.append(dock);
+    root.append(dock);
     voiceState.dock=dock;voiceState.status=dock.querySelector('#registrationVoiceStatus');voiceState.start=dock.querySelector('#registrationVoiceStart');voiceState.pause=dock.querySelector('#registrationVoicePause');voiceState.resume=dock.querySelector('#registrationVoiceResume');voiceState.extend=dock.querySelector('#registrationVoiceExtend');voiceState.stop=dock.querySelector('#registrationVoiceStop');voiceState.level=dock.querySelector('#registrationVoiceLevel');
     voiceState.bars=Array.from({length:28},()=>{const bar=document.createElement('span');voiceState.level.append(bar);return bar;});
     dock.querySelector('#registrationVoiceClose').addEventListener('pointerdown',event=>{event.preventDefault();event.stopPropagation();closeVoiceDock();});
     dock.querySelector('#registrationVoiceClose').addEventListener('click',event=>{event.preventDefault();event.stopPropagation();closeVoiceDock();});
+    document.addEventListener('click',event=>{if(event.target.closest?.('#registrationVoiceClose')){event.preventDefault();event.stopPropagation();closeVoiceDock();}},true);
     voiceState.start.addEventListener('click',startVoiceRecording);
     voiceState.pause.addEventListener('click',pauseVoiceRecording);
     voiceState.resume.addEventListener('click',resumeVoiceRecording);
@@ -173,18 +176,17 @@ const sharedCaseControls = `<script>
   function makeVoiceDockMovable(dock,handle){
     let drag=null;
     handle.addEventListener('pointerdown',event=>{if(event.target.closest?.('button'))return;drag={x:event.clientX,y:event.clientY,left:dock.offsetLeft,top:dock.offsetTop};handle.setPointerCapture(event.pointerId);});
-    handle.addEventListener('pointermove',event=>{if(!drag)return;const bounds=root.getBoundingClientRect();const nextLeft=drag.left+event.clientX-drag.x;const nextTop=drag.top+event.clientY-drag.y;dock.style.left=Math.min(Math.max(bounds.left+8,nextLeft),bounds.right-dock.offsetWidth-8)+'px';dock.style.top=Math.min(Math.max(bounds.top+8,nextTop),bounds.bottom-dock.offsetHeight-8)+'px';dock.style.bottom='auto';});
+    handle.addEventListener('pointermove',event=>{if(!drag)return;const nextLeft=drag.left+event.clientX-drag.x;const nextTop=drag.top+event.clientY-drag.y;dock.style.left=Math.min(Math.max(8,nextLeft),root.clientWidth-dock.offsetWidth-8)+'px';dock.style.top=Math.min(Math.max(root.scrollTop+8,nextTop),root.scrollTop+root.clientHeight-dock.offsetHeight-8)+'px';dock.style.bottom='auto';});
     handle.addEventListener('pointerup',()=>{drag=null;});
     handle.addEventListener('pointercancel',()=>{drag=null;});
   }
   function positionVoiceDockInsideMobile(){
     const dock=voiceState.dock;
     if(!dock||!dock.classList.contains('visible'))return;
-    const bounds=root.getBoundingClientRect();
-    const width=Math.max(280,Math.min(bounds.width-28,340));
+    const width=Math.max(280,Math.min(root.clientWidth-28,340));
     dock.style.width=width+'px';
-    dock.style.left=(bounds.left+14)+'px';
-    dock.style.top=Math.max(bounds.top+14,Math.min(bounds.bottom-dock.offsetHeight-14,window.innerHeight-dock.offsetHeight-14))+'px';
+    dock.style.left='14px';
+    dock.style.top=(root.scrollTop+14)+'px';
     dock.style.bottom='auto';
   }
   function ensureMobileControls(){
@@ -238,9 +240,26 @@ const sharedCaseControls = `<script>
   function renderCaseIdentity(){
     const active=cases.find(item=>item.id===caseId);
     const mobileId=root.querySelector('#mh-id');
-    if(mobileId)mobileId.textContent='Episode '+caseId+' · UHID '+(active?.uhid&&active.uhid!=='No UHID'?active.uhid:'missing');
+    const uhid=caseData.uhid||active?.uhid;
+    if(mobileId)mobileId.textContent='Episode '+caseId+' · UHID '+(uhid&&uhid!=='No UHID'&&uhid!=='NIL'?uhid:'missing');
     const dock=root.querySelector('.dock-target');
-    if(dock&&active)dock.textContent=(active.name||'Unknown patient')+' · '+caseId;
+    if(dock)dock.textContent=(caseData.name||active?.name||'Patient name missing')+' · '+caseId;
+  }
+  function renderRegistrationValues(){
+    const heading=root.querySelector('#mh-content h2')?.textContent?.trim();
+    if(heading!=='Registration')return;
+    const content=root.querySelector('#mh-content');
+    if(!content)return;
+    let box=content.querySelector('.woyz-registration-values');
+    if(!box){
+      box=document.createElement('div');
+      box.className='woyz-registration-values';
+      box.style.cssText='margin:12px 0;padding:12px;border:1px solid #cfe0d5;border-radius:10px;background:white;color:#203c33;font:14px/1.45 system-ui';
+      const prompts=content.querySelector('[aria-label],.box')||content.querySelector('button')?.parentElement;
+      (content.querySelector('.shared-stage-display')||prompts||content).after(box);
+    }
+    const rows=[['Name',caseData.name],['UHID',caseData.uhid],['Age',caseData.age],['Sex',caseData.sex],['Mobile',caseData.mobile],['Contact',caseData.contact],['Diagnosis',caseData.diagnosis],['Registration note',caseData.stage_0]];
+    box.innerHTML='<strong>Saved registration</strong>'+rows.map(([label,value])=>'<div style="display:grid;grid-template-columns:110px 1fr;gap:8px;margin-top:7px"><span style="font-weight:750;color:#5d7067">'+esc(label)+'</span><span>'+esc(value&&value!=='NIL'?value:'Not recorded')+'</span></div>').join('');
   }
   function replaceRecorderCopy(){
     const walker=document.createTreeWalker(root,NodeFilter.SHOW_TEXT);
@@ -258,13 +277,14 @@ const sharedCaseControls = `<script>
     if(create){event.preventDefault();event.stopImmediatePropagation();post({type:'createCase'});return;}
     const select=event.target.closest?.('[data-firestore-case]');
     if(select){event.preventDefault();event.stopImmediatePropagation();post({type:'selectCase',caseId:select.getAttribute('data-firestore-case')});const drawer=root.querySelector('#mh-drawer');if(drawer)drawer.hidden=true;}
-    setTimeout(()=>{renderMobileCases();renderCaseIdentity();updateVoiceAvailability();},0);
-    setTimeout(()=>{renderMobileCases();renderCaseIdentity();updateVoiceAvailability();},120);
-    setTimeout(()=>{renderMobileCases();renderCaseIdentity();updateVoiceAvailability();},600);
+    setTimeout(()=>{renderMobileCases();renderCaseIdentity();renderRegistrationValues();updateVoiceAvailability();},0);
+    setTimeout(()=>{renderMobileCases();renderCaseIdentity();renderRegistrationValues();updateVoiceAvailability();},120);
+    setTimeout(()=>{renderMobileCases();renderCaseIdentity();renderRegistrationValues();updateVoiceAvailability();},600);
   },true);
   window.addEventListener('message',event=>{
     if(event.source!==parent||event.data?.channel!=='woyz-case-v1')return;
     if(event.data.caseId)caseId=event.data.caseId;
+    if(event.data.data&&typeof event.data.data==='object')caseData=event.data.data;
     if(Array.isArray(event.data.cases))cases=event.data.cases;
     if(event.data.type==='created'){
       const drawer=root.querySelector('#mh-drawer');
@@ -274,14 +294,14 @@ const sharedCaseControls = `<script>
     }
     if(event.data.type==='voiceRegistrationSaved')setVoiceStatus('Registration saved to Firestore');
     if(event.data.type==='voiceRegistrationError')setVoiceStatus(event.data.error||'Voice registration failed');
-    setTimeout(()=>{renderMobileCases();renderDesktopCases();renderCaseIdentity();replaceRecorderCopy();updateVoiceAvailability();},0);
+    setTimeout(()=>{renderMobileCases();renderDesktopCases();renderCaseIdentity();renderRegistrationValues();replaceRecorderCopy();updateVoiceAvailability();},0);
   });
   ensureMobileControls();
   ensureVoicePlugin();
   renderCaseIdentity();
   replaceRecorderCopy();
   updateVoiceAvailability();
-  setInterval(()=>{renderMobileCases();renderCaseIdentity();replaceRecorderCopy();updateVoiceAvailability();},1000);
+  setInterval(()=>{renderMobileCases();renderCaseIdentity();renderRegistrationValues();replaceRecorderCopy();updateVoiceAvailability();},1000);
 })();
 </script>`;
 
