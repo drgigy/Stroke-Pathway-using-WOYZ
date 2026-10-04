@@ -27,8 +27,139 @@ const sharedCaseControls = `<script>
   let cases=[];
   const esc=value=>String(value??'').replace(/[&<>"']/g,match=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[match]));
   function post(message){parent.postMessage({channel:'woyz-case-v1',...message},'*');}
+  const voiceState={recorder:null,stream:null,context:null,analyser:null,source:null,chunks:[],bars:[],raf:0,remaining:300,timer:0,recording:false,paused:false,dock:null,status:null,start:null,pause:null,resume:null,extend:null,stop:null,level:null};
+  function ensureVoicePlugin(){
+    if(root.querySelector('#registration-voice-plugin'))return;
+    const style=document.createElement('style');
+    style.textContent='.registration-voice{display:flex;align-items:center;gap:10px;margin:12px 16px 0}.registration-voice-btn{display:inline-flex;align-items:center;gap:10px;border:0;border-radius:999px;background:#1b1b1d;color:#fff;padding:8px 18px;font:800 20px/1 system-ui;box-shadow:0 0 0 4px #ff514a}.registration-voice-dot{width:18px;height:18px;border-radius:999px;background:#ff514a;box-shadow:0 0 0 5px rgba(255,81,74,.22)}.registration-voice small{color:#5d7067;font-weight:750}.registration-voice-dock{display:none;position:fixed;left:18px;bottom:22px;z-index:999;width:min(9cm,calc(100vw - 28px));min-height:5.7cm;padding:13px 16px;border-radius:18px;background:#1b1b1d;color:#f7f7fb;box-shadow:0 20px 46px rgba(16,24,43,.28);touch-action:none}.registration-voice-dock.visible{display:grid;grid-template-rows:auto 1fr;gap:8px}.registration-voice-head{display:flex;align-items:center;justify-content:space-between;gap:12px;cursor:grab}.registration-voice-title{display:inline-flex;align-items:center;gap:8px;color:#ff514a;font-size:13px;font-weight:800}.registration-voice-title:before{content:"";width:7px;height:7px;border-radius:999px;background:#ff514a;box-shadow:0 0 0 4px rgba(255,81,74,.1)}.registration-voice-close{width:28px;height:28px;border:0;border-radius:8px;background:#2f2f32;color:#f7f7fb;font-size:18px;line-height:1}.registration-voice-body{display:grid;grid-template-rows:auto auto auto auto;justify-items:center;align-content:center;gap:12px}.registration-voice-level{width:76%;height:34px;display:grid;grid-template-columns:repeat(28,1fr);gap:3px;align-items:end}.registration-voice-level span{height:4px;border-radius:999px 999px 3px 3px;background:rgba(255,81,74,.18);opacity:.45;transition:height .06s linear,background .06s linear,opacity .06s linear}.registration-voice-level span.active{background:#ff514a;opacity:1}.registration-voice-timer{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:34px;line-height:1;font-weight:800;letter-spacing:0}.registration-voice-actions{display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap}.registration-voice-action{min-height:38px;border:0;border-radius:999px;color:#fff;background:#2f2f32;padding:0 13px;display:grid;place-items:center;box-shadow:0 12px 26px rgba(0,0,0,.22);font-weight:900;font-size:12px;white-space:nowrap}.registration-voice-action.start{background:#ff514a}.registration-voice-action.stop{background:#ff514a;color:#fff;min-width:132px}.registration-voice-action:disabled{opacity:.38;cursor:not-allowed}.registration-voice-status{width:100%;min-height:18px;color:#c9c9cf;text-align:center;font-size:12px;font-weight:750}';
+    document.head.append(style);
+    const row=document.createElement('div');
+    row.id='registration-voice-plugin';
+    row.className='registration-voice';
+    row.innerHTML='<button id="registrationVoiceOpen" class="registration-voice-btn" type="button" aria-label="Open registration voice plugin"><span class="registration-voice-dot"></span><span>WOYZ</span></button><small>Registration voice</small>';
+    const editor=root.querySelector('.shared-editor');
+    if(editor)editor.before(row);else root.querySelector('header')?.after(row);
+    const dock=document.createElement('div');
+    dock.id='registrationVoiceDock';
+    dock.className='registration-voice-dock';
+    dock.setAttribute('aria-live','polite');
+    dock.innerHTML='<div class="registration-voice-head" id="registrationVoiceHead"><div class="registration-voice-title">Patient registration</div><button class="registration-voice-close" id="registrationVoiceClose" aria-label="Close voice panel" type="button">&times;</button></div><div class="registration-voice-body"><div class="registration-voice-level" id="registrationVoiceLevel" aria-label="Voice activity"></div><div class="registration-voice-timer" id="registrationVoiceTimer">05:00</div><div class="registration-voice-actions"><button class="registration-voice-action start" id="registrationVoiceStart" type="button">Start</button><button class="registration-voice-action" id="registrationVoicePause" type="button" disabled>Pause</button><button class="registration-voice-action" id="registrationVoiceResume" type="button" disabled>Resume</button><button class="registration-voice-action" id="registrationVoiceExtend" type="button">+5 min</button><button class="registration-voice-action stop" id="registrationVoiceStop" type="button" disabled>Stop & transcribe</button></div><div class="registration-voice-status" id="registrationVoiceStatus">Open, then start recording registration</div></div>';
+    document.body.append(dock);
+    voiceState.dock=dock;voiceState.status=dock.querySelector('#registrationVoiceStatus');voiceState.start=dock.querySelector('#registrationVoiceStart');voiceState.pause=dock.querySelector('#registrationVoicePause');voiceState.resume=dock.querySelector('#registrationVoiceResume');voiceState.extend=dock.querySelector('#registrationVoiceExtend');voiceState.stop=dock.querySelector('#registrationVoiceStop');voiceState.level=dock.querySelector('#registrationVoiceLevel');
+    voiceState.bars=Array.from({length:28},()=>{const bar=document.createElement('span');voiceState.level.append(bar);return bar;});
+    row.querySelector('#registrationVoiceOpen').addEventListener('click',()=>{dock.classList.add('visible');setVoiceStatus('Ready for patient registration');});
+    dock.querySelector('#registrationVoiceClose').addEventListener('click',()=>dock.classList.remove('visible'));
+    voiceState.start.addEventListener('click',startVoiceRecording);
+    voiceState.pause.addEventListener('click',pauseVoiceRecording);
+    voiceState.resume.addEventListener('click',resumeVoiceRecording);
+    voiceState.extend.addEventListener('click',extendVoiceRecording);
+    voiceState.stop.addEventListener('click',finishVoiceRecording);
+    makeVoiceDockMovable(dock,dock.querySelector('#registrationVoiceHead'));
+    drawVoiceBars();
+  }
+  function setVoiceStatus(text){if(voiceState.status)voiceState.status.textContent=text;}
+  function setVoiceTimer(){
+    const timer=voiceState.dock?.querySelector('#registrationVoiceTimer');
+    if(!timer)return;
+    const minutes=String(Math.floor(voiceState.remaining/60)).padStart(2,'0');
+    const seconds=String(voiceState.remaining%60).padStart(2,'0');
+    timer.textContent=minutes+':'+seconds;
+  }
+  function updateVoiceButtons(){
+    if(!voiceState.start)return;
+    voiceState.start.disabled=voiceState.recording;
+    voiceState.pause.disabled=!voiceState.recording||voiceState.paused;
+    voiceState.resume.disabled=!voiceState.recording||!voiceState.paused;
+    voiceState.stop.disabled=!voiceState.recording;
+  }
+  function nilVoiceBars(){voiceState.bars.forEach(bar=>{bar.classList.remove('active');bar.style.height='4px';});}
+  function drawVoiceBars(){
+    if(!voiceState.analyser||!voiceState.recording||voiceState.paused){nilVoiceBars();voiceState.raf=requestAnimationFrame(drawVoiceBars);return;}
+    const freq=new Uint8Array(voiceState.analyser.frequencyBinCount);
+    voiceState.analyser.getByteFrequencyData(freq);
+    const avg=freq.reduce((sum,value)=>sum+value,0)/(freq.length*255);
+    if(avg<0.018){nilVoiceBars();voiceState.raf=requestAnimationFrame(drawVoiceBars);return;}
+    voiceState.bars.forEach((bar,index)=>{
+      const sample=freq[Math.min(freq.length-1,Math.floor(index/voiceState.bars.length*freq.length))]/255;
+      const height=Math.max(4,Math.round(4+sample*30));
+      bar.classList.toggle('active',sample>0.04);
+      bar.style.height=height+'px';
+    });
+    voiceState.raf=requestAnimationFrame(drawVoiceBars);
+  }
+  async function startVoiceRecording(){
+    if(voiceState.recording)return;
+    if(!navigator.mediaDevices?.getUserMedia||!window.MediaRecorder){setVoiceStatus('Microphone recording is not available in this browser');return;}
+    try{
+      voiceState.stream=await navigator.mediaDevices.getUserMedia({audio:true});
+      voiceState.context=new (window.AudioContext||window.webkitAudioContext)();
+      voiceState.analyser=voiceState.context.createAnalyser();
+      voiceState.analyser.fftSize=256;
+      voiceState.source=voiceState.context.createMediaStreamSource(voiceState.stream);
+      voiceState.source.connect(voiceState.analyser);
+      voiceState.chunks=[];
+      voiceState.recorder=new MediaRecorder(voiceState.stream);
+      voiceState.recorder.ondataavailable=event=>{if(event.data?.size)voiceState.chunks.push(event.data);};
+      voiceState.recorder.onstop=sendVoiceRecording;
+      voiceState.recorder.start();
+      voiceState.recording=true;voiceState.paused=false;voiceState.remaining=300;
+      updateVoiceButtons();
+      clearInterval(voiceState.timer);
+      voiceState.timer=setInterval(()=>{if(!voiceState.paused){voiceState.remaining=Math.max(0,voiceState.remaining-1);setVoiceTimer();if(voiceState.remaining===0)finishVoiceRecording();}},1000);
+      setVoiceTimer();
+      setVoiceStatus('Recording registration');
+    }catch(error){setVoiceStatus(error.message||'Microphone permission was not granted');}
+  }
+  function pauseVoiceRecording(){
+    if(!voiceState.recording||voiceState.recorder?.state!=='recording')return;
+    voiceState.recorder.pause();
+    voiceState.paused=true;
+    updateVoiceButtons();
+    setVoiceStatus('Paused');
+  }
+  function resumeVoiceRecording(){
+    if(!voiceState.recording||voiceState.recorder?.state!=='paused')return;
+    voiceState.recorder.resume();
+    voiceState.paused=false;
+    updateVoiceButtons();
+    setVoiceStatus('Recording registration');
+  }
+  function extendVoiceRecording(){
+    voiceState.remaining+=300;
+    setVoiceTimer();
+    setVoiceStatus('Extended by 5 minutes');
+  }
+  function finishVoiceRecording(){
+    if(!voiceState.recording){setVoiceStatus('No registration recording to finish');return;}
+    setVoiceStatus('Stopping and preparing transcription…');
+    if(voiceState.recorder&&voiceState.recorder.state!=='inactive')voiceState.recorder.stop();
+  }
+  function stopVoiceTracks(){
+    clearInterval(voiceState.timer);
+    voiceState.stream?.getTracks?.().forEach(track=>track.stop());
+    voiceState.context?.close?.();
+    voiceState.recording=false;voiceState.paused=false;voiceState.remaining=300;setVoiceTimer();updateVoiceButtons();
+    voiceState.stream=null;voiceState.context=null;voiceState.analyser=null;voiceState.source=null;nilVoiceBars();
+  }
+  function sendVoiceRecording(){
+    const blob=new Blob(voiceState.chunks,{type:voiceState.recorder?.mimeType||'audio/webm'});
+    stopVoiceTracks();
+    if(!blob.size){setVoiceStatus('No voice was captured');return;}
+    const reader=new FileReader();
+    reader.onload=()=>{const data=String(reader.result||'').split(',')[1]||'';post({type:'voiceRegistration',caseId,audioData:data,mimeType:blob.type,mutationId:crypto.randomUUID()});setVoiceStatus('Sending to Gemini for registration output…');};
+    reader.onerror=()=>setVoiceStatus('Could not read the recording');
+    reader.readAsDataURL(blob);
+  }
+  function makeVoiceDockMovable(dock,handle){
+    let drag=null;
+    handle.addEventListener('pointerdown',event=>{drag={x:event.clientX,y:event.clientY,left:dock.offsetLeft,top:dock.offsetTop};handle.setPointerCapture(event.pointerId);});
+    handle.addEventListener('pointermove',event=>{if(!drag)return;dock.style.left=Math.max(8,drag.left+event.clientX-drag.x)+'px';dock.style.top=Math.max(8,drag.top+event.clientY-drag.y)+'px';dock.style.bottom='auto';});
+    handle.addEventListener('pointerup',()=>{drag=null;});
+    handle.addEventListener('pointercancel',()=>{drag=null;});
+  }
   function ensureMobileControls(){
     const list=root.querySelector('#mh-patients');
+    ensureVoicePlugin();
     if(!list||root.querySelector('#mh-new-firestore'))return;
     const button=document.createElement('button');
     button.id='mh-new-firestore';
@@ -59,20 +190,42 @@ const sharedCaseControls = `<script>
     const dock=root.querySelector('.dock-target');
     if(dock&&active)dock.textContent=(active.name||'Unknown patient')+' · '+caseId;
   }
+  function replaceRecorderCopy(){
+    const walker=document.createTreeWalker(root,NodeFilter.SHOW_TEXT);
+    let node;
+    while((node=walker.nextNode())){
+      if(node.nodeValue.includes('Recorder controls are simulated in this mockup.')){
+        node.nodeValue=node.nodeValue.replace('Recorder controls are simulated in this mockup.','Registration voice records locally and sends to Gemini only when Stop & transcribe is clicked.');
+      }
+    }
+  }
   root.addEventListener('click',event=>{
     const create=event.target.closest?.('#mh-new-firestore');
     if(create){event.preventDefault();event.stopImmediatePropagation();post({type:'createCase'});return;}
     const select=event.target.closest?.('[data-firestore-case]');
     if(select){event.preventDefault();event.stopImmediatePropagation();post({type:'selectCase',caseId:select.getAttribute('data-firestore-case')});const drawer=root.querySelector('#mh-drawer');if(drawer)drawer.hidden=true;}
+    setTimeout(renderCaseIdentity,0);
+    setTimeout(renderCaseIdentity,120);
   },true);
   window.addEventListener('message',event=>{
     if(event.source!==parent||event.data?.channel!=='woyz-case-v1')return;
     if(event.data.caseId)caseId=event.data.caseId;
     if(Array.isArray(event.data.cases))cases=event.data.cases;
-    setTimeout(()=>{renderMobileCases();renderDesktopCases();renderCaseIdentity();},0);
+    if(event.data.type==='created'){
+      const drawer=root.querySelector('#mh-drawer');
+      if(drawer)drawer.hidden=true;
+      root.querySelector('#mh-home')?.click?.();
+      setVoiceStatus('New Firestore patient opened: '+caseId);
+    }
+    if(event.data.type==='voiceRegistrationSaved')setVoiceStatus('Registration saved to Firestore');
+    if(event.data.type==='voiceRegistrationError')setVoiceStatus(event.data.error||'Voice registration failed');
+    setTimeout(()=>{renderMobileCases();renderDesktopCases();renderCaseIdentity();replaceRecorderCopy();},0);
   });
   ensureMobileControls();
+  ensureVoicePlugin();
   renderCaseIdentity();
+  replaceRecorderCopy();
+  setInterval(()=>{renderCaseIdentity();replaceRecorderCopy();},1000);
 })();
 </script>`;
 
@@ -130,10 +283,10 @@ const page = `<!doctype html>
     <button id="settingsBtn" class="settings" type="button" aria-label="Settings">⚙</button>
   </div>
   <div class="notice">
-    <span>Private prototype · Saved fields sync across devices in this account. Recording remains simulated; verify clinical entries before use.</span>
+    <span>Private prototype · Saved fields sync across devices in this workspace. Verify clinical entries before use.</span>
     <span id="syncNote"></span>
   </div>
-  <iframe id="workspaceFrame" title="mobile stroke workspace" sandbox="allow-scripts" referrerpolicy="no-referrer"></iframe>
+  <iframe id="workspaceFrame" title="mobile stroke workspace" sandbox="allow-scripts" allow="microphone" referrerpolicy="no-referrer"></iframe>
 </div>
 <dialog id="settingsDialog">
   <form method="dialog" class="settings-panel">
@@ -205,10 +358,30 @@ function switchMode(next){if(next===mode)return;if(!confirm("Switch views? Save 
 function newCaseId(){const stamp=new Date().toISOString().replace(/[-:TZ.]/g,"").slice(0,14);return "ST-"+stamp+"-"+Math.random().toString(36).slice(2,6).toUpperCase();}
 function connect(){if(unsubscribeCase){unsubscribeCase();unsubscribeCase=null;}document.getElementById("caseTitle").textContent="WOYZ · Case "+caseId;if(!currentUser){setStatus("Creating user…");sendSnapshot();return;}setStatus("Connecting…");unsubscribeCase=onSnapshot(ref(),docSnap=>{if(docSnap.exists()){writeSnapshot(docSnap.data());setStatus(snapshot.version?"Synced · v"+snapshot.version:"Firestore ready");}else{writeSnapshot({data:{},version:0,updatedAt:null});setStatus("Firestore ready");}sendSnapshot();},error=>{setStatus("Firestore unavailable",true,error.code||error.message);sendSnapshot();});}
 function connectList(){if(unsubscribeList){unsubscribeList();unsubscribeList=null;}if(!currentUser)return;unsubscribeList=onSnapshot(caseCollection(),listSnap=>{cases=listSnap.docs.map(item=>({id:item.id,...cleanSnapshot(item.data())})).sort((a,b)=>String(b.updatedAtText||"").localeCompare(String(a.updatedAtText||"")));if(cases.length&&!cases.some(item=>item.id===caseId)){caseId=cases[0].id;connect();}sendSnapshot();},error=>{setStatus("Case list unavailable",true,error.code||error.message);sendSnapshot();});}
-async function createCase(){if(!currentUser){post({type:"error",error:"Firestore user is not ready yet. Retry in a moment."});return;}if(saving)return;const nextId=newCaseId();saving=true;setStatus("Creating patient…");try{await runTransaction(db,async tx=>{tx.set(doc(db,"strokeWorkspaces",workspaceId,"strokeCases",nextId),{sharedApp:"woyz-stroke",createdByUid:currentUser.uid,updatedByUid:currentUser.uid,episode:nextId,data:{name:"Unknown patient"},version:0,createdAt:serverTimestamp(),updatedAt:serverTimestamp(),updatedAtText:new Date().toISOString(),mutationId:crypto.randomUUID()});});caseId=nextId;writeSnapshot({data:{name:"Unknown patient"},version:0,updatedAt:null,updatedAtText:new Date().toISOString()});connect();sendSnapshot("created");}catch(error){setStatus("Not created",true,error.code||error.message);post({type:"error",error:error.message||"Create patient failed"});}finally{saving=false;}}
+async function createCase(){if(!currentUser){post({type:"error",error:"Firestore user is not ready yet. Retry in a moment."});return;}if(saving)return;const nextId=newCaseId();saving=true;setStatus("Creating patient…");try{await runTransaction(db,async tx=>{tx.set(doc(db,"strokeWorkspaces",workspaceId,"strokeCases",nextId),{sharedApp:"woyz-stroke",createdByUid:currentUser.uid,updatedByUid:currentUser.uid,episode:nextId,data:{},version:0,createdAt:serverTimestamp(),updatedAt:serverTimestamp(),updatedAtText:new Date().toISOString(),mutationId:crypto.randomUUID()});});caseId=nextId;writeSnapshot({data:{},version:0,updatedAt:null,updatedAtText:new Date().toISOString()});connect();sendSnapshot("created");}catch(error){setStatus("Not created",true,error.code||error.message);post({type:"error",error:error.message||"Create patient failed"});}finally{saving=false;}}
 function selectCase(nextId){const cleaned=String(nextId||"").replace(/[^A-Za-z0-9_-]/g,"-");if(!cleaned||cleaned===caseId)return;caseId=cleaned;writeSnapshot({data:{},version:0,updatedAt:null});connect();}
 async function saveField(message){if(!currentUser){setStatus("Creating user…",true,"Firestore user is not ready yet");post({type:"error",error:"Firestore user is not ready yet. Retry in a moment."});return;}if(saving)return;saving=true;setStatus("Saving…");try{let result=null;await runTransaction(db,async tx=>{const snap=await tx.get(ref());const current=snap.exists()?cleanSnapshot(snap.data()):{data:{},version:0};if(current.version!==message.version){result={conflict:true,...current};return;}const next={sharedApp:"woyz-stroke",data:{...current.data,[message.key]:message.value},version:current.version+1,createdByUid:snap.data()?.createdByUid||currentUser.uid,updatedByUid:currentUser.uid,episode:caseId,updatedAt:serverTimestamp(),updatedAtText:new Date().toISOString(),mutationId:message.mutationId};tx.set(ref(),next,{merge:true});result={conflict:false,...next,updatedAt:null};});if(result?.conflict){writeSnapshot(result);setStatus("Conflict",true,"Review retained draft");post({type:"conflict",key:message.key,error:"Another device saved changes. Your draft is retained; compare it with the latest value before saving again.",...snapshot});}else{writeSnapshot(result);setStatus("Synced · v"+snapshot.version);post({type:"saved",key:message.key,...snapshot,caseId,cases:cases.map(caseLabel)});}}catch(error){setStatus("Not saved",true,error.code||error.message);post({type:"error",error:error.message||"Save failed"});}finally{saving=false;}}
-window.addEventListener("message",event=>{if(event.source!==frame.contentWindow||event.data?.channel!=="woyz-case-v1")return;const message=event.data;if(message.type==="ready")sendSnapshot();if(message.type==="save")saveField(message);if(message.type==="createCase")createCase();if(message.type==="selectCase")selectCase(message.caseId);});
+async function savePatch(patch,mutationId){if(!currentUser){post({type:"voiceRegistrationError",error:"Firestore user is not ready yet. Retry in a moment."});return;}if(saving){post({type:"voiceRegistrationError",error:"Another save is running. Retry in a moment."});return;}saving=true;setStatus("Saving registration…");try{let result=null;await runTransaction(db,async tx=>{const snap=await tx.get(ref());const current=snap.exists()?cleanSnapshot(snap.data()):{data:{},version:0};const next={sharedApp:"woyz-stroke",data:{...current.data,...patch},version:current.version+1,createdByUid:snap.data()?.createdByUid||currentUser.uid,updatedByUid:currentUser.uid,episode:caseId,updatedAt:serverTimestamp(),updatedAtText:new Date().toISOString(),mutationId};tx.set(ref(),next,{merge:true});result={...next,updatedAt:null};});writeSnapshot(result);setStatus("Synced · v"+snapshot.version);post({type:"voiceRegistrationSaved",patch,...snapshot,caseId,cases:cases.map(caseLabel)});}catch(error){setStatus("Registration not saved",true,error.code||error.message);post({type:"voiceRegistrationError",error:error.message||"Registration save failed"});}finally{saving=false;}}
+function cleanGeminiText(value){const fence=String.fromCharCode(96)+String.fromCharCode(96)+String.fromCharCode(96);return String(value??"").replace(new RegExp("^"+fence+"(?:json)?","i"),"").replace(new RegExp(fence+"$"),"").trim();}
+function fieldValue(value){const text=String(value??"").trim();return text||"NIL";}
+async function generateRegistrationFromAudio(message){
+  const apiKey=localStorage.getItem(geminiStoreKey)||"";
+  if(!apiKey.trim()){post({type:"voiceRegistrationError",error:"Add Gemini API key in Settings first."});document.getElementById("settingsBtn").click();return;}
+  if(!message.audioData){post({type:"voiceRegistrationError",error:"No audio was received from the voice plugin."});return;}
+  setStatus("Gemini registration…");
+  try{
+    const schema={type:"object",properties:{name:{type:"string"},uhid:{type:"string"},age:{type:"string"},sex:{type:"string"},mobile:{type:"string"},contact:{type:"string"},diagnosis:{type:"string"},registrationNote:{type:"string"}},required:["name","uhid","age","sex","mobile","contact","diagnosis","registrationNote"]};
+    const prompt="You are WOYZ Stroke registration extraction assistant. Listen to the audio and return strict JSON only for these registration columns: name, uhid, age, sex, mobile, contact, diagnosis, registrationNote. Extract only explicitly stated information; never invent, infer or complete missing demographics. Use NIL for any column that is not supported by the audio. Keep each column concise and clinically usable. registrationNote should be a short registration-stage note containing presenting complaint, onset or last-known-well if stated, examination findings, provisional diagnosis, and any scan/decision/IVT/thrombectomy-relevant statement only when the speaker says it. Do not include advice, explanations, markdown or extra keys.";
+    const response=await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key="+encodeURIComponent(apiKey.trim()),{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({contents:[{role:"user",parts:[{text:prompt},{inline_data:{mime_type:message.mimeType||"audio/webm",data:message.audioData}}]}],generationConfig:{temperature:0,responseMimeType:"application/json",responseSchema:schema}})});
+    if(!response.ok)throw new Error("Gemini request failed: "+response.status+" "+await response.text());
+    const data=await response.json();
+    const text=cleanGeminiText((data.candidates?.[0]?.content?.parts||[]).map(part=>part.text||"").join(""));
+    const parsed=JSON.parse(text);
+    const patch={name:fieldValue(parsed.name),uhid:fieldValue(parsed.uhid),age:fieldValue(parsed.age),sex:fieldValue(parsed.sex),mobile:fieldValue(parsed.mobile),contact:fieldValue(parsed.contact),diagnosis:fieldValue(parsed.diagnosis),stage_0:fieldValue(parsed.registrationNote)};
+    await savePatch(patch,message.mutationId||crypto.randomUUID());
+  }catch(error){setStatus("Gemini failed",true,error.message||String(error));post({type:"voiceRegistrationError",error:error.message||"Gemini registration failed"});}
+}
+window.addEventListener("message",event=>{if(event.source!==frame.contentWindow||event.data?.channel!=="woyz-case-v1")return;const message=event.data;if(message.type==="ready")sendSnapshot();if(message.type==="save")saveField(message);if(message.type==="createCase")createCase();if(message.type==="selectCase")selectCase(message.caseId);if(message.type==="voiceRegistration")generateRegistrationFromAudio(message);});
 mobileBtn.addEventListener("click",()=>switchMode("mobile"));
 desktopBtn.addEventListener("click",()=>switchMode("desktop"));
 document.getElementById("settingsBtn").addEventListener("click",()=>{caseDocId.value=caseId;workspaceCodeInput.value=workspaceId;geminiKeyInput.value=localStorage.getItem(geminiStoreKey)||"";settingsDialog.showModal();});
