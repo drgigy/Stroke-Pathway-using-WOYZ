@@ -27,6 +27,7 @@ const sharedCaseControls = `<script>
   let cases=[];
   let selectedStageIndex=null;
   let selectedStageName='';
+  let selectedVoiceKind='stage';
   const voiceStages=['Registration','Initial Assessment','Scan','NIH Stroke Scale','Decision','Checklist','IVT','Thrombectomy','Timings','Inpatient review','Discharge','Follow-up'];
   const esc=value=>String(value??'').replace(/[&<>"']/g,match=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[match]));
   function post(message){parent.postMessage({channel:'woyz-case-v1',...message},'*');}
@@ -44,13 +45,15 @@ const sharedCaseControls = `<script>
     document.body.append(dock);
     voiceState.dock=dock;voiceState.status=dock.querySelector('#registrationVoiceStatus');voiceState.start=dock.querySelector('#registrationVoiceStart');voiceState.pause=dock.querySelector('#registrationVoicePause');voiceState.resume=dock.querySelector('#registrationVoiceResume');voiceState.extend=dock.querySelector('#registrationVoiceExtend');voiceState.stop=dock.querySelector('#registrationVoiceStop');voiceState.level=dock.querySelector('#registrationVoiceLevel');
     voiceState.bars=Array.from({length:28},()=>{const bar=document.createElement('span');voiceState.level.append(bar);return bar;});
-    dock.querySelector('#registrationVoiceClose').addEventListener('click',()=>dock.classList.remove('visible'));
+    dock.querySelector('#registrationVoiceClose').addEventListener('pointerdown',event=>{event.preventDefault();event.stopPropagation();closeVoiceDock();});
+    dock.querySelector('#registrationVoiceClose').addEventListener('click',event=>{event.preventDefault();event.stopPropagation();closeVoiceDock();});
     voiceState.start.addEventListener('click',startVoiceRecording);
     voiceState.pause.addEventListener('click',pauseVoiceRecording);
     voiceState.resume.addEventListener('click',resumeVoiceRecording);
     voiceState.extend.addEventListener('click',extendVoiceRecording);
     voiceState.stop.addEventListener('click',finishVoiceRecording);
     makeVoiceDockMovable(dock,dock.querySelector('#registrationVoiceHead'));
+    window.addEventListener('resize',positionVoiceDockInsideMobile);
     drawVoiceBars();
   }
   function openVoiceDockForStage(){
@@ -59,10 +62,20 @@ const sharedCaseControls = `<script>
     if(!stage){setVoiceStatus('Select a pathway section first');return;}
     selectedStageIndex=stage.index;
     selectedStageName=stage.name;
+    selectedVoiceKind=stage.kind||'stage';
     const title=voiceState.dock?.querySelector('.registration-voice-title');
     if(title)title.textContent=selectedStageName;
     voiceState.dock?.classList.add('visible');
+    requestAnimationFrame(positionVoiceDockInsideMobile);
     setVoiceStatus('Ready for '+selectedStageName);
+  }
+  function closeVoiceDock(){
+    if(voiceState.recording&&voiceState.recorder&&voiceState.recorder.state!=='inactive'){
+      voiceState.recorder.onstop=null;
+      voiceState.recorder.stop();
+    }
+    stopVoiceTracks();
+    voiceState.dock?.classList.remove('visible');
   }
   function setVoiceStatus(text){if(voiceState.status)voiceState.status.textContent=text;}
   function setVoiceTimer(){
@@ -153,16 +166,26 @@ const sharedCaseControls = `<script>
     stopVoiceTracks();
     if(!blob.size){setVoiceStatus('No voice was captured');return;}
     const reader=new FileReader();
-    reader.onload=()=>{const data=String(reader.result||'').split(',')[1]||'';post({type:'voiceRegistration',caseId,audioData:data,mimeType:blob.type,mutationId:crypto.randomUUID(),stageIndex:selectedStageIndex,stageName:selectedStageName});setVoiceStatus('Sending '+(selectedStageName||'selected section')+' audio to Gemini…');};
+    reader.onload=()=>{const data=String(reader.result||'').split(',')[1]||'';post({type:'voiceRegistration',caseId,audioData:data,mimeType:blob.type,mutationId:crypto.randomUUID(),stageIndex:selectedStageIndex,stageName:selectedStageName,voiceKind:selectedVoiceKind});setVoiceStatus('Sending '+(selectedStageName||'selected section')+' audio to Gemini…');};
     reader.onerror=()=>setVoiceStatus('Could not read the recording');
     reader.readAsDataURL(blob);
   }
   function makeVoiceDockMovable(dock,handle){
     let drag=null;
-    handle.addEventListener('pointerdown',event=>{drag={x:event.clientX,y:event.clientY,left:dock.offsetLeft,top:dock.offsetTop};handle.setPointerCapture(event.pointerId);});
-    handle.addEventListener('pointermove',event=>{if(!drag)return;dock.style.left=Math.max(8,drag.left+event.clientX-drag.x)+'px';dock.style.top=Math.max(8,drag.top+event.clientY-drag.y)+'px';dock.style.bottom='auto';});
+    handle.addEventListener('pointerdown',event=>{if(event.target.closest?.('button'))return;drag={x:event.clientX,y:event.clientY,left:dock.offsetLeft,top:dock.offsetTop};handle.setPointerCapture(event.pointerId);});
+    handle.addEventListener('pointermove',event=>{if(!drag)return;const bounds=root.getBoundingClientRect();const nextLeft=drag.left+event.clientX-drag.x;const nextTop=drag.top+event.clientY-drag.y;dock.style.left=Math.min(Math.max(bounds.left+8,nextLeft),bounds.right-dock.offsetWidth-8)+'px';dock.style.top=Math.min(Math.max(bounds.top+8,nextTop),bounds.bottom-dock.offsetHeight-8)+'px';dock.style.bottom='auto';});
     handle.addEventListener('pointerup',()=>{drag=null;});
     handle.addEventListener('pointercancel',()=>{drag=null;});
+  }
+  function positionVoiceDockInsideMobile(){
+    const dock=voiceState.dock;
+    if(!dock||!dock.classList.contains('visible'))return;
+    const bounds=root.getBoundingClientRect();
+    const width=Math.max(280,Math.min(bounds.width-28,340));
+    dock.style.width=width+'px';
+    dock.style.left=(bounds.left+14)+'px';
+    dock.style.top=Math.max(bounds.top+14,Math.min(bounds.bottom-dock.offsetHeight-14,window.innerHeight-dock.offsetHeight-14))+'px';
+    dock.style.bottom='auto';
   }
   function ensureMobileControls(){
     const list=root.querySelector('#mh-patients');
@@ -177,8 +200,9 @@ const sharedCaseControls = `<script>
   }
   function currentStageFromContent(){
     const heading=root.querySelector('#mh-content h2')?.textContent?.trim()||'';
+    if(heading==='All 24 KPIs')return {index:100,name:'KPI missing details',kind:'kpi'};
     const index=voiceStages.indexOf(heading);
-    return index>=0?{index,name:voiceStages[index]}:null;
+    return index>=0?{index,name:voiceStages[index],kind:'stage'}:null;
   }
   function updateVoiceAvailability(){
     ensureVoicePlugin();
@@ -186,12 +210,14 @@ const sharedCaseControls = `<script>
     if(stage){
       selectedStageIndex=stage.index;
       selectedStageName=stage.name;
+      selectedVoiceKind=stage.kind||'stage';
       const title=root.querySelector('.registration-voice-title');
       if(title)title.textContent=stage.name;
       return;
     }
     selectedStageIndex=null;
     selectedStageName='';
+    selectedVoiceKind='stage';
     voiceState.dock?.classList.remove('visible');
   }
   function renderMobileCases(){
@@ -232,8 +258,9 @@ const sharedCaseControls = `<script>
     if(create){event.preventDefault();event.stopImmediatePropagation();post({type:'createCase'});return;}
     const select=event.target.closest?.('[data-firestore-case]');
     if(select){event.preventDefault();event.stopImmediatePropagation();post({type:'selectCase',caseId:select.getAttribute('data-firestore-case')});const drawer=root.querySelector('#mh-drawer');if(drawer)drawer.hidden=true;}
-    setTimeout(()=>{renderCaseIdentity();updateVoiceAvailability();},0);
-    setTimeout(()=>{renderCaseIdentity();updateVoiceAvailability();},120);
+    setTimeout(()=>{renderMobileCases();renderCaseIdentity();updateVoiceAvailability();},0);
+    setTimeout(()=>{renderMobileCases();renderCaseIdentity();updateVoiceAvailability();},120);
+    setTimeout(()=>{renderMobileCases();renderCaseIdentity();updateVoiceAvailability();},600);
   },true);
   window.addEventListener('message',event=>{
     if(event.source!==parent||event.data?.channel!=='woyz-case-v1')return;
@@ -254,7 +281,7 @@ const sharedCaseControls = `<script>
   renderCaseIdentity();
   replaceRecorderCopy();
   updateVoiceAvailability();
-  setInterval(()=>{renderCaseIdentity();replaceRecorderCopy();updateVoiceAvailability();},1000);
+  setInterval(()=>{renderMobileCases();renderCaseIdentity();replaceRecorderCopy();updateVoiceAvailability();},1000);
 })();
 </script>`;
 
@@ -380,17 +407,19 @@ function cleanSnapshot(raw){return {data:{...(raw?.data||{})},version:Number(raw
 function writeSnapshot(next){snapshot=cleanSnapshot(next);}
 function setStatus(text,isError=false,note=""){statusEl.textContent=text;statusEl.style.color="inherit";syncNote.textContent=note;syncNote.className=isError?"error":"";}
 function post(message){frame.contentWindow?.postMessage({channel:"woyz-case-v1",...message},"*");}
-function caseLabel(item){const name=item.data?.name||"Unknown patient";const uhid=item.data?.uhid||"No UHID";return {id:item.id,name,uhid,version:item.version||0};}
-function sendSnapshot(type="snapshot",extra={}){post({type,workspaceId,caseId,cases:cases.map(caseLabel),...snapshot,...extra});}
+function caseLabel(item){const name=item.data?.name||"Patient name missing";const uhid=item.data?.uhid||"No UHID";return {id:item.id,name,uhid,version:item.version||0};}
+function visibleCaseLabels(){const current={id:caseId,...snapshot};const merged=[current,...cases.filter(item=>item.id!==caseId)];return merged.map(caseLabel);}
+function rememberCurrentCase(){cases=[{id:caseId,...snapshot},...cases.filter(item=>item.id!==caseId)];}
+function sendSnapshot(type="snapshot",extra={}){post({type,workspaceId,caseId,cases:visibleCaseLabels(),...snapshot,...extra});}
 function renderFrame(){frame.srcdoc=mode==="desktop"?desktopDocument:mobileDocument;frame.title=mode==="desktop"?"desktop stroke workspace":"mobile stroke workspace";mobileBtn.classList.toggle("active",mode==="mobile");desktopBtn.classList.toggle("active",mode==="desktop");}
 function switchMode(next){if(next===mode)return;if(!confirm("Switch views? Save any open draft first. Unsaved text will be discarded."))return;mode=next;history.replaceState(null,"",next==="desktop"?"#admin":"#mobile");renderFrame();setTimeout(()=>sendSnapshot(),150);}
 function newCaseId(){const stamp=new Date().toISOString().replace(/[-:TZ.]/g,"").slice(0,14);return "ST-"+stamp+"-"+Math.random().toString(36).slice(2,6).toUpperCase();}
 function connect(){if(unsubscribeCase){unsubscribeCase();unsubscribeCase=null;}document.getElementById("caseTitle").textContent="WOYZ · Case "+caseId;if(!currentUser){setStatus("Creating user…");sendSnapshot();return;}setStatus("Connecting…");unsubscribeCase=onSnapshot(ref(),docSnap=>{if(docSnap.exists()){writeSnapshot(docSnap.data());setStatus(snapshot.version?"Synced · v"+snapshot.version:"Firestore ready");}else{writeSnapshot({data:{},version:0,updatedAt:null});setStatus("Firestore ready");}sendSnapshot();},error=>{setStatus("Firestore unavailable",true,error.code||error.message);sendSnapshot();});}
 function connectList(){if(unsubscribeList){unsubscribeList();unsubscribeList=null;}if(!currentUser)return;unsubscribeList=onSnapshot(caseCollection(),listSnap=>{cases=listSnap.docs.map(item=>({id:item.id,...cleanSnapshot(item.data())})).sort((a,b)=>String(b.updatedAtText||"").localeCompare(String(a.updatedAtText||"")));if(cases.length&&!cases.some(item=>item.id===caseId)){caseId=cases[0].id;connect();}sendSnapshot();},error=>{setStatus("Case list unavailable",true,error.code||error.message);sendSnapshot();});}
-async function createCase(){if(!currentUser){post({type:"error",error:"Firestore user is not ready yet. Retry in a moment."});return;}if(saving)return;const nextId=newCaseId();saving=true;setStatus("Creating patient…");try{await runTransaction(db,async tx=>{tx.set(doc(db,"strokeWorkspaces",workspaceId,"strokeCases",nextId),{sharedApp:"woyz-stroke",createdByUid:currentUser.uid,updatedByUid:currentUser.uid,episode:nextId,data:{},version:0,createdAt:serverTimestamp(),updatedAt:serverTimestamp(),updatedAtText:new Date().toISOString(),mutationId:crypto.randomUUID()});});caseId=nextId;writeSnapshot({data:{},version:0,updatedAt:null,updatedAtText:new Date().toISOString()});connect();sendSnapshot("created");}catch(error){setStatus("Not created",true,error.code||error.message);post({type:"error",error:error.message||"Create patient failed"});}finally{saving=false;}}
+async function createCase(){if(!currentUser){post({type:"error",error:"Firestore user is not ready yet. Retry in a moment."});return;}if(saving)return;const nextId=newCaseId();saving=true;setStatus("Creating patient…");try{await runTransaction(db,async tx=>{tx.set(doc(db,"strokeWorkspaces",workspaceId,"strokeCases",nextId),{sharedApp:"woyz-stroke",createdByUid:currentUser.uid,updatedByUid:currentUser.uid,episode:nextId,data:{},version:0,createdAt:serverTimestamp(),updatedAt:serverTimestamp(),updatedAtText:new Date().toISOString(),mutationId:crypto.randomUUID()});});caseId=nextId;writeSnapshot({data:{},version:0,updatedAt:null,updatedAtText:new Date().toISOString()});rememberCurrentCase();connect();sendSnapshot("created");}catch(error){setStatus("Not created",true,error.code||error.message);post({type:"error",error:error.message||"Create patient failed"});}finally{saving=false;}}
 function selectCase(nextId){const cleaned=String(nextId||"").replace(/[^A-Za-z0-9_-]/g,"-");if(!cleaned||cleaned===caseId)return;caseId=cleaned;writeSnapshot({data:{},version:0,updatedAt:null});connect();}
-async function saveField(message){if(!currentUser){setStatus("Creating user…",true,"Firestore user is not ready yet");post({type:"error",error:"Firestore user is not ready yet. Retry in a moment."});return;}if(saving)return;saving=true;setStatus("Saving…");try{let result=null;await runTransaction(db,async tx=>{const snap=await tx.get(ref());const current=snap.exists()?cleanSnapshot(snap.data()):{data:{},version:0};if(current.version!==message.version){result={conflict:true,...current};return;}const next={sharedApp:"woyz-stroke",data:{...current.data,[message.key]:message.value},version:current.version+1,createdByUid:snap.data()?.createdByUid||currentUser.uid,updatedByUid:currentUser.uid,episode:caseId,updatedAt:serverTimestamp(),updatedAtText:new Date().toISOString(),mutationId:message.mutationId};tx.set(ref(),next,{merge:true});result={conflict:false,...next,updatedAt:null};});if(result?.conflict){writeSnapshot(result);setStatus("Conflict",true,"Review retained draft");post({type:"conflict",key:message.key,error:"Another device saved changes. Your draft is retained; compare it with the latest value before saving again.",...snapshot});}else{writeSnapshot(result);setStatus("Synced · v"+snapshot.version);post({type:"saved",key:message.key,...snapshot,caseId,cases:cases.map(caseLabel)});}}catch(error){setStatus("Not saved",true,error.code||error.message);post({type:"error",error:error.message||"Save failed"});}finally{saving=false;}}
-async function savePatch(patch,mutationId){if(!currentUser){post({type:"voiceRegistrationError",error:"Firestore user is not ready yet. Retry in a moment."});return;}if(saving){post({type:"voiceRegistrationError",error:"Another save is running. Retry in a moment."});return;}saving=true;setStatus("Saving registration…");try{let result=null;await runTransaction(db,async tx=>{const snap=await tx.get(ref());const current=snap.exists()?cleanSnapshot(snap.data()):{data:{},version:0};const next={sharedApp:"woyz-stroke",data:{...current.data,...patch},version:current.version+1,createdByUid:snap.data()?.createdByUid||currentUser.uid,updatedByUid:currentUser.uid,episode:caseId,updatedAt:serverTimestamp(),updatedAtText:new Date().toISOString(),mutationId};tx.set(ref(),next,{merge:true});result={...next,updatedAt:null};});writeSnapshot(result);setStatus("Synced · v"+snapshot.version);post({type:"voiceRegistrationSaved",patch,...snapshot,caseId,cases:cases.map(caseLabel)});}catch(error){setStatus("Registration not saved",true,error.code||error.message);post({type:"voiceRegistrationError",error:error.message||"Registration save failed"});}finally{saving=false;}}
+async function saveField(message){if(!currentUser){setStatus("Creating user…",true,"Firestore user is not ready yet");post({type:"error",error:"Firestore user is not ready yet. Retry in a moment."});return;}if(saving)return;saving=true;setStatus("Saving…");try{let result=null;await runTransaction(db,async tx=>{const snap=await tx.get(ref());const current=snap.exists()?cleanSnapshot(snap.data()):{data:{},version:0};if(current.version!==message.version){result={conflict:true,...current};return;}const next={sharedApp:"woyz-stroke",data:{...current.data,[message.key]:message.value},version:current.version+1,createdByUid:snap.data()?.createdByUid||currentUser.uid,updatedByUid:currentUser.uid,episode:caseId,updatedAt:serverTimestamp(),updatedAtText:new Date().toISOString(),mutationId:message.mutationId};tx.set(ref(),next,{merge:true});result={conflict:false,...next,updatedAt:null};});if(result?.conflict){writeSnapshot(result);setStatus("Conflict",true,"Review retained draft");post({type:"conflict",key:message.key,error:"Another device saved changes. Your draft is retained; compare it with the latest value before saving again.",...snapshot});}else{writeSnapshot(result);rememberCurrentCase();setStatus("Synced · v"+snapshot.version);post({type:"saved",key:message.key,...snapshot,caseId,cases:visibleCaseLabels()});}}catch(error){setStatus("Not saved",true,error.code||error.message);post({type:"error",error:error.message||"Save failed"});}finally{saving=false;}}
+async function savePatch(patch,mutationId){if(!currentUser){post({type:"voiceRegistrationError",error:"Firestore user is not ready yet. Retry in a moment."});return;}if(saving){post({type:"voiceRegistrationError",error:"Another save is running. Retry in a moment."});return;}saving=true;setStatus("Saving registration…");try{let result=null;await runTransaction(db,async tx=>{const snap=await tx.get(ref());const current=snap.exists()?cleanSnapshot(snap.data()):{data:{},version:0};const next={sharedApp:"woyz-stroke",data:{...current.data,...patch},version:current.version+1,createdByUid:snap.data()?.createdByUid||currentUser.uid,updatedByUid:currentUser.uid,episode:caseId,updatedAt:serverTimestamp(),updatedAtText:new Date().toISOString(),mutationId};tx.set(ref(),next,{merge:true});result={...next,updatedAt:null};});writeSnapshot(result);rememberCurrentCase();setStatus("Synced · v"+snapshot.version);post({type:"voiceRegistrationSaved",patch,...snapshot,caseId,cases:visibleCaseLabels()});}catch(error){setStatus("Registration not saved",true,error.code||error.message);post({type:"voiceRegistrationError",error:error.message||"Registration save failed"});}finally{saving=false;}}
 function cleanGeminiText(value){const fence=String.fromCharCode(96)+String.fromCharCode(96)+String.fromCharCode(96);return String(value??"").replace(new RegExp("^"+fence+"(?:json)?","i"),"").replace(new RegExp(fence+"$"),"").trim();}
 function fieldValue(value){const text=String(value??"").trim();return text||"NIL";}
 async function generateRegistrationFromAudio(message){
@@ -401,7 +430,8 @@ async function generateRegistrationFromAudio(message){
   const stageName=String(message.stageName||"Registration");
   setStatus("Gemini · "+stageName);
   try{
-    const registrationMode=stageIndex===0;
+    const kpiMode=message.voiceKind==="kpi";
+    const registrationMode=!kpiMode&&stageIndex===0;
     const schema=registrationMode?{type:"object",properties:{name:{type:"string"},uhid:{type:"string"},age:{type:"string"},sex:{type:"string"},mobile:{type:"string"},contact:{type:"string"},diagnosis:{type:"string"},registrationNote:{type:"string"}},required:["name","uhid","age","sex","mobile","contact","diagnosis","registrationNote"]}:{type:"object",properties:{stageNote:{type:"string"}},required:["stageNote"]};
     const prompt=registrationMode?"You are WOYZ Stroke registration extraction assistant. Listen to the audio and return strict JSON only for these registration columns: name, uhid, age, sex, mobile, contact, diagnosis, registrationNote. Extract only explicitly stated information; never invent, infer or complete missing demographics. Use NIL for any column that is not supported by the audio. Keep each column concise and clinically usable. registrationNote should be a short registration-stage note containing presenting complaint, onset or last-known-well if stated, examination findings, provisional diagnosis, and any scan/decision/IVT/thrombectomy-relevant statement only when the speaker says it. Do not include advice, explanations, markdown or extra keys.":"You are WOYZ Stroke pathway extraction assistant. The selected section is "+stageName+". Listen to the audio and return strict JSON only with stageNote. Generate the note for this selected pathway section only. Include explicit times, findings, decisions, reasons, drugs, scores and outcomes only if stated. Use NIL if the audio does not contain information for this section. Keep it concise, clinically usable, and do not add advice, markdown or extra keys.";
     const response=await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key="+encodeURIComponent(apiKey.trim()),{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({contents:[{role:"user",parts:[{text:prompt},{inline_data:{mime_type:message.mimeType||"audio/webm",data:message.audioData}}]}],generationConfig:{temperature:0,responseMimeType:"application/json",responseSchema:schema}})});
@@ -409,7 +439,7 @@ async function generateRegistrationFromAudio(message){
     const data=await response.json();
     const text=cleanGeminiText((data.candidates?.[0]?.content?.parts||[]).map(part=>part.text||"").join(""));
     const parsed=JSON.parse(text);
-    const patch=registrationMode?{name:fieldValue(parsed.name),uhid:fieldValue(parsed.uhid),age:fieldValue(parsed.age),sex:fieldValue(parsed.sex),mobile:fieldValue(parsed.mobile),contact:fieldValue(parsed.contact),diagnosis:fieldValue(parsed.diagnosis),stage_0:fieldValue(parsed.registrationNote)}:{["stage_"+stageIndex]:fieldValue(parsed.stageNote)};
+    const patch=registrationMode?{name:fieldValue(parsed.name),uhid:fieldValue(parsed.uhid),age:fieldValue(parsed.age),sex:fieldValue(parsed.sex),mobile:fieldValue(parsed.mobile),contact:fieldValue(parsed.contact),diagnosis:fieldValue(parsed.diagnosis),stage_0:fieldValue(parsed.registrationNote)}:kpiMode?{kpi_missing_details:fieldValue(parsed.stageNote)}:{["stage_"+stageIndex]:fieldValue(parsed.stageNote)};
     await savePatch(patch,message.mutationId||crypto.randomUUID());
   }catch(error){setStatus("Gemini failed",true,error.message||String(error));post({type:"voiceRegistrationError",error:error.message||"Gemini registration failed"});}
 }
