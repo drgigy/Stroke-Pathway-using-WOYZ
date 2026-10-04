@@ -1,0 +1,54 @@
+WOYZ STROKE — SOURCE CODE HANDOVER
+Prepared 3 October 2026
+
+This package contains the current source of the privately published mobile and desktop prototype. It is the newer Sites/Vinext project, not the earlier standalone Python application.
+
+START HERE
+1. Install Node.js 22.13 or newer (Node 24 recommended) and npm.
+2. Unzip and open the woyz-stroke-source folder in VS Code or Codex.
+3. Run: npm run install:ci
+4. Run: npm run build
+5. Apply the local database schema once:
+   node --import ./scripts/sites-env.mjs ./node_modules/wrangler/bin/wrangler.js d1 execute DB --local --config dist/server/wrangler.json --persist-to .wrangler/state --file drizzle/0000_dusty_silhouette.sql
+6. Run: npm run dev
+7. Open the Local URL printed by the server, then /mobile or /admin.
+   Local sign-in uses the starter's simulated development account. Production identity is supplied by Sites.
+8. For changes: npx tsc --noEmit and npm run build.
+
+CODE MAP
+app/mobile/page.tsx       Mobile route
+app/admin/page.tsx        Desktop route
+app/components/workspace.tsx  Host navigation, authenticated API calls and five-second refresh
+app/components/documents.ts  Embedded mobile/desktop HTML, original proforma images and synchronization bridge
+app/api/case/route.ts     Authenticated case reads and version-checked writes
+app/chatgpt-auth.ts       Sites identity helpers
+ db/schema.ts            D1 schema (cases and revision history)
+ drizzle/                Initial schema and append-only audit triggers
+ build/ and scripts/     Preserved Sites/Vinext build integration
+
+HOW SYNC WORKS
+The same signed-in account sees the same ST-024 record on both routes/devices. Data is keyed by account and episode. A field save checks the record version. Conflicting edits are rejected; drafts remain visible for comparison. Every saved revision is retained by database audit triggers. There is no cross-account case-sharing implementation yet.
+
+CURRENT LIMITS — PLEASE REVIEW BEFORE EXPANDING
+- One shared case ST-024 per account; no multi-patient creation workflow yet.
+- Recording controls are simulated. Audio capture, transcription and clinical extraction are not connected.
+- Structured values and stage notes can be entered with Edit shared case details.
+- Narrative view uses entered stage notes, not an AI-generated chronological narrative.
+- Seven-page proforma backgrounds are preserved; field overlays are partial. Long values can be shortened in preview. Final PDF generation, continuation-page mapping and print validation remain unfinished.
+- The 24 KPI list and data prompts are present; there is no approved clinical rule engine or validated KPI-rate calculation. Some missing-data prompts remain static.
+- Quality statistics are illustrative and not calculated from the shared database.
+- In-memory drafts do not survive closing or refreshing the page.
+- UI documents are currently embedded strings. Refactoring into maintainable components and a single shared field registry is a useful next step.
+- Review all clinical definitions and source-form versions with the clinical owner before operational use.
+
+DESIGN REQUIREMENTS
+Keep the WOYZ green header and left patient list, without OP/IP tabs. Maintain a compact mobile stage guide with a scrollable prompt box. Desktop has a descriptive note and the original filled proforma as separate review views. Keep event time distinct from recording time. Missing/unknown/not-applicable must not become normal or complete by default. Delay explanations must not turn a missed target into an achieved target. Preserve source provenance, clinician confirmation and correction history.
+
+VALIDATION ALREADY PERFORMED
+TypeScript check and production build passed. Local API tests checked authentication, origin rejection, field validation, retries and stale-write conflicts. Local browser tests demonstrated mobile-to-desktop patient-name sync and desktop-to-mobile consultant-comment sync. Live private desktop successfully loaded the hosted empty case. Clinical validation and complete print testing remain outstanding.
+
+COLLABORATION
+Prefer a private GitHub/GitLab repository. Upload this source, invite Sujith as a collaborator, and make changes on branches with pull requests. A ZIP alone lets him edit a copy but does not automatically merge his edits back.
+
+DEPLOYMENT IS SEPARATE
+The live Site project ID has been removed from this handover's hosting manifest. No credentials, database contents, node_modules, local runtime state or Git history are included. Sujith can develop locally without access to the live Site. Do not reconnect to or deploy over the original Site without coordinating with the owner. Sites hosting/editor access and code repository access are separate permissions.

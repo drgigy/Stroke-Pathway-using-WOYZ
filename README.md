@@ -1,42 +1,17 @@
-# WOYZ Stroke Local Prototype
+# WOYZ Stroke shared prototype
 
-This is a standalone local prototype generated from the supplied design review package and implementation brief.
+Private Sites project with mobile (`/mobile`) and desktop (`/admin`) views.
 
-It is not a clinical system. It does not validate treatment rules, calculate final NABH KPIs, capture microphone audio, authenticate users, generate a production PDF, or connect to an existing deployment.
+## Shared records
 
-## Open Locally
+Both views read and write the same D1 case for the signed-in user. This first implementation supports one shared case, ST-024, per account. The case starts empty. Use **Edit shared case details** and **Save to shared case**. Consultant, discharge and KPI draft save controls also persist to the same record. The other view refreshes every five seconds. Edits use optimistic version checks; conflicting drafts stay visible for comparison rather than overwriting another device's update. Offline drafts remain in the open page but are not durable after closing/reloading.
 
-Start a local server from this directory:
+`app/api/case/route.ts` enforces identity, origin checks, allowed field names, length limits and version matching. Database triggers append every case revision to immutable history. No production sample records are seeded. Local test data is not packaged.
 
-```bash
-python3 -m http.server 8000
-```
+## Preserved previews
 
-Then open:
+Both documents remain in sandboxed iframes with the original CSP; a source-checked postMessage bridge connects the allowed editor fields to the authenticated parent application. Shared values replace mock case content. OP/IP filtering is hidden. Statistics remain explicitly illustrative. Audio capture and transcription are simulated; final PDF printing and full proforma field mapping are not connected. Case notes are stage-organized entered text, not automatic AI-generated prose. Do not treat the prototype as a validated clinical system.
 
-```text
-http://localhost:8000
-```
+## Validation
 
-## Implemented Locally
-
-- Temporary and registered episode examples.
-- Mobile and desktop modes over the same episode data.
-- Mobile WOYZ state controls with visible start, pause, resume and finish states.
-- Floating black WOYZ voice dock adapted from the handover package, with equalizer bars, timer, `+5`, stop, and browser-local transcript capture where supported.
-- Desktop-only chronological summary, KPI evidence view and print action.
-- Structured registration, scan, decision, IVT, thrombectomy, monitoring, review, discharge and follow-up screens.
-- Append-only monitoring observations.
-- Numbered decision checklist with Yes/No/Unknown/N/A states.
-- Local browser persistence via `localStorage`.
-- JSON export for the selected episode.
-
-## Deliberately Provisional
-
-- The transplanted voice dock does not import the WOYZ Notes Firebase/Gemini backend, authorization-key storage, or production transcription workflow.
-- Clinical contraindication rules.
-- Dose logic.
-- KPI numerators and denominators.
-- Imaging and MT timing endpoints.
-- Print form revision and coordinate mapping.
-- Authentication, audit immutability, encryption, backups and deployment controls.
+Production build and TypeScript checks; local API checks for auth, origin, retry, version conflicts and field validation; browser verification of mobile-to-desktop name synchronization and desktop-to-mobile consultant-comment synchronization.

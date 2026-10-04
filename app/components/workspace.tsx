@@ -1,0 +1,16 @@
+'use client';
+import {useEffect,useRef,useState} from 'react';
+import {mobileDocument,desktopDocument} from './documents';
+export default function Workspace({initialMode="mobile"}:{initialMode?:string}){
+ const frame=useRef<HTMLIFrameElement>(null),snapshot=useRef<any>(null),saving=useRef(false);
+ const [mode,setMode]=useState(initialMode),[status,setStatus]=useState('Connecting to shared case…');
+
+ useEffect(()=>{
+ let alive=true;const send=(m:any)=>frame.current?.contentWindow?.postMessage({channel:'woyz-case-v1',...m},'*');
+ async function load(){if(saving.current)return;try{const r=await fetch('/api/case',{cache:'no-store'});const v:any=await r.json();if(!r.ok)throw Error(v.error||'Unable to load');if(!alive||saving.current||v.version<(snapshot.current?.version??0))return;snapshot.current=v;send({type:'snapshot',...v});setStatus(v.version?'Synced · revision '+v.version+' · '+new Date(v.updatedAt).toLocaleTimeString():'Shared case ready · no details saved');}catch(e){if(alive)setStatus('Offline / unavailable · drafts remain unsaved');}}
+ async function receive(e:MessageEvent){if(e.source!==frame.current?.contentWindow||e.data?.channel!=='woyz-case-v1')return;const m=e.data;if(m.type==='ready'){if(snapshot.current)send({type:'snapshot',...snapshot.current});else load();}if(m.type!=='save'||saving.current)return;saving.current=true;setStatus('Saving…');try{const r=await fetch('/api/case',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:m.key,value:m.value,version:m.version,mutationId:m.mutationId})});const v:any=await r.json();if(r.status===409){snapshot.current=v;send({type:'conflict',key:m.key,...v});setStatus('Conflict · review the retained draft');}else if(!r.ok)throw Error(v.error||'Save failed');else{snapshot.current=v;send({type:'saved',key:m.key,...v});setStatus('Saved to shared case · revision '+v.version);}}catch(e){send({type:'error',error:e instanceof Error?e.message:'Save failed'});setStatus('Not saved · retry when connected');}finally{saving.current=false;}}
+ window.addEventListener('message',receive);load();const timer=setInterval(load,5000);return()=>{alive=false;clearInterval(timer);window.removeEventListener('message',receive);};
+ },[]);
+ function change(next:string){if(next===mode)return;if(!confirm('Switch views? Save any open draft first. Unsaved text will be discarded.'))return;location.assign(next==='desktop'?'/admin':'/mobile');}
+ return <><div style={{display:'flex',gap:10,alignItems:'center',flexWrap:'wrap',padding:'10px 18px',background:'#215f51',color:'white'}}><strong>WOYZ · Shared case ST-024</strong><button onClick={()=>change('mobile')}>Mobile</button><button onClick={()=>change('desktop')}>Desktop / Admin</button><span role="status" style={{fontSize:12}}>{status}</span></div><div style={{padding:'8px 18px',fontSize:12,color:'#52695e'}}>Private prototype · Saved fields sync across devices in this account. Recording remains simulated; verify clinical entries before use.</div><iframe ref={frame} title={mode+' stroke workspace'} sandbox="allow-scripts" referrerPolicy="no-referrer" srcDoc={mode==='desktop'?desktopDocument:mobileDocument} style={{width:'100%',height:'calc(100vh - 100px)',border:0,display:'block'}}/></>;
+}
