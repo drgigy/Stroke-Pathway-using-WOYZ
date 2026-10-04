@@ -19,8 +19,69 @@ function scriptString(value) {
   return JSON.stringify(value).replace(/<\/(script)/gi, "<\\/$1");
 }
 
-const standaloneMobileDocument = standaloneDocument(mobileDocument);
-const standaloneDesktopDocument = standaloneDocument(desktopDocument);
+const sharedCaseControls = `<script>
+(()=> {
+  const root=document.querySelector('#stroke-mobile-home,#stroke-review');
+  if(!root)return;
+  let caseId='ST-024';
+  let cases=[];
+  const esc=value=>String(value??'').replace(/[&<>"']/g,match=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[match]));
+  function post(message){parent.postMessage({channel:'woyz-case-v1',...message},'*');}
+  function ensureMobileControls(){
+    const list=root.querySelector('#mh-patients');
+    if(!list||root.querySelector('#mh-new-firestore'))return;
+    const button=document.createElement('button');
+    button.id='mh-new-firestore';
+    button.type='button';
+    button.textContent='New patient';
+    button.style.cssText='width:100%;margin:10px 0 4px;padding:12px;border:0;border-radius:8px;background:#0f8a5f;color:white;font-weight:800';
+    list.before(button);
+  }
+  function renderMobileCases(){
+    ensureMobileControls();
+    const list=root.querySelector('#mh-patients');
+    if(!list)return;
+    const visible=cases.length?cases:[{id:caseId,name:'Unknown patient',uhid:'No UHID'}];
+    list.innerHTML=visible.map(item=>{
+      const selected=item.id===caseId;
+      return '<div class="patient-row"'+(selected?' style="border-left:4px solid #0f8a5f;padding-left:10px"':'')+'><button type="button" data-firestore-case="'+esc(item.id)+'"><strong>'+esc(item.name||'Unknown patient')+'</strong><br><small>'+esc(item.id)+' · '+esc(item.uhid||'No UHID')+'</small></button></div>';
+    }).join('');
+  }
+  function renderDesktopCases(){
+    const rows=root.querySelector('#sr-list tbody');
+    if(!rows||!cases.length)return;
+    rows.innerHTML=cases.map(item=>'<tr><td>'+esc(item.name||'Unknown patient')+' · '+esc(item.id)+'</td><td>'+esc(item.uhid||'No UHID')+'</td><td>Shared</td><td>v'+Number(item.version||0)+'</td></tr>').join('');
+  }
+  function renderCaseIdentity(){
+    const active=cases.find(item=>item.id===caseId);
+    const mobileId=root.querySelector('#mh-id');
+    if(mobileId)mobileId.textContent='Episode '+caseId+' · UHID '+(active?.uhid&&active.uhid!=='No UHID'?active.uhid:'missing');
+    const dock=root.querySelector('.dock-target');
+    if(dock&&active)dock.textContent=(active.name||'Unknown patient')+' · '+caseId;
+  }
+  root.addEventListener('click',event=>{
+    const create=event.target.closest?.('#mh-new-firestore');
+    if(create){event.preventDefault();event.stopImmediatePropagation();post({type:'createCase'});return;}
+    const select=event.target.closest?.('[data-firestore-case]');
+    if(select){event.preventDefault();event.stopImmediatePropagation();post({type:'selectCase',caseId:select.getAttribute('data-firestore-case')});const drawer=root.querySelector('#mh-drawer');if(drawer)drawer.hidden=true;}
+  },true);
+  window.addEventListener('message',event=>{
+    if(event.source!==parent||event.data?.channel!=='woyz-case-v1')return;
+    if(event.data.caseId)caseId=event.data.caseId;
+    if(Array.isArray(event.data.cases))cases=event.data.cases;
+    setTimeout(()=>{renderMobileCases();renderDesktopCases();renderCaseIdentity();},0);
+  });
+  ensureMobileControls();
+  renderCaseIdentity();
+})();
+</script>`;
+
+function enhanceDocument(value) {
+  return standaloneDocument(value).replace("</body>", `${sharedCaseControls}</body>`);
+}
+
+const standaloneMobileDocument = enhanceDocument(mobileDocument);
+const standaloneDesktopDocument = enhanceDocument(desktopDocument);
 
 const page = `<!doctype html>
 <html lang="en">
@@ -37,9 +98,8 @@ const page = `<!doctype html>
   .shell{min-height:100vh;background:#f4f7f5}
   .bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:9px 16px;background:#215f51;color:white}
   .bar strong{font-weight:800}
-  .bar button,.bar a{min-height:30px;border:1px solid rgb(255 255 255 / .28);border-radius:7px;background:rgb(255 255 255 / .94);color:#183b32;padding:4px 10px;font-size:13px;font-weight:750;text-decoration:none;line-height:1}
+  .bar button{min-height:30px;border:1px solid rgb(255 255 255 / .28);border-radius:7px;background:rgb(255 255 255 / .94);color:#183b32;padding:4px 10px;font-size:13px;font-weight:750;text-decoration:none;line-height:1}
   .bar button.active{background:#0f8a5f;color:white;box-shadow:inset 0 0 0 1px rgb(255 255 255 / .36)}
-  .bar a{background:transparent;color:white}
   .bar .spacer{flex:1 1 auto}
   .bar .settings{width:32px;padding:4px 0}
   .status{font-size:12px;opacity:.78;white-space:nowrap}
@@ -68,7 +128,6 @@ const page = `<!doctype html>
     <span id="status" class="status" role="status">Connecting…</span>
     <span class="spacer"></span>
     <button id="settingsBtn" class="settings" type="button" aria-label="Settings">⚙</button>
-    <a href="https://github.com/drgigy/Stroke-Pathway-using-WOYZ">GitHub</a>
   </div>
   <div class="notice">
     <span>Private prototype · Saved fields sync across devices in this account. Recording remains simulated; verify clinical entries before use.</span>
@@ -82,13 +141,16 @@ const page = `<!doctype html>
       <h2>Settings</h2>
       <button value="cancel" type="submit" aria-label="Close">×</button>
     </header>
-    <label>Firestore document ID
+    <label>Current Firestore case ID
       <input id="caseDocId" value="ST-024" autocomplete="off">
+    </label>
+    <label>Workspace code
+      <input id="workspaceCode" autocomplete="off" spellcheck="false">
     </label>
     <label>Gemini API key
       <input id="geminiKey" type="password" autocomplete="off" placeholder="Optional for later transcription work">
     </label>
-    <p style="margin:0;color:#52695e;font-size:13px;line-height:1.4">Firestore project: <strong>minutes-woyz-3</strong>. Data is stored in owner-scoped <code>strokeCases</code> documents.</p>
+    <p style="margin:0;color:#52695e;font-size:13px;line-height:1.4">Firestore project: <strong>minutes-woyz-3</strong>. Data is stored in workspace-scoped <code>strokeCases</code> documents.</p>
     <menu>
       <button id="clearGeminiBtn" type="button">Clear key</button>
       <button class="primary" value="save" type="submit">Done</button>
@@ -98,7 +160,7 @@ const page = `<!doctype html>
 <script type="module">
 import {initializeApp} from "https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js";
 import {getAuth,onAuthStateChanged,signInAnonymously} from "https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js";
-import {getFirestore,doc,onSnapshot,runTransaction,serverTimestamp} from "https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js";
+import {getFirestore,collection,doc,onSnapshot,runTransaction,serverTimestamp} from "https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js";
 
 const mobileDocument=${scriptString(standaloneMobileDocument)};
 const desktopDocument=${scriptString(standaloneDesktopDocument)};
@@ -113,36 +175,46 @@ const mobileBtn=document.getElementById("mobileBtn");
 const desktopBtn=document.getElementById("desktopBtn");
 const settingsDialog=document.getElementById("settingsDialog");
 const caseDocId=document.getElementById("caseDocId");
+const workspaceCodeInput=document.getElementById("workspaceCode");
 const geminiKeyInput=document.getElementById("geminiKey");
-const localStoreKey="woyz-stroke-v3-local-snapshot";
-const caseIdKey="woyz-stroke-v3-case-id";
 const geminiStoreKey="woyz-stroke-gemini-key";
 let mode=location.pathname.endsWith("/admin")||location.hash==="#admin"?"desktop":"mobile";
-let caseId=localStorage.getItem(caseIdKey)||"ST-024";
+let caseId="ST-024";
+let workspaceId=initialWorkspaceId();
 let currentUser=null;
-let unsubscribe=null;
-let snapshot=readLocal();
+let unsubscribeCase=null;
+let unsubscribeList=null;
+let cases=[];
+let snapshot={data:{},version:0,updatedAt:null,updatedAtText:null};
 let saving=false;
 
 function nowText(){return new Date().toLocaleTimeString();}
-function ref(){return doc(db,"strokeCases",caseId);}
+function randomId(prefix){const bytes=new Uint8Array(12);crypto.getRandomValues(bytes);return prefix+Array.from(bytes,b=>b.toString(36).padStart(2,"0")).join("").slice(0,22);}
+function cleanId(value,fallback){return String(value||fallback).replace(/[^A-Za-z0-9_-]/g,"-").slice(0,64);}
+function initialWorkspaceId(){const url=new URL(location.href);let id=cleanId(url.searchParams.get("w"),"");if(id.length<16){id=randomId("WS-");url.searchParams.set("w",id);history.replaceState(null,"",url.pathname+"?"+url.searchParams.toString()+url.hash);}return id;}
+function caseCollection(){return collection(db,"strokeWorkspaces",workspaceId,"strokeCases");}
+function ref(){return doc(db,"strokeWorkspaces",workspaceId,"strokeCases",caseId);}
 function cleanSnapshot(raw){return {data:{...(raw?.data||{})},version:Number(raw?.version||0),updatedAt:raw?.updatedAt||null,updatedAtText:raw?.updatedAtText||null};}
-function readLocal(){try{return cleanSnapshot(JSON.parse(localStorage.getItem(localStoreKey)||"{}"));}catch{return {data:{},version:0,updatedAt:null};}}
-function writeLocal(next){snapshot=cleanSnapshot(next);localStorage.setItem(localStoreKey,JSON.stringify(snapshot));}
+function writeSnapshot(next){snapshot=cleanSnapshot(next);}
 function setStatus(text,isError=false,note=""){statusEl.textContent=text;statusEl.style.color="inherit";syncNote.textContent=note;syncNote.className=isError?"error":"";}
 function post(message){frame.contentWindow?.postMessage({channel:"woyz-case-v1",...message},"*");}
-function sendSnapshot(type="snapshot",extra={}){post({type,...snapshot,...extra});}
+function caseLabel(item){const name=item.data?.name||"Unknown patient";const uhid=item.data?.uhid||"No UHID";return {id:item.id,name,uhid,version:item.version||0};}
+function sendSnapshot(type="snapshot",extra={}){post({type,workspaceId,caseId,cases:cases.map(caseLabel),...snapshot,...extra});}
 function renderFrame(){frame.srcdoc=mode==="desktop"?desktopDocument:mobileDocument;frame.title=mode==="desktop"?"desktop stroke workspace":"mobile stroke workspace";mobileBtn.classList.toggle("active",mode==="mobile");desktopBtn.classList.toggle("active",mode==="desktop");}
 function switchMode(next){if(next===mode)return;if(!confirm("Switch views? Save any open draft first. Unsaved text will be discarded."))return;mode=next;history.replaceState(null,"",next==="desktop"?"#admin":"#mobile");renderFrame();setTimeout(()=>sendSnapshot(),150);}
-function connect(){if(unsubscribe){unsubscribe();unsubscribe=null;}document.getElementById("caseTitle").textContent="WOYZ · Shared case "+caseId;if(!currentUser){setStatus("Creating user…");sendSnapshot();return;}setStatus("Connecting…");unsubscribe=onSnapshot(ref(),docSnap=>{if(docSnap.exists()){writeLocal(docSnap.data());setStatus(snapshot.version?"Synced · v"+snapshot.version:"Firestore ready");}else{writeLocal({data:{},version:0,updatedAt:null});setStatus("Firestore ready");}sendSnapshot();},error=>{setStatus("Firestore unavailable",true,error.code||error.message);sendSnapshot();});}
-async function saveField(message){if(!currentUser){setStatus("Creating user…",true,"Firestore user is not ready yet");post({type:"error",error:"Firestore user is not ready yet. Retry in a moment."});return;}if(saving)return;saving=true;setStatus("Saving…");try{let result=null;await runTransaction(db,async tx=>{const snap=await tx.get(ref());const current=snap.exists()?cleanSnapshot(snap.data()):{data:{},version:0};if(current.version!==message.version){result={conflict:true,...current};return;}const next={data:{...current.data,[message.key]:message.value},version:current.version+1,ownerUid:currentUser.uid,episode:caseId,updatedAt:serverTimestamp(),updatedAtText:new Date().toISOString(),mutationId:message.mutationId};tx.set(ref(),next,{merge:true});result={conflict:false,...next,updatedAt:null};});if(result?.conflict){writeLocal(result);setStatus("Conflict",true,"Review retained draft");post({type:"conflict",key:message.key,error:"Another device saved changes. Your draft is retained; compare it with the latest value before saving again.",...snapshot});}else{writeLocal(result);setStatus("Synced · v"+snapshot.version);post({type:"saved",key:message.key,...snapshot});}}catch(error){setStatus("Not saved",true,error.code||error.message);post({type:"error",error:error.message||"Save failed"});}finally{saving=false;}}
-window.addEventListener("message",event=>{if(event.source!==frame.contentWindow||event.data?.channel!=="woyz-case-v1")return;const message=event.data;if(message.type==="ready")sendSnapshot();if(message.type==="save")saveField(message);});
+function newCaseId(){const stamp=new Date().toISOString().replace(/[-:TZ.]/g,"").slice(0,14);return "ST-"+stamp+"-"+Math.random().toString(36).slice(2,6).toUpperCase();}
+function connect(){if(unsubscribeCase){unsubscribeCase();unsubscribeCase=null;}document.getElementById("caseTitle").textContent="WOYZ · Case "+caseId;if(!currentUser){setStatus("Creating user…");sendSnapshot();return;}setStatus("Connecting…");unsubscribeCase=onSnapshot(ref(),docSnap=>{if(docSnap.exists()){writeSnapshot(docSnap.data());setStatus(snapshot.version?"Synced · v"+snapshot.version:"Firestore ready");}else{writeSnapshot({data:{},version:0,updatedAt:null});setStatus("Firestore ready");}sendSnapshot();},error=>{setStatus("Firestore unavailable",true,error.code||error.message);sendSnapshot();});}
+function connectList(){if(unsubscribeList){unsubscribeList();unsubscribeList=null;}if(!currentUser)return;unsubscribeList=onSnapshot(caseCollection(),listSnap=>{cases=listSnap.docs.map(item=>({id:item.id,...cleanSnapshot(item.data())})).sort((a,b)=>String(b.updatedAtText||"").localeCompare(String(a.updatedAtText||"")));if(cases.length&&!cases.some(item=>item.id===caseId)){caseId=cases[0].id;connect();}sendSnapshot();},error=>{setStatus("Case list unavailable",true,error.code||error.message);sendSnapshot();});}
+async function createCase(){if(!currentUser){post({type:"error",error:"Firestore user is not ready yet. Retry in a moment."});return;}if(saving)return;const nextId=newCaseId();saving=true;setStatus("Creating patient…");try{await runTransaction(db,async tx=>{tx.set(doc(db,"strokeWorkspaces",workspaceId,"strokeCases",nextId),{sharedApp:"woyz-stroke",createdByUid:currentUser.uid,updatedByUid:currentUser.uid,episode:nextId,data:{name:"Unknown patient"},version:0,createdAt:serverTimestamp(),updatedAt:serverTimestamp(),updatedAtText:new Date().toISOString(),mutationId:crypto.randomUUID()});});caseId=nextId;writeSnapshot({data:{name:"Unknown patient"},version:0,updatedAt:null,updatedAtText:new Date().toISOString()});connect();sendSnapshot("created");}catch(error){setStatus("Not created",true,error.code||error.message);post({type:"error",error:error.message||"Create patient failed"});}finally{saving=false;}}
+function selectCase(nextId){const cleaned=String(nextId||"").replace(/[^A-Za-z0-9_-]/g,"-");if(!cleaned||cleaned===caseId)return;caseId=cleaned;writeSnapshot({data:{},version:0,updatedAt:null});connect();}
+async function saveField(message){if(!currentUser){setStatus("Creating user…",true,"Firestore user is not ready yet");post({type:"error",error:"Firestore user is not ready yet. Retry in a moment."});return;}if(saving)return;saving=true;setStatus("Saving…");try{let result=null;await runTransaction(db,async tx=>{const snap=await tx.get(ref());const current=snap.exists()?cleanSnapshot(snap.data()):{data:{},version:0};if(current.version!==message.version){result={conflict:true,...current};return;}const next={sharedApp:"woyz-stroke",data:{...current.data,[message.key]:message.value},version:current.version+1,createdByUid:snap.data()?.createdByUid||currentUser.uid,updatedByUid:currentUser.uid,episode:caseId,updatedAt:serverTimestamp(),updatedAtText:new Date().toISOString(),mutationId:message.mutationId};tx.set(ref(),next,{merge:true});result={conflict:false,...next,updatedAt:null};});if(result?.conflict){writeSnapshot(result);setStatus("Conflict",true,"Review retained draft");post({type:"conflict",key:message.key,error:"Another device saved changes. Your draft is retained; compare it with the latest value before saving again.",...snapshot});}else{writeSnapshot(result);setStatus("Synced · v"+snapshot.version);post({type:"saved",key:message.key,...snapshot,caseId,cases:cases.map(caseLabel)});}}catch(error){setStatus("Not saved",true,error.code||error.message);post({type:"error",error:error.message||"Save failed"});}finally{saving=false;}}
+window.addEventListener("message",event=>{if(event.source!==frame.contentWindow||event.data?.channel!=="woyz-case-v1")return;const message=event.data;if(message.type==="ready")sendSnapshot();if(message.type==="save")saveField(message);if(message.type==="createCase")createCase();if(message.type==="selectCase")selectCase(message.caseId);});
 mobileBtn.addEventListener("click",()=>switchMode("mobile"));
 desktopBtn.addEventListener("click",()=>switchMode("desktop"));
-document.getElementById("settingsBtn").addEventListener("click",()=>{caseDocId.value=caseId;geminiKeyInput.value=localStorage.getItem(geminiStoreKey)||"";settingsDialog.showModal();});
-settingsDialog.addEventListener("close",()=>{if(settingsDialog.returnValue!=="save")return;caseId=(caseDocId.value.trim()||"ST-024").replace(/[^A-Za-z0-9_-]/g,"-");localStorage.setItem(caseIdKey,caseId);localStorage.setItem(geminiStoreKey,geminiKeyInput.value.trim());connect();});
+document.getElementById("settingsBtn").addEventListener("click",()=>{caseDocId.value=caseId;workspaceCodeInput.value=workspaceId;geminiKeyInput.value=localStorage.getItem(geminiStoreKey)||"";settingsDialog.showModal();});
+settingsDialog.addEventListener("close",()=>{if(settingsDialog.returnValue!=="save")return;caseId=cleanId(caseDocId.value.trim(),"ST-024");const nextWorkspace=cleanId(workspaceCodeInput.value.trim(),workspaceId);if(nextWorkspace.length>=16&&nextWorkspace!==workspaceId){workspaceId=nextWorkspace;const url=new URL(location.href);url.searchParams.set("w",workspaceId);history.replaceState(null,"",url.pathname+"?"+url.searchParams.toString()+url.hash);cases=[];writeSnapshot({data:{},version:0,updatedAt:null});connectList();}localStorage.setItem(geminiStoreKey,geminiKeyInput.value.trim());connect();});
 document.getElementById("clearGeminiBtn").addEventListener("click",()=>{geminiKeyInput.value="";localStorage.removeItem(geminiStoreKey);});
-onAuthStateChanged(auth,user=>{currentUser=user;if(user){connect();return;}setStatus("Creating user…");signInAnonymously(auth).catch(error=>{setStatus("Auth setup needed",true,error.code||error.message);sendSnapshot();});});
+onAuthStateChanged(auth,user=>{currentUser=user;if(user){connectList();connect();return;}setStatus("Creating user…");signInAnonymously(auth).catch(error=>{setStatus("Auth setup needed",true,error.code||error.message);sendSnapshot();});});
 renderFrame();
 </script>
 </body>

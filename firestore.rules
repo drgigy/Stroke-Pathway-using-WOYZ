@@ -6,9 +6,16 @@ service cloud.firestore {
       return caseId.matches('ST-[A-Za-z0-9_-]{1,32}');
     }
 
+    function validWorkspaceId(workspaceId) {
+      return workspaceId.matches('[A-Za-z0-9_-]{16,64}');
+    }
+
     function validCaseShape(caseId) {
       return request.resource.data.keys().hasOnly([
         'ownerUid',
+        'createdByUid',
+        'updatedByUid',
+        'sharedApp',
         'episode',
         'episodeId',
         'patientId',
@@ -33,9 +40,10 @@ service cloud.firestore {
         'final',
         'followup',
         'audit',
-        'voiceSegments'
+        'voiceSegments',
+        'createdAt',
       ])
-      && request.resource.data.ownerUid == request.auth.uid
+      && (!('sharedApp' in request.resource.data) || request.resource.data.sharedApp == 'woyz-stroke')
       && (!('episode' in request.resource.data) || request.resource.data.episode == caseId)
       && (!('data' in request.resource.data) || request.resource.data.data is map)
       && (!('version' in request.resource.data) || request.resource.data.version is int);
@@ -51,11 +59,24 @@ service cloud.firestore {
       allow list: if false;
       allow create: if request.auth != null
         && validCaseId(caseId)
-        && validCaseShape(caseId);
+        && validCaseShape(caseId)
+        && request.resource.data.ownerUid == request.auth.uid;
       allow update: if request.auth != null
         && validCaseId(caseId)
         && validCaseShape(caseId)
-        && resource.data.ownerUid == request.auth.uid;
+        && resource.data.ownerUid == request.auth.uid
+        && request.resource.data.ownerUid == request.auth.uid;
+      allow delete: if false;
+    }
+
+    match /strokeWorkspaces/{workspaceId}/strokeCases/{caseId} {
+      allow get, list: if request.auth != null
+        && validWorkspaceId(workspaceId)
+        && validCaseId(caseId);
+      allow create, update: if request.auth != null
+        && validWorkspaceId(workspaceId)
+        && validCaseId(caseId)
+        && validCaseShape(caseId);
       allow delete: if false;
     }
 
