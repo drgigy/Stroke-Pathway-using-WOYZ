@@ -37,7 +37,7 @@ const sharedCaseControls = `<script>
     if(document.querySelector('#registrationVoiceDock'))return;
     root.style.position='relative';
     const style=document.createElement('style');
-    style.textContent='.registration-voice-dock{display:none;position:absolute;left:14px;top:14px;z-index:999;width:calc(100% - 28px);max-width:340px;min-height:5.7cm;padding:13px 16px;border-radius:18px;background:#1b1b1d;color:#f7f7fb;box-shadow:0 20px 46px rgba(16,24,43,.28);touch-action:none}.registration-voice-dock.visible{display:grid;grid-template-rows:auto 1fr;gap:8px}.registration-voice-head{display:flex;align-items:center;justify-content:space-between;gap:12px;cursor:grab}.registration-voice-title{display:inline-flex;align-items:center;gap:8px;color:#ff514a;font-size:13px;font-weight:800}.registration-voice-title:before{content:"";width:7px;height:7px;border-radius:999px;background:#ff514a;box-shadow:0 0 0 4px rgba(255,81,74,.1)}.registration-voice-close{width:28px;height:28px;border:0;border-radius:8px;background:#2f2f32;color:#f7f7fb;font-size:18px;line-height:1;cursor:pointer}.registration-voice-body{display:grid;grid-template-rows:auto auto auto auto;justify-items:center;align-content:center;gap:12px}.registration-voice-level{width:76%;height:34px;display:grid;grid-template-columns:repeat(28,1fr);gap:3px;align-items:end}.registration-voice-level span{height:4px;border-radius:999px 999px 3px 3px;background:rgba(255,81,74,.18);opacity:.45;transition:height .06s linear,background .06s linear,opacity .06s linear}.registration-voice-level span.active{background:#ff514a;opacity:1}.registration-voice-timer{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:34px;line-height:1;font-weight:800;letter-spacing:0}.registration-voice-actions{display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap}.registration-voice-action{min-height:38px;border:0;border-radius:999px;color:#fff;background:#2f2f32;padding:0 13px;display:grid;place-items:center;box-shadow:0 12px 26px rgba(0,0,0,.22);font-weight:900;font-size:12px;white-space:nowrap}.registration-voice-action.start{background:#ff514a}.registration-voice-action.stop{background:#ff514a;color:#fff;min-width:132px}.registration-voice-action:disabled{opacity:.38;cursor:not-allowed}.registration-voice-status{width:100%;min-height:18px;color:#c9c9cf;text-align:center;font-size:12px;font-weight:750}';
+    style.textContent='.registration-voice-dock{display:none;position:absolute;left:14px;top:14px;z-index:999;width:calc(100% - 28px);max-width:340px;min-height:5.7cm;padding:13px 16px;border-radius:18px;background:#1b1b1d;color:#f7f7fb;box-shadow:0 20px 46px rgba(16,24,43,.28);touch-action:none}.registration-voice-dock.visible{display:grid;grid-template-rows:auto 1fr;gap:8px}.registration-voice-head{display:flex;align-items:center;justify-content:space-between;gap:12px;cursor:grab}.registration-voice-title{display:inline-flex;align-items:center;gap:8px;color:#ff514a;font-size:13px;font-weight:800}.registration-voice-title:before{content:"";width:7px;height:7px;border-radius:999px;background:#ff514a;box-shadow:0 0 0 4px rgba(255,81,74,.1)}.registration-voice-close{width:28px;height:28px;border:0;border-radius:8px;background:#2f2f32;color:#f7f7fb;font-size:18px;line-height:1;cursor:pointer}.registration-voice-body{display:grid;grid-template-rows:auto auto auto auto;justify-items:center;align-content:center;gap:12px}.registration-voice-level{width:76%;height:34px;display:grid;grid-template-columns:repeat(28,1fr);gap:3px;align-items:end}.registration-voice-level span{height:4px;border-radius:999px 999px 3px 3px;background:rgba(255,81,74,.18);opacity:.45;transition:height .06s linear,background .06s linear,opacity .06s linear}.registration-voice-level span.active{background:#ff514a;opacity:1}.registration-voice-timer{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:34px;line-height:1;font-weight:800;letter-spacing:0}.registration-voice-actions{display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap}.registration-voice-action{min-height:38px;border:0;border-radius:999px;color:#fff;background:#2f2f32;padding:0 13px;display:grid;place-items:center;box-shadow:0 12px 26px rgba(0,0,0,.22);font-weight:900;font-size:12px;white-space:nowrap}.registration-voice-action.start{background:#ff514a}.registration-voice-action.stop{background:#ff514a;color:#fff;min-width:132px}.registration-voice-action:disabled{opacity:.38;cursor:not-allowed}.registration-voice-status{width:100%;min-height:18px;color:#c9c9cf;text-align:center;font-size:12px;font-weight:750}.woyz-guide-value{display:block;margin-top:8px;color:#10271f;font-weight:900}.woyz-guide-value.empty{color:#91a098;font-weight:700}';
     document.head.append(style);
     const dock=document.createElement('div');
     dock.id='registrationVoiceDock';
@@ -250,6 +250,9 @@ const sharedCaseControls = `<script>
     if(heading!=='Registration')return;
     const content=root.querySelector('#mh-content');
     if(!content)return;
+    const stale=content.querySelector('.shared-stage-display');
+    if(stale)stale.hidden=true;
+    hydrateRegistrationGuide();
     let box=content.querySelector('.woyz-registration-values');
     if(!box){
       box=document.createElement('div');
@@ -260,6 +263,19 @@ const sharedCaseControls = `<script>
     }
     const rows=[['Name',caseData.name],['UHID',caseData.uhid],['Age',caseData.age],['Sex',caseData.sex],['Mobile',caseData.mobile],['Contact',caseData.contact],['Diagnosis',caseData.diagnosis],['Registration note',caseData.stage_0]];
     box.innerHTML='<strong>Saved registration</strong>'+rows.map(([label,value])=>'<div style="display:grid;grid-template-columns:110px 1fr;gap:8px;margin-top:7px"><span style="font-weight:750;color:#5d7067">'+esc(label)+'</span><span>'+esc(value&&value!=='NIL'?value:'Not recorded')+'</span></div>').join('');
+  }
+  function hydrateRegistrationGuide(){
+    const values={'Name':caseData.name,'Age (years)':caseData.age,'UHID No.':caseData.uhid,'Mobile No.':caseData.mobile,'Diagnosis':caseData.diagnosis,'Contact person & number':caseData.contact};
+    root.querySelectorAll('.guide-field').forEach(field=>{
+      const label=Object.keys(values).find(key=>field.textContent.trim().startsWith(key));
+      if(!label)return;
+      field.querySelector('.woyz-guide-value')?.remove();
+      const value=values[label];
+      const span=document.createElement('span');
+      span.className='woyz-guide-value'+(!value||value==='NIL'?' empty':'');
+      span.textContent=value&&value!=='NIL'?value:'Not recorded';
+      field.append(span);
+    });
   }
   function replaceRecorderCopy(){
     const walker=document.createTreeWalker(root,NodeFilter.SHOW_TEXT);
@@ -421,7 +437,7 @@ let saving=false;
 function nowText(){return new Date().toLocaleTimeString();}
 function randomId(prefix){const bytes=new Uint8Array(12);crypto.getRandomValues(bytes);return prefix+Array.from(bytes,b=>b.toString(36).padStart(2,"0")).join("").slice(0,22);}
 function cleanId(value,fallback){return String(value||fallback).replace(/[^A-Za-z0-9_-]/g,"-").slice(0,64);}
-function initialWorkspaceId(){const url=new URL(location.href);let id=cleanId(url.searchParams.get("w"),"");if(id.length<16){id=defaultWorkspaceId;url.searchParams.set("w",id);history.replaceState(null,"",url.pathname+"?"+url.searchParams.toString()+url.hash);}return id;}
+function initialWorkspaceId(){const url=new URL(location.href);let id=cleanId(url.searchParams.get("w"),"");if(id.length<16||id.startsWith("WS-")){id=defaultWorkspaceId;url.searchParams.set("w",id);history.replaceState(null,"",url.pathname+"?"+url.searchParams.toString()+url.hash);}return id;}
 function caseCollection(){return collection(db,"strokeWorkspaces",workspaceId,"strokeCases");}
 function ref(){return doc(db,"strokeWorkspaces",workspaceId,"strokeCases",caseId);}
 function cleanSnapshot(raw){return {data:{...(raw?.data||{})},version:Number(raw?.version||0),updatedAt:raw?.updatedAt||null,updatedAtText:raw?.updatedAtText||null};}
