@@ -11,9 +11,16 @@ if (typeof mobileDocument !== "string" || typeof desktopDocument !== "string") {
   throw new Error("Could not extract embedded WOYZ documents");
 }
 
+function standaloneDocument(value) {
+  return value.replace("__CODEX_VISUALIZATION_WIDGET_STATE__", "{}");
+}
+
 function scriptString(value) {
   return JSON.stringify(value).replace(/<\/(script)/gi, "<\\/$1");
 }
+
+const standaloneMobileDocument = standaloneDocument(mobileDocument);
+const standaloneDesktopDocument = standaloneDocument(desktopDocument);
 
 const page = `<!doctype html>
 <html lang="en">
@@ -93,8 +100,8 @@ import {initializeApp} from "https://www.gstatic.com/firebasejs/11.10.0/firebase
 import {getAuth,GoogleAuthProvider,onAuthStateChanged,signInWithPopup,signOut} from "https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js";
 import {getFirestore,doc,onSnapshot,runTransaction,serverTimestamp} from "https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js";
 
-const mobileDocument=${scriptString(mobileDocument)};
-const desktopDocument=${scriptString(desktopDocument)};
+const mobileDocument=${scriptString(standaloneMobileDocument)};
+const desktopDocument=${scriptString(standaloneDesktopDocument)};
 const firebaseConfig={projectId:"minutes-woyz-3",appId:"1:25423577451:web:a98bbfd85be9a804d34c2e",storageBucket:"minutes-woyz-3.firebasestorage.app",apiKey:"AIzaSyCHZTh_chvcWJqX97b2rfvTVevLQhPVmBY",authDomain:"minutes-woyz-3.firebaseapp.com",messagingSenderId:"25423577451"};
 const app=initializeApp(firebaseConfig);
 const auth=getAuth(app);
@@ -146,4 +153,4 @@ renderFrame();
 `;
 
 fs.writeFileSync("index.html", page);
-console.log(`Wrote index.html with ${mobileDocument.length} mobile chars and ${desktopDocument.length} desktop chars.`);
+console.log(`Wrote index.html with ${standaloneMobileDocument.length} mobile chars and ${standaloneDesktopDocument.length} desktop chars.`);
