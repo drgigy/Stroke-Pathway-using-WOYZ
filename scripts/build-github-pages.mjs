@@ -302,7 +302,7 @@ const sharedCaseControls = `<script>
     const create=event.target.closest?.('#mh-new-firestore');
     if(create){event.preventDefault();event.stopImmediatePropagation();post({type:'createCase'});return;}
     const select=event.target.closest?.('[data-firestore-case]');
-    if(select){event.preventDefault();event.stopImmediatePropagation();post({type:'selectCase',caseId:select.getAttribute('data-firestore-case')});const drawer=root.querySelector('#mh-drawer');if(drawer)drawer.hidden=true;}
+    if(select){event.preventDefault();event.stopImmediatePropagation();post({type:'selectCase',caseId:select.getAttribute('data-firestore-case')});const drawer=root.querySelector('#mh-drawer');if(drawer)drawer.hidden=true;root.querySelector('#mh-home')?.click?.();}
     setTimeout(()=>{renderMobileCases();renderCaseIdentity();renderRegistrationValues();updateVoiceAvailability();},0);
     setTimeout(()=>{renderMobileCases();renderCaseIdentity();renderRegistrationValues();updateVoiceAvailability();},120);
     setTimeout(()=>{renderMobileCases();renderCaseIdentity();renderRegistrationValues();updateVoiceAvailability();},600);
