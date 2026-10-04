@@ -6,15 +6,18 @@ service cloud.firestore {
       return caseId.matches('ST-[A-Za-z0-9_-]{1,32}');
     }
 
-    function validCaseShape() {
+    function validCaseShape(caseId) {
       return request.resource.data.keys().hasOnly([
         'ownerUid',
+        'episode',
         'episodeId',
         'patientId',
         'stage',
+        'data',
         'version',
         'updatedAt',
         'updatedAtText',
+        'mutationId',
         'patient',
         'registration',
         'times',
@@ -31,7 +34,11 @@ service cloud.firestore {
         'followup',
         'audit',
         'voiceSegments'
-      ]);
+      ])
+      && request.resource.data.ownerUid == request.auth.uid
+      && (!('episode' in request.resource.data) || request.resource.data.episode == caseId)
+      && (!('data' in request.resource.data) || request.resource.data.data is map)
+      && (!('version' in request.resource.data) || request.resource.data.version is int);
     }
 
     match /strokeCases/{caseId} {
@@ -44,13 +51,11 @@ service cloud.firestore {
       allow list: if false;
       allow create: if request.auth != null
         && validCaseId(caseId)
-        && validCaseShape()
-        && request.resource.data.ownerUid == request.auth.uid;
+        && validCaseShape(caseId);
       allow update: if request.auth != null
         && validCaseId(caseId)
-        && validCaseShape()
-        && resource.data.ownerUid == request.auth.uid
-        && request.resource.data.ownerUid == request.auth.uid;
+        && validCaseShape(caseId)
+        && resource.data.ownerUid == request.auth.uid;
       allow delete: if false;
     }
 
