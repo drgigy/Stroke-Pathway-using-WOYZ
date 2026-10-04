@@ -3,200 +3,57 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Stroke Pathway using WOYZ</title>
+  <title>WOYZ Stroke</title>
   <style>
-    :root {
-      color-scheme: light;
-      --green: #087c4a;
-      --green-dark: #0b5f3e;
-      --ink: #17251d;
-      --muted: #5d6f64;
-      --line: #d8e5dd;
-      --bg: #f6faf7;
-      --surface: #ffffff;
-      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    }
-
-    * {
-      box-sizing: border-box;
-    }
-
-    body {
-      margin: 0;
-      min-height: 100vh;
-      background: var(--bg);
-      color: var(--ink);
-    }
-
-    header {
-      border-bottom: 1px solid var(--line);
-      background: var(--surface);
-    }
-
-    .wrap {
-      width: min(1080px, calc(100vw - 32px));
-      margin: 0 auto;
-    }
-
-    .topbar {
-      min-height: 72px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 16px;
-    }
-
-    .brand {
-      display: inline-flex;
-      align-items: center;
-      gap: 10px;
-      font-weight: 900;
-      font-size: 22px;
-      letter-spacing: 0;
-    }
-
-    .brand-dot {
-      width: 30px;
-      height: 30px;
-      border-radius: 999px;
-      background: #f45155;
-      border: 7px solid #452126;
-      box-shadow: 0 0 0 4px #17171d;
-    }
-
-    main {
-      padding: 52px 0;
-    }
-
-    .hero {
-      display: grid;
-      grid-template-columns: minmax(0, 1.05fr) minmax(320px, 0.95fr);
-      gap: 28px;
-      align-items: start;
-    }
-
-    h1 {
-      margin: 0;
-      font-size: clamp(38px, 6vw, 68px);
-      line-height: 1;
-      letter-spacing: 0;
-    }
-
-    .lead {
-      margin: 20px 0 0;
-      color: var(--muted);
-      font-size: 19px;
-      line-height: 1.55;
-    }
-
-    .actions {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 10px;
-      margin-top: 28px;
-    }
-
-    a.button {
-      min-height: 42px;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      border-radius: 7px;
-      padding: 0 15px;
-      text-decoration: none;
-      font-weight: 800;
-    }
-
-    .primary {
-      background: var(--green);
-      color: #fff;
-    }
-
-    .secondary {
-      border: 1px solid var(--line);
-      background: var(--surface);
-      color: var(--ink);
-    }
-
-    .panel {
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      background: var(--surface);
-      padding: 22px;
-      box-shadow: 0 18px 40px rgb(21 70 42 / 10%);
-    }
-
-    .panel h2 {
-      margin: 0 0 12px;
-      font-size: 21px;
-    }
-
-    .panel p,
-    .panel li {
-      color: var(--muted);
-      line-height: 1.5;
-    }
-
-    code {
-      border-radius: 5px;
-      background: #edf5f0;
-      padding: 2px 6px;
-      color: var(--green-dark);
-      font-weight: 800;
-    }
-
-    ul {
-      margin: 0;
-      padding-left: 20px;
-    }
-
-    .note {
-      margin-top: 18px;
-      border-left: 4px solid var(--green);
-      padding-left: 12px;
-      color: var(--muted);
-      line-height: 1.5;
-    }
-
-    @media (max-width: 800px) {
-      .hero {
-        grid-template-columns: 1fr;
-      }
-    }
+    :root{--bg:#f6faf7;--surface:#fff;--soft:#eef7f1;--ink:#14231a;--muted:#617167;--line:#d7e5db;--green:#087c4a;--green2:#0b5f3e;--red:#b42318;--shadow:0 18px 42px rgb(22 64 39/.1);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+    *{box-sizing:border-box}body{margin:0;min-height:100vh;background:var(--bg);color:var(--ink)}button,input,textarea{font:inherit}button{min-height:38px;border:0;border-radius:7px;padding:0 12px;cursor:pointer;font-weight:800}input,textarea{width:100%;border:1px solid var(--line);border-radius:7px;background:#fff;color:var(--ink);padding:9px 10px}textarea{min-height:88px;resize:vertical}
+    .app{display:grid;grid-template-columns:310px minmax(0,1fr);min-height:100vh}.sidebar{display:flex;flex-direction:column;gap:14px;padding:18px;border-right:1px solid var(--line);background:#fff}.brand{display:flex;align-items:center;gap:11px;font-weight:950;font-size:23px}.brand-dot{width:34px;height:34px;border-radius:999px;background:#f45155;border:8px solid #452126;box-shadow:0 0 0 6px #17171d}.status{border:1px solid var(--line);border-radius:8px;background:var(--soft);color:var(--green2);padding:10px;font-size:13px;line-height:1.35;font-weight:750}.status.error{border-color:#f1c7c4;background:#fff1f0;color:var(--red)}
+    .field,.search{display:grid;gap:5px;color:var(--muted);font-size:12px;font-weight:850}.patient-list{display:grid;gap:8px;overflow:auto;min-height:0}.patient-card{border:1px solid var(--line);border-radius:8px;background:#fff;padding:11px;text-align:left}.patient-card.active{border-color:var(--green);box-shadow:inset 3px 0 0 var(--green)}.patient-card strong{display:block;font-size:14px;margin-bottom:6px}.patient-card span{color:var(--muted);font-size:12px;font-weight:700}
+    .workspace{min-width:0;padding:18px}.topbar,.row,.section-title,.voice-head{display:flex;align-items:center;justify-content:space-between;gap:12px}.topbar{margin-bottom:14px}.eyebrow{margin:0 0 4px;color:var(--green2);font-size:12px;font-weight:900;text-transform:uppercase}h1,h2,h3,p{margin-top:0}h1{margin-bottom:0;font-size:26px}h2{margin-bottom:0;font-size:22px}h3{margin-bottom:0;font-size:15px}.actions,.stages{display:flex;flex-wrap:wrap;gap:8px}.primary{background:var(--green);color:#fff}.secondary{border:1px solid var(--line);background:#fff;color:var(--ink)}.icon-button{width:38px;min-height:38px;padding:0;display:inline-grid;place-items:center}.stage-button{border:1px solid var(--line);background:#fff;color:var(--ink)}.stage-button.active{border-color:var(--green);background:var(--green);color:#fff}
+    .layout{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(350px,.75fr);gap:14px;margin-top:14px}.panel{border:1px solid var(--line);border-radius:8px;background:#fff;box-shadow:var(--shadow)}.panel-body{padding:16px}.voice-strip{position:sticky;top:0;z-index:4;display:flex;align-items:center;gap:12px;border-bottom:1px solid var(--line);background:#f3fbf6;padding:10px 14px}.woyz-logo{min-height:44px;border:4px solid #f45155;border-radius:999px;background:#17171d;color:#fff;padding:7px 16px 7px 10px;display:inline-flex;align-items:center;gap:9px;font-weight:950;font-size:18px}.woyz-logo span:first-child{width:28px;height:28px;border-radius:999px;background:#f45155;border:7px solid #452126}.form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.wide{grid-column:1/-1}
+    .timeline,.kpi-list{display:grid;gap:9px}.event{border-left:3px solid var(--green);padding-left:10px}.event time{color:var(--muted);font-size:12px;font-weight:800}.event p{margin:3px 0 0;color:var(--ink);line-height:1.4}.kpi-item{display:grid;grid-template-columns:28px minmax(0,1fr) auto;gap:8px;align-items:center;font-size:13px}.pill{display:inline-flex;align-items:center;min-height:24px;border-radius:999px;border:1px solid var(--line);background:var(--soft);color:var(--green2);padding:0 9px;font-size:12px;font-weight:900}
+    .voice-dock{display:none;position:fixed;left:18px;bottom:22px;z-index:20;width:min(9cm,calc(100vw - 28px));min-height:5.2cm;padding:13px 16px;border-radius:18px;background:#1b1b1d;color:#f7f7fb;box-shadow:0 20px 46px rgb(16 24 43/.28)}.voice-dock.visible{display:grid;grid-template-rows:auto 1fr;gap:8px}.voice-head{cursor:grab;user-select:none;touch-action:none}.voice-title{display:inline-flex;align-items:center;gap:8px;color:#ff514a;font-size:13px;font-weight:900}.voice-title:before{content:"";width:7px;height:7px;border-radius:999px;background:#ff514a;box-shadow:0 0 0 4px rgb(255 81 74/.1)}.voice-close{width:28px;min-height:28px;border-radius:8px;background:#2f2f32;color:#f7f7fb;padding:0;font-size:18px}.voice-body{display:grid;justify-items:center;align-content:center;gap:12px}.voice-level{width:76%;height:30px;display:grid;grid-template-columns:repeat(28,1fr);gap:3px;align-items:end}.voice-level span{height:4px;border-radius:999px 999px 3px 3px;background:rgb(255 81 74/.22);opacity:.65}.voice-level span.live{background:#ff514a;opacity:1}.timer{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#f7f7fb;font-size:34px;line-height:1;font-weight:900}.voice-actions{display:flex;justify-content:center;gap:14px}.voice-action{width:60px;min-height:60px;border-radius:999px;padding:0;display:grid;place-items:center;color:#fff;background:#2f2f32}.voice-action.start{background:#ff514a}.voice-action.stop{color:#ff514a}.voice-status{min-height:18px;color:#c9c9cf;font-size:12px;font-weight:850;text-align:center}.transcript{width:100%;max-height:82px;overflow:auto;border:1px solid #313136;border-radius:10px;background:#111113;padding:8px 10px;color:#f7f7fb;font-size:12px;line-height:1.35;white-space:pre-wrap}.transcript:empty:before{content:"Transcript appears here when supported by the browser.";color:#85858d}
+    dialog{border:0;border-radius:8px;padding:0;box-shadow:0 24px 70px rgb(0 0 0/.28)}dialog::backdrop{background:rgb(20 35 26/.35)}.settings{width:min(430px,calc(100vw - 32px));display:grid;gap:14px;padding:18px;background:#fff}.settings menu{display:flex;justify-content:flex-end;gap:8px;margin:0;padding:0}@media(max-width:900px){.app,.layout,.form-grid{grid-template-columns:1fr}.sidebar{border-right:0;border-bottom:1px solid var(--line)}}
   </style>
 </head>
 <body>
-  <header>
-    <div class="wrap topbar">
+  <div class="app">
+    <aside class="sidebar">
       <div class="brand"><span class="brand-dot"></span><span>WOYZ Stroke</span></div>
-      <a class="button secondary" href="https://github.com/drgigy/Stroke-Pathway-using-WOYZ">GitHub source</a>
-    </div>
-  </header>
-
-  <main>
-    <div class="wrap hero">
-      <section>
-        <h1>Stroke Pathway using WOYZ</h1>
-        <p class="lead">Shared mobile and desktop stroke-pathway prototype source. The application code now lives as a Vinext/Next project with <code>/mobile</code>, <code>/admin</code>, and an authenticated case API.</p>
-        <div class="actions">
-          <a class="button primary" href="https://github.com/drgigy/Stroke-Pathway-using-WOYZ">Open repository</a>
-          <a class="button secondary" href="https://github.com/drgigy/Stroke-Pathway-using-WOYZ/blob/main/START-HERE-SUJITH.txt">Start here</a>
-          <a class="button secondary" href="https://github.com/drgigy/Stroke-Pathway-using-WOYZ/blob/main/README.md">README</a>
-        </div>
-        <p class="note">This GitHub Pages page is a source landing page. The current app is not a plain static site; run it with Node/Vinext locally or deploy it to an app runtime.</p>
-      </section>
-
-      <aside class="panel">
-        <h2>Local Run</h2>
-        <ul>
-          <li>Install Node.js 22.13 or newer.</li>
-          <li>Run <code>npm run install:ci</code>.</li>
-          <li>Run <code>npm run build</code>.</li>
-          <li>Apply the local D1 schema from <code>drizzle/0000_dusty_silhouette.sql</code>.</li>
-          <li>Run <code>npm run dev</code> and open <code>/mobile</code> or <code>/admin</code>.</li>
-        </ul>
-      </aside>
-    </div>
-  </main>
+      <div id="syncStatus" class="status">Connecting to Firestore project minutes-woyz-3...</div>
+      <label class="search">Search<input id="searchInput" type="search" placeholder="Name, UHID, episode"></label>
+      <div id="patientList" class="patient-list"></div>
+      <button id="newCaseBtn" class="primary">New local episode</button>
+    </aside>
+    <main class="workspace">
+      <header class="topbar"><div><p id="episodeContext" class="eyebrow">Episode ST-024</p><h1 id="episodeTitle">Unknown patient</h1></div><div class="actions"><button id="mobileModeBtn" class="secondary">Mobile</button><button id="desktopModeBtn" class="secondary">Desktop</button><button id="authBtn" class="secondary">Sign in</button><button id="settingsBtn" class="icon-button secondary" aria-label="Settings">⚙</button><a class="secondary" href="https://github.com/drgigy/Stroke-Pathway-using-WOYZ" style="display:inline-flex;align-items:center;text-decoration:none;min-height:38px;border-radius:7px;padding:0 12px;font-weight:800;color:var(--ink)">GitHub</a></div></header>
+      <nav id="stageNav" class="stages"></nav>
+      <div class="layout">
+        <section class="panel"><div class="voice-strip"><button id="voiceLogoBtn" class="woyz-logo"><span></span><strong>WOYZ</strong></button><span id="voiceState" class="pill">Ready</span></div><div id="stagePanel" class="panel-body"></div></section>
+        <aside class="panel"><div class="panel-body"><section><div class="section-title"><h3>Case Summary</h3><span id="versionPill" class="pill">v0</span></div><div id="caseSummary" class="timeline"></div></section><section style="margin-top:20px"><div class="section-title"><h3>KPI Completion</h3><span id="kpiScore" class="pill">0/24</span></div><div id="kpiList" class="kpi-list"></div></section></div></aside>
+      </div>
+    </main>
+  </div>
+  <div id="voiceDock" class="voice-dock" aria-live="polite"><div id="voiceHandle" class="voice-head"><div class="voice-title">Stroke voice segment</div><button id="voiceCloseBtn" class="voice-close" aria-label="Close">&times;</button></div><div class="voice-body"><div id="voiceLevel" class="voice-level"></div><div id="voiceTimer" class="timer">05:00</div><div class="voice-actions"><button id="voiceStartBtn" class="voice-action start">▶</button><button id="voiceExtendBtn" class="voice-action">+5</button><button id="voiceStopBtn" class="voice-action stop">■</button></div><div id="voiceStatus" class="voice-status">Press play to start recording</div><div id="transcriptBox" class="transcript"></div></div></div>
+  <dialog id="settingsDialog"><form method="dialog" class="settings"><div class="topbar" style="margin:0"><h3>Settings</h3><button class="icon-button secondary" value="close">×</button></div><label class="field wide"><span>Gemini API key</span><input id="geminiKey" type="password" autocomplete="off" placeholder="Optional: paste Gemini API key"></label><label class="field wide"><span>Firestore document</span><input id="caseDocId" type="text" value="ST-024"></label><p style="margin:0;color:var(--muted);font-size:13px;line-height:1.4">Firestore project: <strong>minutes-woyz-3</strong>. If permissions are denied, update rules for this approved project.</p><menu><button id="clearKeyBtn" type="button" class="secondary">Clear key</button><button class="primary" value="save">Done</button></menu></form></dialog>
+  <script type="module">
+    import{initializeApp}from"https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js";import{getFirestore,doc,onSnapshot,setDoc,serverTimestamp}from"https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js";import{getAuth,GoogleAuthProvider,onAuthStateChanged,signInWithPopup,signOut}from"https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js";
+    const firebaseConfig={projectId:"minutes-woyz-3",appId:"1:25423577451:web:a98bbfd85be9a804d34c2e",storageBucket:"minutes-woyz-3.firebasestorage.app",apiKey:"AIzaSyCHZTh_chvcWJqX97b2rfvTVevLQhPVmBY",authDomain:"minutes-woyz-3.firebaseapp.com",messagingSenderId:"25423577451"};
+    const stages=[["registration","Registration",[["patient.name","Name or explicit unknown"],["patient.uhid","UHID"],["patient.age","Age"],["patient.sex","Sex"],["registration.complaint","Presenting complaint","textarea"],["registration.exam","Examination and provisional diagnosis","textarea"],["times.erArrival","ER arrival"],["times.codeActivation","Code Stroke activation"],["observations.initial","BP, pulse, rhythm, SpO2, glucose","textarea"],["registration.swallow","Dysphagia screen","textarea"],["registration.nihss","NIHSS","textarea"]]],["scan","Scan",[["scan.modality","Modality"],["times.scanArrival","Scan arrival"],["times.scanStart","Scan start"],["times.firstImage","First image"],["times.scanFinish","Scan finish"],["scan.radiology","Radiologist opinion","textarea"],["scan.angiogram","CTA/MRA findings","textarea"]]],["decision","Decision",[["decision.consultant","Consultant"],["times.decision","Decision time"],["decision.selectedTreatment","Selected treatment"],["decision.rationale","Rationale","textarea"],["decision.counselling","Counselling and consent evidence","textarea"]]],["ivt","IVT",[["ivt.given","Treatment actually given"],["ivt.drug","Drug"],["ivt.weight","Weight and source"],["ivt.prescribedDose","Prescribed dose"],["ivt.administeredDose","Administered dose"],["times.ivtBolus","Bolus timestamp"],["ivt.complications","Complications","textarea"]]],["mt","Thrombectomy",[["mt.target","Target vessel and side"],["times.cathlabArrival","Cathlab arrival"],["times.puncture","Puncture"],["times.firstPass","First pass"],["times.finalReperfusion","Final reperfusion"],["mt.tici","Final TICI"],["mt.complications","Complications and handover","textarea"]]],["monitoring","Monitoring",[["monitoring.latest","Append latest observation","textarea"]]],["reviews","24/48h Review",[["review24.time","24-hour review time"],["review24.findings","24-hour findings","textarea"],["review48.time","48-hour review time"],["review48.findings","48-hour findings","textarea"]]],["discharge","Discharge",[["discharge.status","Discharge/transfer/death status"],["times.discharge","Discharge time"],["final.category","Final category"],["final.summary","Final diagnosis and treatment summary","textarea"]]],["followup","Follow-up",[["followup.dueDate","Due date"],["followup.actualDate","Actual assessment date"],["followup.method","Contact method"],["followup.outcome","Outcome, mRS, vital status","textarea"]]]];
+    const kpis=["First imaging time","Timely IVT","Post-IVT sICH","Initial inpatient neurological assessment","Initial swallow screen","Timely rehabilitation","90-day functional outcome","Medication errors","Seven-day inpatient mortality","Carotid-procedure stroke/death","Diagnostic-angiography stroke/death","Hospital-acquired pressure injury","Hospital-acquired DVT","Imaging wait","Thrombolytic stockouts","Falls","Timely EVT","Post-EVT sICH","Speech/swallow reassessment","Intracranial-stenting stroke/death","Post-EVD ventriculitis","Final reperfusion grade","Timely MT with reperfusion","Puncture-to-reperfusion"];
+    const $=s=>document.querySelector(s),app=initializeApp(firebaseConfig),db=getFirestore(app),auth=getAuth(app),provider=new GoogleAuthProvider(),localKey="woyz-stroke-pages-case",geminiKey="woyz-stroke-gemini-key",SpeechRecognition=window.SpeechRecognition||window.webkitSpeechRecognition;let caseId=localStorage.getItem("woyz-stroke-case-id")||"ST-024",activeStage="registration",mode="mobile",remoteOk=false,currentUser=null,unsub=null,currentCase=loadLocal(),saveTimer=null,voiceSeconds=300,voiceInterval=null,recording=false,transcript="",recognition=null,audioContext=null,analyser=null,audioData=null,mediaStream=null,animationFrame=null,dragging=false;
+    function emptyCase(id=caseId){return{episodeId:id,patientId:"P-TEMP-001",stage:"registration",version:0,patient:{name:"Unknown patient",uhid:"",age:"",sex:""},audit:[{time:now(),text:"Local episode opened.",author:"Browser"}]}}function loadLocal(){try{return JSON.parse(localStorage.getItem(localKey))||emptyCase()}catch{return emptyCase()}}function saveLocal(){localStorage.setItem(localKey,JSON.stringify(currentCase))}function now(){return new Date().toLocaleString("sv-SE").slice(0,16)}function getValue(path){return path.split(".").reduce((x,p)=>x?.[p],currentCase)??""}function setValue(path,value){const parts=path.split("."),last=parts.pop();let t=currentCase;for(const p of parts){t[p]=t[p]||{};t=t[p]}t[last]=value}function audit(text){currentCase.audit=currentCase.audit||[];currentCase.audit.push({time:now(),text,author:mode==="desktop"?"Desktop reviewer":"Mobile clinician"})}function caseRef(){return doc(db,"strokeCases",caseId)}
+    function connectFirestore(){if(unsub)unsub();if(!currentUser){remoteOk=false;$("#syncStatus").className="status error";$("#syncStatus").textContent="Sign in with Google to sync this case to Firestore. Local draft is available.";render();return;}$("#syncStatus").className="status";$("#syncStatus").textContent=`Connecting to Firestore project minutes-woyz-3 / ${caseId}...`;unsub=onSnapshot(caseRef(),snap=>{remoteOk=true;if(snap.exists()){currentCase={...emptyCase(caseId),...snap.data(),episodeId:caseId};saveLocal()}else currentCase={...currentCase,episodeId:caseId,ownerUid:currentUser.uid};$("#syncStatus").className="status";$("#syncStatus").textContent=snap.exists()?"Firestore connected. Shared case is syncing.":"Firestore connected. Edit a field to create this shared case.";render()},err=>{remoteOk=false;$("#syncStatus").className="status error";$("#syncStatus").textContent=`Firestore permissions blocked sync: ${err.code||err.message}. Local draft is still usable.`;render()})}
+    async function saveRemote(reason){if(!currentUser){saveLocal();$("#syncStatus").className="status error";$("#syncStatus").textContent="Saved locally. Sign in with Google to sync to Firestore.";return;}currentCase.ownerUid=currentUser.uid;currentCase.episodeId=caseId;currentCase.stage=activeStage;currentCase.version=Number(currentCase.version||0)+1;currentCase.updatedAtText=now();saveLocal();renderSummary();try{await setDoc(caseRef(),{...currentCase,updatedAt:serverTimestamp()},{merge:true});remoteOk=true;$("#syncStatus").className="status";$("#syncStatus").textContent=`Saved to Firestore: ${reason}`}catch(err){remoteOk=false;$("#syncStatus").className="status error";$("#syncStatus").textContent=`Saved locally only. Firestore denied write: ${err.code||err.message}`}}function scheduleSave(reason){clearTimeout(saveTimer);saveTimer=setTimeout(()=>saveRemote(reason),450)}
+    function render(){currentCase=currentCase||emptyCase();$("#episodeContext").textContent=`${caseId} / ${currentCase.patientId||"P-TEMP"}`;$("#episodeTitle").textContent=currentCase.patient?.name||"Unknown patient";$("#versionPill").textContent=`v${currentCase.version||0}`;renderList();renderStages();renderStage();renderSummary();renderKpis();$("#voiceState").textContent=recording?"Listening":remoteOk?"Synced":"Local"}function renderList(){const q=$("#searchInput").value.toLowerCase(),hay=`${caseId} ${currentCase.patient?.name||""} ${currentCase.patient?.uhid||""}`.toLowerCase();$("#patientList").innerHTML=hay.includes(q)?`<button class="patient-card active"><strong>${esc(currentCase.patient?.name||"Unknown patient")}</strong><span>${esc(caseId)} · ${esc(currentCase.patient?.uhid||"No UHID")}</span></button>`:`<div class="status">No matching episode.</div>`}function renderStages(){$("#stageNav").innerHTML=stages.map(([id,label])=>`<button class="stage-button ${id===activeStage?"active":""}" data-stage="${id}">${label}</button>`).join("");document.querySelectorAll("[data-stage]").forEach(b=>b.onclick=()=>{activeStage=b.dataset.stage;currentCase.stage=activeStage;saveLocal();render()})}
+    function renderStage(){const stage=stages.find(([id])=>id===activeStage)||stages[0],[,label,fields]=stage;$("#stagePanel").innerHTML=`<div class="section-title"><div><p class="eyebrow">Current stage</p><h2>${label}</h2></div><span class="pill">${remoteOk?"Firestore":"Local draft"}</span></div><div class="form-grid" style="margin-top:14px">${fields.map(f=>fieldHtml(...f)).join("")}</div>`;document.querySelectorAll("[data-field]").forEach(f=>f.onchange=()=>{setValue(f.dataset.field,f.value);audit(`${f.dataset.label} updated.`);scheduleSave(f.dataset.label)})}function fieldHtml(path,label,type="text"){const v=esc(getValue(path));return type==="textarea"?`<label class="field wide"><span>${label}</span><textarea data-field="${path}" data-label="${label}">${v}</textarea></label>`:`<label class="field"><span>${label}</span><input data-field="${path}" data-label="${label}" value="${v}"></label>`}
+    function renderSummary(){const events=[...(currentCase.audit||[])].slice(-12).reverse();$("#caseSummary").innerHTML=events.length?events.map(e=>`<article class="event"><time>${esc(e.time)} / ${esc(e.author||"User")}</time><p>${esc(e.text)}</p></article>`).join(""):`<p class="status">No events yet.</p>`}function renderKpis(){const evidence={1:"times.scanStart",2:"times.ivtBolus",4:"registration.nihss",5:"registration.swallow",7:"followup.outcome",17:"times.firstPass",22:"mt.tici",24:"times.finalReperfusion"};let count=0;$("#kpiList").innerHTML=kpis.map((n,i)=>{const hit=!!(evidence[i+1]&&getValue(evidence[i+1]));if(hit)count++;return`<div class="kpi-item"><strong>${i+1}</strong><span>${n}</span><span class="pill">${hit?"evidence":"pending"}</span></div>`}).join("");$("#kpiScore").textContent=`${count}/24`}
+    function prompt(stageId,text){const st=stages.find(([id])=>id===stageId)||stages[0],fields=st[2].map(([p,l])=>`- ${l}: ${p}`).join("\\n");return`You are the WOYZ Stroke ${st[1]} extraction assistant. Use only the transcript. Return JSON only. Use NIL for absent values. Do not infer normal findings, signatures, treatment eligibility, dosage or KPI success. Populate these fields:\\n${fields}\\nAlso return uncertainItems[], corrections[], reviewRequired, rawTranscript.\\nTranscript:\\n${text||"NIL"}`}function nilOut(stageId,text){const st=stages.find(([id])=>id===stageId)||stages[0],out={};st[2].forEach(([p])=>out[p]="NIL");return{...out,uncertainItems:[],corrections:[],reviewRequired:true,rawTranscript:text||"NIL"}}async function structure(text){const key=localStorage.getItem(geminiKey),fallback=nilOut(activeStage,text);if(!text.trim()||!key)return fallback;try{const res=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(key)}`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({generationConfig:{responseMimeType:"application/json",temperature:0},contents:[{role:"user",parts:[{text:prompt(activeStage,text)}]}]})});if(!res.ok)throw new Error("Gemini failed");const data=await res.json(),body=data?.candidates?.[0]?.content?.parts?.map(p=>p.text||"").join("").trim();return body?{...fallback,...JSON.parse(body),rawTranscript:text}:fallback}catch{return fallback}}function applyOut(out){Object.entries(out||{}).forEach(([p,v])=>{if(!p.includes(".")||["uncertainItems","corrections","reviewRequired","rawTranscript"].includes(p))return;if(typeof v==="string"&&v&&v!=="NIL")setValue(p,v)})}
+    function setupVoice(){$("#voiceLevel").innerHTML=Array.from({length:28},()=>"<span></span>").join("");updateTimer();setupDrag()}function openVoice(){$("#voiceDock").classList.add("visible");$("#voiceStatus").textContent=SpeechRecognition?"Press play to start browser transcription":"Speech recognition unavailable";if(!voiceInterval)voiceInterval=setInterval(()=>{if(recording&&voiceSeconds>0)voiceSeconds--;updateTimer()},1000)}function closeVoice(){stopRecognition();stopAudio();recording=false;$("#voiceDock").classList.remove("visible");$("#voiceStartBtn").textContent="▶";render()}function updateTimer(){$("#voiceTimer").textContent=`${String(Math.floor(voiceSeconds/60)).padStart(2,"0")}:${String(voiceSeconds%60).padStart(2,"0")}`}
+    async function toggleVoice(){openVoice();recording=!recording;$("#voiceStartBtn").textContent=recording?"Ⅱ":"▶";$("#voiceStatus").textContent=recording?"Recording in progress...":"Recording paused";if(recording){await startAudio();startRecognition()}else{stopRecognition();stopAudio()}render()}async function startAudio(){if(!navigator.mediaDevices?.getUserMedia)return;try{mediaStream=await navigator.mediaDevices.getUserMedia({audio:true});audioContext=new(window.AudioContext||window.webkitAudioContext)();analyser=audioContext.createAnalyser();analyser.fftSize=256;audioContext.createMediaStreamSource(mediaStream).connect(analyser);audioData=new Uint8Array(analyser.frequencyBinCount);drawAudio()}catch{flatBars()}}function drawAudio(){if(!recording||!analyser){flatBars();return}analyser.getByteFrequencyData(audioData);const bars=[...document.querySelectorAll("#voiceLevel span")],bucket=Math.max(1,Math.floor(audioData.length/bars.length));bars.forEach((bar,i)=>{const slice=audioData.slice(i*bucket,i*bucket+bucket),avg=slice.reduce((a,b)=>a+b,0)/slice.length/255,live=avg>.035;bar.classList.toggle("live",live);bar.style.height=live?`${Math.max(4,Math.round(4+avg*30))}px`:"4px"});animationFrame=requestAnimationFrame(drawAudio)}function flatBars(){document.querySelectorAll("#voiceLevel span").forEach(b=>{b.classList.remove("live");b.style.height="4px"})}function stopAudio(){if(animationFrame)cancelAnimationFrame(animationFrame);animationFrame=null;if(mediaStream)mediaStream.getTracks().forEach(t=>t.stop());mediaStream=null;if(audioContext)audioContext.close().catch(()=>{});audioContext=null;analyser=null;flatBars()}
+    function startRecognition(){if(!SpeechRecognition)return;if(!recognition){recognition=new SpeechRecognition();recognition.continuous=true;recognition.interimResults=true;recognition.lang="en-IN";recognition.onresult=e=>{let finalText="",interim="";for(let i=e.resultIndex;i<e.results.length;i++){const part=e.results[i][0].transcript;if(e.results[i].isFinal)finalText+=part;else interim+=part}if(finalText)transcript=`${transcript} ${finalText}`.trim();$("#transcriptBox").textContent=[transcript,interim].filter(Boolean).join("\\n")}}try{recognition.start()}catch{}}function stopRecognition(){try{recognition?.stop()}catch{}}async function finishVoice(){stopRecognition();stopAudio();recording=false;$("#voiceStartBtn").textContent="▶";$("#voiceStatus").textContent=transcript?"Structuring transcript...":"No voice captured; NIL saved";const out=await structure(transcript);applyOut(out);currentCase.voiceSegments=currentCase.voiceSegments||[];currentCase.voiceSegments.push({stage:activeStage,time:now(),transcript,structuredOutput:out});audit(transcript?`WOYZ transcript structured for ${stages.find(([id])=>id===activeStage)?.[1]}.`:"WOYZ voice segment ended with no transcript.");transcript="";$("#transcriptBox").textContent="";await saveRemote("voice segment");$("#voiceStatus").textContent="Voice segment saved for review"}
+    function setupDrag(){const dock=$("#voiceDock"),handle=$("#voiceHandle");let offset={x:0,y:0};handle.onpointerdown=e=>{if(e.target.closest("button"))return;dragging=true;const r=dock.getBoundingClientRect();offset={x:e.clientX-r.left,y:e.clientY-r.top};handle.setPointerCapture(e.pointerId)};handle.onpointermove=e=>{if(!dragging)return;const r=dock.getBoundingClientRect(),left=Math.min(Math.max(8,e.clientX-offset.x),window.innerWidth-r.width-8),top=Math.min(Math.max(8,e.clientY-offset.y),window.innerHeight-r.height-8);dock.style.left=`${left}px`;dock.style.top=`${top}px`;dock.style.bottom="auto"};handle.onpointerup=e=>{dragging=false;handle.releasePointerCapture(e.pointerId)}}function esc(v){return String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
+    $("#searchInput").oninput=renderList;$("#mobileModeBtn").onclick=()=>{mode="mobile";render()};$("#desktopModeBtn").onclick=()=>{mode="desktop";render()};$("#authBtn").onclick=()=>currentUser?signOut(auth):signInWithPopup(auth,provider);onAuthStateChanged(auth,user=>{currentUser=user;$("#authBtn").textContent=user?"Sign out":"Sign in";connectFirestore()});$("#newCaseBtn").onclick=()=>{caseId=`ST-${String(Math.floor(Math.random()*900)+100)}`;localStorage.setItem("woyz-stroke-case-id",caseId);currentCase=emptyCase(caseId);if(currentUser)currentCase.ownerUid=currentUser.uid;saveLocal();connectFirestore();render()};$("#settingsBtn").onclick=()=>{$("#geminiKey").value=localStorage.getItem(geminiKey)||"";$("#caseDocId").value=caseId;$("#settingsDialog").showModal()};$("#settingsDialog").onclose=()=>{if($("#settingsDialog").returnValue==="save"){localStorage.setItem(geminiKey,$("#geminiKey").value.trim());caseId=$("#caseDocId").value.trim()||"ST-024";localStorage.setItem("woyz-stroke-case-id",caseId);currentCase.episodeId=caseId;connectFirestore();render()}};$("#clearKeyBtn").onclick=()=>{$("#geminiKey").value="";localStorage.removeItem(geminiKey)};$("#voiceLogoBtn").onclick=openVoice;$("#voiceCloseBtn").onclick=closeVoice;$("#voiceStartBtn").onclick=toggleVoice;$("#voiceExtendBtn").onclick=()=>{voiceSeconds+=300;updateTimer();$("#voiceStatus").textContent="Recording extended by 5 minutes"};$("#voiceStopBtn").onclick=finishVoice;setupVoice();connectFirestore();render();
+  </script>
 </body>
 </html>

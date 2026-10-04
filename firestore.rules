@@ -1,0 +1,61 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function validCaseId(caseId) {
+      return caseId.matches('ST-[A-Za-z0-9_-]{1,32}');
+    }
+
+    function validCaseShape() {
+      return request.resource.data.keys().hasOnly([
+        'ownerUid',
+        'episodeId',
+        'patientId',
+        'stage',
+        'version',
+        'updatedAt',
+        'updatedAtText',
+        'patient',
+        'registration',
+        'times',
+        'observations',
+        'scan',
+        'decision',
+        'ivt',
+        'mt',
+        'monitoring',
+        'review24',
+        'review48',
+        'discharge',
+        'final',
+        'followup',
+        'audit',
+        'voiceSegments'
+      ]);
+    }
+
+    match /strokeCases/{caseId} {
+      allow get: if request.auth != null
+        && validCaseId(caseId)
+        && (
+          !exists(/databases/$(database)/documents/strokeCases/$(caseId))
+          || resource.data.ownerUid == request.auth.uid
+        );
+      allow list: if false;
+      allow create: if request.auth != null
+        && validCaseId(caseId)
+        && validCaseShape()
+        && request.resource.data.ownerUid == request.auth.uid;
+      allow update: if request.auth != null
+        && validCaseId(caseId)
+        && validCaseShape()
+        && resource.data.ownerUid == request.auth.uid
+        && request.resource.data.ownerUid == request.auth.uid;
+      allow delete: if false;
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
