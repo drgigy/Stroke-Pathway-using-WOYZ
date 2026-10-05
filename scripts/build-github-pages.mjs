@@ -15,6 +15,13 @@ function standaloneDocument(value) {
   return value.replace("__CODEX_VISUALIZATION_WIDGET_STATE__", "{}");
 }
 
+function removeDesktopOnlyChrome(value) {
+  return value.replace(
+    "</style>",
+    "#stroke-review>header,#stroke-review .dictation-dock{display:none!important}</style>",
+  );
+}
+
 function scriptString(value) {
   return JSON.stringify(value).replace(/<\/(script)/gi, "<\\/$1");
 }
@@ -361,7 +368,7 @@ function enhanceDocument(value) {
 }
 
 const standaloneMobileDocument = enhanceDocument(mobileDocument);
-const standaloneDesktopDocument = enhanceDocument(desktopDocument);
+const standaloneDesktopDocument = enhanceDocument(removeDesktopOnlyChrome(desktopDocument));
 
 const page = `<!doctype html>
 <html lang="en">
@@ -485,6 +492,7 @@ const workspaceCodeInput=document.getElementById("workspaceCode");
 const geminiKeyInput=document.getElementById("geminiKey");
 const geminiStoreKey="woyz-stroke-gemini-key";
 const defaultWorkspaceId="WOYZ-STROKE-SHARED";
+const responsiveModeQuery=window.matchMedia("(max-width:1100px)");
 let mode=initialMode();
 let workspaceId=initialWorkspaceId();
 let caseId=initialCaseId();
@@ -498,7 +506,7 @@ let saving=false;
 function nowText(){return new Date().toLocaleTimeString();}
 function randomId(prefix){const bytes=new Uint8Array(12);crypto.getRandomValues(bytes);return prefix+Array.from(bytes,b=>b.toString(36).padStart(2,"0")).join("").slice(0,22);}
 function cleanId(value,fallback){return String(value||fallback).replace(/[^A-Za-z0-9_-]/g,"-").slice(0,64);}
-function initialMode(){if(location.pathname.endsWith("/admin")||location.hash==="#admin")return "desktop";if(location.hash==="#mobile")return "mobile";return window.matchMedia("(max-width:720px)").matches?"mobile":"desktop";}
+function initialMode(){return responsiveModeQuery.matches?"mobile":"desktop";}
 function writeUrlState(){const url=new URL(location.href);url.searchParams.set("w",defaultWorkspaceId);url.searchParams.set("c",caseId);history.replaceState(null,"",url.pathname+"?"+url.searchParams.toString()+url.hash);}
 function initialWorkspaceId(){const url=new URL(location.href);if(url.searchParams.get("w")!==defaultWorkspaceId){url.searchParams.set("w",defaultWorkspaceId);history.replaceState(null,"",url.pathname+"?"+url.searchParams.toString()+url.hash);}return defaultWorkspaceId;}
 function initialCaseId(){const url=new URL(location.href);const id=cleanId(url.searchParams.get("c"),"ST-024");return id.startsWith("ST-")?id:"ST-024";}
@@ -513,6 +521,7 @@ function visibleCaseLabels(){const current={id:caseId,...snapshot};const merged=
 function rememberCurrentCase(){cases=[{id:caseId,...snapshot},...cases.filter(item=>item.id!==caseId)];}
 function sendSnapshot(type="snapshot",extra={}){post({type,workspaceId,caseId,cases:visibleCaseLabels(),...snapshot,...extra});}
 function renderFrame(){frame.srcdoc=mode==="desktop"?desktopDocument:mobileDocument;frame.title=mode==="desktop"?"desktop stroke workspace":"mobile stroke workspace";}
+function syncResponsiveMode(){const next=initialMode();if(next===mode)return;mode=next;renderFrame();setTimeout(()=>sendSnapshot(),150);}
 function newCaseId(){const stamp=new Date().toISOString().replace(/[-:TZ.]/g,"").slice(0,14);return "ST-"+stamp+"-"+Math.random().toString(36).slice(2,6).toUpperCase();}
 function connect(){if(unsubscribeCase){unsubscribeCase();unsubscribeCase=null;}document.getElementById("caseTitle").textContent="WOYZ · Case "+caseId;if(!currentUser){setStatus("Sign in required");sendSnapshot();return;}setStatus("Connecting…");unsubscribeCase=onSnapshot(ref(),docSnap=>{if(docSnap.exists()){writeSnapshot(docSnap.data());setStatus(snapshot.version?"Synced · v"+snapshot.version:"Firestore ready");}else{writeSnapshot({data:{},version:0,updatedAt:null});setStatus("Firestore ready");}sendSnapshot();},error=>{setStatus("Firestore unavailable",true,error.code||error.message);sendSnapshot();});}
 function connectList(){if(unsubscribeList){unsubscribeList();unsubscribeList=null;}if(!currentUser)return;unsubscribeList=onSnapshot(caseCollection(),listSnap=>{cases=listSnap.docs.map(item=>({id:item.id,...cleanSnapshot(item.data())})).sort((a,b)=>String(b.updatedAtText||"").localeCompare(String(a.updatedAtText||"")));if(cases.length&&!cases.some(item=>item.id===caseId)){caseId=cases[0].id;writeUrlState();connect();}sendSnapshot();},error=>{setStatus("Case list unavailable",true,error.code||error.message);sendSnapshot();});}
@@ -564,6 +573,7 @@ settingsDialog.addEventListener("close",()=>{if(settingsDialog.returnValue!=="sa
 document.getElementById("clearGeminiBtn").addEventListener("click",()=>{geminiKeyInput.value="";localStorage.removeItem(geminiStoreKey);});
 loginForm.addEventListener("submit",async event=>{event.preventDefault();loginError.textContent="";setStatus("Signing in…");try{await signInWithEmailAndPassword(auth,loginEmail.value.trim(),loginPassword.value);}catch(error){loginError.textContent=error.message||"Sign in failed";setStatus("Sign in failed",true,error.code||error.message);}});
 signOutBtn.addEventListener("click",()=>signOut(auth));
+responsiveModeQuery.addEventListener("change",syncResponsiveMode);
 onAuthStateChanged(auth,user=>{currentUser=user;if(user){authScreen.hidden=true;signOutBtn.hidden=false;connectList();connect();renderFrame();return;}authScreen.hidden=false;signOutBtn.hidden=true;if(unsubscribeCase){unsubscribeCase();unsubscribeCase=null;}if(unsubscribeList){unsubscribeList();unsubscribeList=null;}setStatus("Sign in required");sendSnapshot();});
 renderFrame();
 </script>
