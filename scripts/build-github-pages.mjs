@@ -382,10 +382,20 @@ const page = `<!doctype html>
   .bar button.active{background:#0f8a5f;color:white;box-shadow:inset 0 0 0 1px rgb(255 255 255 / .36)}
   .bar .spacer{flex:1 1 auto}
   .bar .settings{width:32px;padding:4px 0}
+  .bar .link{display:inline-grid;place-items:center;min-height:30px;border:1px solid rgb(255 255 255 / .28);border-radius:7px;background:rgb(255 255 255 / .94);color:#183b32;padding:4px 10px;font-size:13px;font-weight:750;text-decoration:none;line-height:1}
   .status{font-size:12px;opacity:.78;white-space:nowrap}
   .notice{display:flex;justify-content:space-between;gap:12px;align-items:center;padding:8px 18px;font-size:12px;color:#52695e;border-bottom:1px solid #dce8df}
   .notice .error{color:#b42318;font-weight:750}
   iframe{width:100%;height:calc(100vh - 91px);border:0;display:block;background:white}
+  .auth-screen{position:fixed;inset:0;z-index:20;display:grid;place-items:center;background:#f4f7f5;padding:20px}
+  .auth-screen[hidden]{display:none}
+  .auth-card{width:min(420px,100%);display:grid;gap:14px;padding:24px;border:1px solid #cfe0d5;border-radius:12px;background:white;box-shadow:0 18px 60px rgb(0 0 0 / .12)}
+  .auth-card h1{margin:0;color:#16372d;font-size:28px;line-height:1.1}
+  .auth-card p{margin:0;color:#5e7067}
+  .auth-card label{display:grid;gap:6px;color:#52695e;font-size:13px;font-weight:750}
+  .auth-card input{width:100%;border:1px solid #cfe0d5;border-radius:7px;padding:11px 12px;font:inherit;color:#14231a}
+  .auth-card button{border:0;border-radius:8px;background:#0f8a5f;color:white;padding:12px 14px;font-weight:850}
+  .auth-error{min-height:18px;color:#b42318;font-weight:750;font-size:13px}
   dialog{border:0;border-radius:10px;box-shadow:0 24px 80px rgb(0 0 0 / .28);padding:0}
   dialog::backdrop{background:rgb(20 35 26 / .38)}
   .settings-panel{width:min(440px,calc(100vw - 32px));display:grid;gap:14px;padding:18px;background:white}
@@ -407,6 +417,9 @@ const page = `<!doctype html>
     <button id="desktopBtn" type="button">Desktop / Admin</button>
     <span id="status" class="status" role="status">Connecting…</span>
     <span class="spacer"></span>
+    <span id="userEmail" class="status"></span>
+    <a class="link" href="admin.html">Users</a>
+    <button id="signOutBtn" type="button" hidden>Sign out</button>
     <button id="settingsBtn" class="settings" type="button" aria-label="Settings">⚙</button>
   </div>
   <div class="notice">
@@ -415,6 +428,20 @@ const page = `<!doctype html>
   </div>
   <iframe id="workspaceFrame" title="mobile stroke workspace" sandbox="allow-scripts allow-same-origin" allow="microphone" referrerpolicy="no-referrer"></iframe>
 </div>
+<section id="authScreen" class="auth-screen">
+  <form id="loginForm" class="auth-card">
+    <h1>WOYZ Stroke</h1>
+    <p>Sign in to access the shared stroke workspace.</p>
+    <label>Email
+      <input id="loginEmail" type="email" autocomplete="username" required>
+    </label>
+    <label>Password
+      <input id="loginPassword" type="password" autocomplete="current-password" required>
+    </label>
+    <button type="submit">Sign in</button>
+    <div id="loginError" class="auth-error" role="alert"></div>
+  </form>
+</section>
 <dialog id="settingsDialog">
   <form method="dialog" class="settings-panel">
     <header>
@@ -439,7 +466,7 @@ const page = `<!doctype html>
 </dialog>
 <script type="module">
 import {initializeApp} from "https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js";
-import {getAuth,onAuthStateChanged,signInAnonymously} from "https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js";
+import {getAuth,onAuthStateChanged,signInWithEmailAndPassword,signOut} from "https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js";
 import {getFirestore,collection,doc,onSnapshot,runTransaction,serverTimestamp} from "https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js";
 
 const mobileDocument=${scriptString(standaloneMobileDocument)};
@@ -453,13 +480,20 @@ const statusEl=document.getElementById("status");
 const syncNote=document.getElementById("syncNote");
 const mobileBtn=document.getElementById("mobileBtn");
 const desktopBtn=document.getElementById("desktopBtn");
+const authScreen=document.getElementById("authScreen");
+const loginForm=document.getElementById("loginForm");
+const loginEmail=document.getElementById("loginEmail");
+const loginPassword=document.getElementById("loginPassword");
+const loginError=document.getElementById("loginError");
+const userEmail=document.getElementById("userEmail");
+const signOutBtn=document.getElementById("signOutBtn");
 const settingsDialog=document.getElementById("settingsDialog");
 const caseDocId=document.getElementById("caseDocId");
 const workspaceCodeInput=document.getElementById("workspaceCode");
 const geminiKeyInput=document.getElementById("geminiKey");
 const geminiStoreKey="woyz-stroke-gemini-key";
 const defaultWorkspaceId="WOYZ-STROKE-SHARED";
-let mode=location.pathname.endsWith("/admin")||location.hash==="#admin"?"desktop":"mobile";
+let mode=initialMode();
 let workspaceId=initialWorkspaceId();
 let caseId=initialCaseId();
 let currentUser=null;
@@ -472,6 +506,7 @@ let saving=false;
 function nowText(){return new Date().toLocaleTimeString();}
 function randomId(prefix){const bytes=new Uint8Array(12);crypto.getRandomValues(bytes);return prefix+Array.from(bytes,b=>b.toString(36).padStart(2,"0")).join("").slice(0,22);}
 function cleanId(value,fallback){return String(value||fallback).replace(/[^A-Za-z0-9_-]/g,"-").slice(0,64);}
+function initialMode(){if(location.pathname.endsWith("/admin")||location.hash==="#admin")return "desktop";if(location.hash==="#mobile")return "mobile";return window.matchMedia("(max-width:720px)").matches?"mobile":"desktop";}
 function writeUrlState(){const url=new URL(location.href);url.searchParams.set("w",defaultWorkspaceId);url.searchParams.set("c",caseId);history.replaceState(null,"",url.pathname+"?"+url.searchParams.toString()+url.hash);}
 function initialWorkspaceId(){const url=new URL(location.href);if(url.searchParams.get("w")!==defaultWorkspaceId){url.searchParams.set("w",defaultWorkspaceId);history.replaceState(null,"",url.pathname+"?"+url.searchParams.toString()+url.hash);}return defaultWorkspaceId;}
 function initialCaseId(){const url=new URL(location.href);const id=cleanId(url.searchParams.get("c"),"ST-024");return id.startsWith("ST-")?id:"ST-024";}
@@ -488,7 +523,7 @@ function sendSnapshot(type="snapshot",extra={}){post({type,workspaceId,caseId,ca
 function renderFrame(){frame.srcdoc=mode==="desktop"?desktopDocument:mobileDocument;frame.title=mode==="desktop"?"desktop stroke workspace":"mobile stroke workspace";mobileBtn.classList.toggle("active",mode==="mobile");desktopBtn.classList.toggle("active",mode==="desktop");}
 function switchMode(next){if(next===mode)return;if(!confirm("Switch views? Save any open draft first. Unsaved text will be discarded."))return;mode=next;history.replaceState(null,"",next==="desktop"?"#admin":"#mobile");renderFrame();setTimeout(()=>sendSnapshot(),150);}
 function newCaseId(){const stamp=new Date().toISOString().replace(/[-:TZ.]/g,"").slice(0,14);return "ST-"+stamp+"-"+Math.random().toString(36).slice(2,6).toUpperCase();}
-function connect(){if(unsubscribeCase){unsubscribeCase();unsubscribeCase=null;}document.getElementById("caseTitle").textContent="WOYZ · Case "+caseId;if(!currentUser){setStatus("Creating user…");sendSnapshot();return;}setStatus("Connecting…");unsubscribeCase=onSnapshot(ref(),docSnap=>{if(docSnap.exists()){writeSnapshot(docSnap.data());setStatus(snapshot.version?"Synced · v"+snapshot.version:"Firestore ready");}else{writeSnapshot({data:{},version:0,updatedAt:null});setStatus("Firestore ready");}sendSnapshot();},error=>{setStatus("Firestore unavailable",true,error.code||error.message);sendSnapshot();});}
+function connect(){if(unsubscribeCase){unsubscribeCase();unsubscribeCase=null;}document.getElementById("caseTitle").textContent="WOYZ · Case "+caseId;if(!currentUser){setStatus("Sign in required");sendSnapshot();return;}setStatus("Connecting…");unsubscribeCase=onSnapshot(ref(),docSnap=>{if(docSnap.exists()){writeSnapshot(docSnap.data());setStatus(snapshot.version?"Synced · v"+snapshot.version:"Firestore ready");}else{writeSnapshot({data:{},version:0,updatedAt:null});setStatus("Firestore ready");}sendSnapshot();},error=>{setStatus("Firestore unavailable",true,error.code||error.message);sendSnapshot();});}
 function connectList(){if(unsubscribeList){unsubscribeList();unsubscribeList=null;}if(!currentUser)return;unsubscribeList=onSnapshot(caseCollection(),listSnap=>{cases=listSnap.docs.map(item=>({id:item.id,...cleanSnapshot(item.data())})).sort((a,b)=>String(b.updatedAtText||"").localeCompare(String(a.updatedAtText||"")));if(cases.length&&!cases.some(item=>item.id===caseId)){caseId=cases[0].id;writeUrlState();connect();}sendSnapshot();},error=>{setStatus("Case list unavailable",true,error.code||error.message);sendSnapshot();});}
 async function createCase(){if(!currentUser){post({type:"error",error:"Firestore user is not ready yet. Retry in a moment."});return;}if(saving)return;const nextId=newCaseId();saving=true;setStatus("Creating patient…");try{await runTransaction(db,async tx=>{tx.set(doc(db,"strokeWorkspaces",workspaceId,"strokeCases",nextId),{sharedApp:"woyz-stroke",createdByUid:currentUser.uid,updatedByUid:currentUser.uid,episode:nextId,data:{},version:0,createdAt:serverTimestamp(),updatedAt:serverTimestamp(),updatedAtText:new Date().toISOString(),mutationId:crypto.randomUUID()});});caseId=nextId;writeUrlState();writeSnapshot({data:{},version:0,updatedAt:null,updatedAtText:new Date().toISOString()});rememberCurrentCase();connect();sendSnapshot("created");}catch(error){setStatus("Not created",true,error.code||error.message);post({type:"error",error:error.message||"Create patient failed"});}finally{saving=false;}}
 function selectCase(nextId){const cleaned=String(nextId||"").replace(/[^A-Za-z0-9_-]/g,"-");if(!cleaned||cleaned===caseId)return;caseId=cleaned;writeUrlState();writeSnapshot({data:{},version:0,updatedAt:null});connect();}
@@ -538,12 +573,135 @@ desktopBtn.addEventListener("click",()=>switchMode("desktop"));
 document.getElementById("settingsBtn").addEventListener("click",()=>{caseDocId.value=caseId;workspaceCodeInput.value=defaultWorkspaceId;geminiKeyInput.value=localStorage.getItem(geminiStoreKey)||"";settingsDialog.showModal();});
 settingsDialog.addEventListener("close",()=>{if(settingsDialog.returnValue!=="save")return;caseId=cleanId(caseDocId.value.trim(),"ST-024");workspaceId=defaultWorkspaceId;workspaceCodeInput.value=defaultWorkspaceId;writeUrlState();localStorage.setItem(geminiStoreKey,geminiKeyInput.value.trim());connectList();connect();});
 document.getElementById("clearGeminiBtn").addEventListener("click",()=>{geminiKeyInput.value="";localStorage.removeItem(geminiStoreKey);});
-onAuthStateChanged(auth,user=>{currentUser=user;if(user){connectList();connect();return;}setStatus("Creating user…");signInAnonymously(auth).catch(error=>{setStatus("Auth setup needed",true,error.code||error.message);sendSnapshot();});});
+loginForm.addEventListener("submit",async event=>{event.preventDefault();loginError.textContent="";setStatus("Signing in…");try{await signInWithEmailAndPassword(auth,loginEmail.value.trim(),loginPassword.value);}catch(error){loginError.textContent=error.message||"Sign in failed";setStatus("Sign in failed",true,error.code||error.message);}});
+signOutBtn.addEventListener("click",()=>signOut(auth));
+onAuthStateChanged(auth,user=>{currentUser=user;if(user){authScreen.hidden=true;userEmail.textContent=user.email||"";signOutBtn.hidden=false;connectList();connect();renderFrame();return;}authScreen.hidden=false;userEmail.textContent="";signOutBtn.hidden=true;if(unsubscribeCase){unsubscribeCase();unsubscribeCase=null;}if(unsubscribeList){unsubscribeList();unsubscribeList=null;}setStatus("Sign in required");sendSnapshot();});
 renderFrame();
 </script>
 </body>
 </html>
 `;
 
+const adminPage = `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WOYZ Stroke · User Admin</title>
+<style>
+  :root{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#14231a;background:#f4f7f5}
+  *{box-sizing:border-box}
+  body{margin:0;min-height:100vh;background:#f4f7f5}
+  .bar{display:flex;align-items:center;gap:10px;padding:12px 18px;background:#215f51;color:white}
+  .bar strong{font-size:18px}
+  .bar a,.bar button{border:1px solid rgb(255 255 255 / .28);border-radius:7px;background:rgb(255 255 255 / .94);color:#183b32;padding:7px 11px;font:inherit;font-weight:800;text-decoration:none}
+  .bar .spacer{flex:1}
+  main{width:min(760px,calc(100% - 32px));margin:28px auto;display:grid;gap:18px}
+  section{background:white;border:1px solid #cfe0d5;border-radius:12px;padding:18px;box-shadow:0 16px 40px rgb(0 0 0 / .08)}
+  h1,h2{margin:0 0 12px;color:#16372d}
+  form{display:grid;gap:12px}
+  label{display:grid;gap:6px;color:#52695e;font-size:13px;font-weight:800}
+  input,select{width:100%;border:1px solid #cfe0d5;border-radius:8px;padding:11px 12px;font:inherit;color:#14231a;background:white}
+  button.primary{border:0;border-radius:8px;background:#0f8a5f;color:white;padding:12px 14px;font:inherit;font-weight:900}
+  .row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .status{min-height:20px;font-weight:800;color:#52695e}
+  .error{color:#b42318}
+  .ok{color:#0f8a5f}
+  table{width:100%;border-collapse:collapse;font-size:14px}
+  th,td{text-align:left;border-bottom:1px solid #dce8df;padding:9px 6px}
+  @media(max-width:640px){.row{grid-template-columns:1fr}.bar{flex-wrap:wrap}}
+</style>
+</head>
+<body>
+<div class="bar">
+  <strong>WOYZ Stroke · User Admin</strong>
+  <span id="adminStatus">Sign in required</span>
+  <span class="spacer"></span>
+  <a href="index.html">Open app</a>
+  <button id="signOutBtn" type="button" hidden>Sign out</button>
+</div>
+<main>
+  <section id="loginPanel">
+    <h1>Admin sign in</h1>
+    <form id="loginForm">
+      <label>Email <input id="loginEmail" type="email" autocomplete="username" required></label>
+      <label>Password <input id="loginPassword" type="password" autocomplete="current-password" required></label>
+      <button class="primary" type="submit">Sign in</button>
+      <div id="loginMessage" class="status error"></div>
+    </form>
+  </section>
+  <section id="createPanel" hidden>
+    <h2>Create user</h2>
+    <form id="createForm">
+      <div class="row">
+        <label>Email <input id="newEmail" type="email" autocomplete="off" required></label>
+        <label>Password <input id="newPassword" type="password" minlength="6" autocomplete="new-password" required></label>
+      </div>
+      <label>Name <input id="newName" autocomplete="off" placeholder="Optional"></label>
+      <button class="primary" type="submit">Create Firebase user</button>
+      <div id="createMessage" class="status"></div>
+    </form>
+  </section>
+  <section id="usersPanel" hidden>
+    <h2>Access model</h2>
+    <p style="margin:0;color:#52695e;line-height:1.5">Users are created in Firebase Authentication. Any signed-in user can access the shared stroke cases in this prototype.</p>
+  </section>
+</main>
+<script type="module">
+import {initializeApp} from "https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js";
+import {getAuth,onAuthStateChanged,signInWithEmailAndPassword,signOut,createUserWithEmailAndPassword} from "https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js";
+
+const firebaseConfig={projectId:"minutes-woyz-3",appId:"1:25423577451:web:a98bbfd85be9a804d34c2e",storageBucket:"minutes-woyz-3.firebasestorage.app",apiKey:"AIzaSyCHZTh_chvcWJqX97b2rfvTVevLQhPVmBY",authDomain:"minutes-woyz-3.firebaseapp.com",messagingSenderId:"25423577451"};
+const app=initializeApp(firebaseConfig);
+const auth=getAuth(app);
+let secondaryAuth=null;
+const adminStatus=document.getElementById("adminStatus");
+const loginPanel=document.getElementById("loginPanel");
+const createPanel=document.getElementById("createPanel");
+const usersPanel=document.getElementById("usersPanel");
+const createMessage=document.getElementById("createMessage");
+const loginMessage=document.getElementById("loginMessage");
+const signOutBtn=document.getElementById("signOutBtn");
+
+function esc(value){return String(value??"").replace(/[&<>"']/g,match=>({"&":"&amp;","<":"&lt;",">":"&gt;","\\"":"&quot;","'":"&#39;"}[match]));}
+function setCreateMessage(text,ok=false){createMessage.textContent=text;createMessage.className=ok?"status ok":"status error";}
+
+document.getElementById("loginForm").addEventListener("submit",async event=>{event.preventDefault();loginMessage.textContent="";try{await signInWithEmailAndPassword(auth,document.getElementById("loginEmail").value.trim(),document.getElementById("loginPassword").value);}catch(error){loginMessage.textContent=error.message||"Sign in failed";}});
+signOutBtn.addEventListener("click",()=>signOut(auth));
+document.getElementById("createForm").addEventListener("submit",async event=>{
+  event.preventDefault();
+  setCreateMessage("Creating user…",true);
+  try{
+    if(!secondaryAuth){
+      const secondaryApp=initializeApp(firebaseConfig,"user-create-"+Date.now());
+      secondaryAuth=getAuth(secondaryApp);
+    }
+    const email=document.getElementById("newEmail").value.trim();
+    const password=document.getElementById("newPassword").value;
+    const name=document.getElementById("newName").value.trim();
+    const credential=await createUserWithEmailAndPassword(secondaryAuth,email,password);
+    await signOut(secondaryAuth);
+    event.target.reset();
+    setCreateMessage("Created "+email+(name?" ("+name+")":""),true);
+  }catch(error){
+    setCreateMessage(error.message||"Could not create user");
+  }
+});
+
+onAuthStateChanged(auth,user=>{
+  if(!user){
+    adminStatus.textContent="Sign in required";
+    loginPanel.hidden=false;createPanel.hidden=true;usersPanel.hidden=true;signOutBtn.hidden=true;
+    return;
+  }
+  adminStatus.textContent=user.email||"Signed in";
+  loginPanel.hidden=true;createPanel.hidden=false;usersPanel.hidden=false;signOutBtn.hidden=false;
+});
+</script>
+</body>
+</html>
+`;
+
 fs.writeFileSync("index.html", page);
-console.log(`Wrote index.html with ${standaloneMobileDocument.length} mobile chars and ${standaloneDesktopDocument.length} desktop chars.`);
+fs.writeFileSync("admin.html", adminPage);
+console.log(`Wrote index.html and admin.html with ${standaloneMobileDocument.length} mobile chars and ${standaloneDesktopDocument.length} desktop chars.`);

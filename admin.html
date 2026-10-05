@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WOYZ Stroke · User Admin</title>
+<style>
+  :root{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#14231a;background:#f4f7f5}
+  *{box-sizing:border-box}
+  body{margin:0;min-height:100vh;background:#f4f7f5}
+  .bar{display:flex;align-items:center;gap:10px;padding:12px 18px;background:#215f51;color:white}
+  .bar strong{font-size:18px}
+  .bar a,.bar button{border:1px solid rgb(255 255 255 / .28);border-radius:7px;background:rgb(255 255 255 / .94);color:#183b32;padding:7px 11px;font:inherit;font-weight:800;text-decoration:none}
+  .bar .spacer{flex:1}
+  main{width:min(760px,calc(100% - 32px));margin:28px auto;display:grid;gap:18px}
+  section{background:white;border:1px solid #cfe0d5;border-radius:12px;padding:18px;box-shadow:0 16px 40px rgb(0 0 0 / .08)}
+  h1,h2{margin:0 0 12px;color:#16372d}
+  form{display:grid;gap:12px}
+  label{display:grid;gap:6px;color:#52695e;font-size:13px;font-weight:800}
+  input,select{width:100%;border:1px solid #cfe0d5;border-radius:8px;padding:11px 12px;font:inherit;color:#14231a;background:white}
+  button.primary{border:0;border-radius:8px;background:#0f8a5f;color:white;padding:12px 14px;font:inherit;font-weight:900}
+  .row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .status{min-height:20px;font-weight:800;color:#52695e}
+  .error{color:#b42318}
+  .ok{color:#0f8a5f}
+  table{width:100%;border-collapse:collapse;font-size:14px}
+  th,td{text-align:left;border-bottom:1px solid #dce8df;padding:9px 6px}
+  @media(max-width:640px){.row{grid-template-columns:1fr}.bar{flex-wrap:wrap}}
+</style>
+</head>
+<body>
+<div class="bar">
+  <strong>WOYZ Stroke · User Admin</strong>
+  <span id="adminStatus">Sign in required</span>
+  <span class="spacer"></span>
+  <a href="index.html">Open app</a>
+  <button id="signOutBtn" type="button" hidden>Sign out</button>
+</div>
+<main>
+  <section id="loginPanel">
+    <h1>Admin sign in</h1>
+    <form id="loginForm">
+      <label>Email <input id="loginEmail" type="email" autocomplete="username" required></label>
+      <label>Password <input id="loginPassword" type="password" autocomplete="current-password" required></label>
+      <button class="primary" type="submit">Sign in</button>
+      <div id="loginMessage" class="status error"></div>
+    </form>
+  </section>
+  <section id="createPanel" hidden>
+    <h2>Create user</h2>
+    <form id="createForm">
+      <div class="row">
+        <label>Email <input id="newEmail" type="email" autocomplete="off" required></label>
+        <label>Password <input id="newPassword" type="password" minlength="6" autocomplete="new-password" required></label>
+      </div>
+      <label>Name <input id="newName" autocomplete="off" placeholder="Optional"></label>
+      <button class="primary" type="submit">Create Firebase user</button>
+      <div id="createMessage" class="status"></div>
+    </form>
+  </section>
+  <section id="usersPanel" hidden>
+    <h2>Access model</h2>
+    <p style="margin:0;color:#52695e;line-height:1.5">Users are created in Firebase Authentication. Any signed-in user can access the shared stroke cases in this prototype.</p>
+  </section>
+</main>
+<script type="module">
+import {initializeApp} from "https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js";
+import {getAuth,onAuthStateChanged,signInWithEmailAndPassword,signOut,createUserWithEmailAndPassword} from "https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js";
+
+const firebaseConfig={projectId:"minutes-woyz-3",appId:"1:25423577451:web:a98bbfd85be9a804d34c2e",storageBucket:"minutes-woyz-3.firebasestorage.app",apiKey:"AIzaSyCHZTh_chvcWJqX97b2rfvTVevLQhPVmBY",authDomain:"minutes-woyz-3.firebaseapp.com",messagingSenderId:"25423577451"};
+const app=initializeApp(firebaseConfig);
+const auth=getAuth(app);
+let secondaryAuth=null;
+const adminStatus=document.getElementById("adminStatus");
+const loginPanel=document.getElementById("loginPanel");
+const createPanel=document.getElementById("createPanel");
+const usersPanel=document.getElementById("usersPanel");
+const createMessage=document.getElementById("createMessage");
+const loginMessage=document.getElementById("loginMessage");
+const signOutBtn=document.getElementById("signOutBtn");
+
+function esc(value){return String(value??"").replace(/[&<>"']/g,match=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[match]));}
+function setCreateMessage(text,ok=false){createMessage.textContent=text;createMessage.className=ok?"status ok":"status error";}
+
+document.getElementById("loginForm").addEventListener("submit",async event=>{event.preventDefault();loginMessage.textContent="";try{await signInWithEmailAndPassword(auth,document.getElementById("loginEmail").value.trim(),document.getElementById("loginPassword").value);}catch(error){loginMessage.textContent=error.message||"Sign in failed";}});
+signOutBtn.addEventListener("click",()=>signOut(auth));
+document.getElementById("createForm").addEventListener("submit",async event=>{
+  event.preventDefault();
+  setCreateMessage("Creating user…",true);
+  try{
+    if(!secondaryAuth){
+      const secondaryApp=initializeApp(firebaseConfig,"user-create-"+Date.now());
+      secondaryAuth=getAuth(secondaryApp);
+    }
+    const email=document.getElementById("newEmail").value.trim();
+    const password=document.getElementById("newPassword").value;
+    const name=document.getElementById("newName").value.trim();
+    const credential=await createUserWithEmailAndPassword(secondaryAuth,email,password);
+    await signOut(secondaryAuth);
+    event.target.reset();
+    setCreateMessage("Created "+email+(name?" ("+name+")":""),true);
+  }catch(error){
+    setCreateMessage(error.message||"Could not create user");
+  }
+});
+
+onAuthStateChanged(auth,user=>{
+  if(!user){
+    adminStatus.textContent="Sign in required";
+    loginPanel.hidden=false;createPanel.hidden=true;usersPanel.hidden=true;signOutBtn.hidden=true;
+    return;
+  }
+  adminStatus.textContent=user.email||"Signed in";
+  loginPanel.hidden=true;createPanel.hidden=false;usersPanel.hidden=false;signOutBtn.hidden=false;
+});
+</script>
+</body>
+</html>
