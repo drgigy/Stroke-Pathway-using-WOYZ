@@ -376,17 +376,17 @@ const page = `<!doctype html>
   html,body,#app{margin:0;min-height:100vh}
   button{font:inherit;cursor:pointer}
   .shell{min-height:100vh;background:#f4f7f5}
-  .bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:9px 16px;background:#215f51;color:white}
+  .bar{display:flex;gap:8px;align-items:center;justify-content:flex-end;flex-wrap:wrap;padding:9px 16px;background:#215f51;color:white}
   .bar strong{font-weight:800}
   .bar button{min-height:30px;border:1px solid rgb(255 255 255 / .28);border-radius:7px;background:rgb(255 255 255 / .94);color:#183b32;padding:4px 10px;font-size:13px;font-weight:750;text-decoration:none;line-height:1}
   .bar button.active{background:#0f8a5f;color:white;box-shadow:inset 0 0 0 1px rgb(255 255 255 / .36)}
   .bar .spacer{flex:1 1 auto}
   .bar .settings{width:32px;padding:4px 0}
   .bar .link{display:inline-grid;place-items:center;min-height:30px;border:1px solid rgb(255 255 255 / .28);border-radius:7px;background:rgb(255 255 255 / .94);color:#183b32;padding:4px 10px;font-size:13px;font-weight:750;text-decoration:none;line-height:1}
-  .status{font-size:12px;opacity:.78;white-space:nowrap}
-  .notice{display:flex;justify-content:space-between;gap:12px;align-items:center;padding:8px 18px;font-size:12px;color:#52695e;border-bottom:1px solid #dce8df}
+  .status{display:none;font-size:12px;opacity:.78;white-space:nowrap}
+  .notice{display:none;justify-content:space-between;gap:12px;align-items:center;padding:8px 18px;font-size:12px;color:#52695e;border-bottom:1px solid #dce8df}
   .notice .error{color:#b42318;font-weight:750}
-  iframe{width:100%;height:calc(100vh - 91px);border:0;display:block;background:white}
+  iframe{width:100%;height:calc(100vh - 48px);border:0;display:block;background:white}
   .auth-screen{position:fixed;inset:0;z-index:20;display:grid;place-items:center;background:#f4f7f5;padding:20px}
   .auth-screen[hidden]{display:none}
   .auth-card{width:min(420px,100%);display:grid;gap:14px;padding:24px;border:1px solid #cfe0d5;border-radius:12px;background:white;box-shadow:0 18px 60px rgb(0 0 0 / .12)}
@@ -406,19 +406,15 @@ const page = `<!doctype html>
   .settings-panel menu{display:flex;justify-content:flex-end;gap:8px;margin:0;padding:0}
   .settings-panel button{border:1px solid #cfe0d5;border-radius:7px;background:white;color:#14231a;padding:8px 12px;font-weight:750}
   .settings-panel .primary{border-color:#0f8a5f;background:#0f8a5f;color:white}
-  @media(max-width:720px){.bar{gap:6px;padding:7px 9px}.bar strong{font-size:14px}.bar button,.bar a{min-height:28px;padding:3px 8px;font-size:12px}.bar .settings{width:30px}.notice{padding:7px 10px}iframe{height:calc(100vh - 112px)}}
+  @media(max-width:720px){.bar{gap:6px;padding:7px 9px}.bar strong{font-size:14px}.bar button,.bar a{min-height:28px;padding:3px 8px;font-size:12px}.bar .settings{width:30px}.notice{padding:7px 10px}iframe{height:calc(100vh - 42px)}}
 </style>
 </head>
 <body>
 <div class="shell">
   <div class="bar">
-    <strong id="caseTitle">WOYZ · Shared case ST-024</strong>
-    <button id="mobileBtn" class="active" type="button">Mobile</button>
-    <button id="desktopBtn" type="button">Desktop / Admin</button>
+    <strong id="caseTitle" hidden>WOYZ · Shared case ST-024</strong>
     <span id="status" class="status" role="status">Connecting…</span>
     <span class="spacer"></span>
-    <span id="userEmail" class="status"></span>
-    <a class="link" href="admin.html">Users</a>
     <button id="signOutBtn" type="button" hidden>Sign out</button>
     <button id="settingsBtn" class="settings" type="button" aria-label="Settings">⚙</button>
   </div>
@@ -437,7 +433,6 @@ const page = `<!doctype html>
     </label>
     <label>Password
       <input id="loginPassword" type="password" autocomplete="current-password" required>
-    </label>
     <button type="submit">Sign in</button>
     <div id="loginError" class="auth-error" role="alert"></div>
   </form>
@@ -478,14 +473,11 @@ const db=getFirestore(app);
 const frame=document.getElementById("workspaceFrame");
 const statusEl=document.getElementById("status");
 const syncNote=document.getElementById("syncNote");
-const mobileBtn=document.getElementById("mobileBtn");
-const desktopBtn=document.getElementById("desktopBtn");
 const authScreen=document.getElementById("authScreen");
 const loginForm=document.getElementById("loginForm");
 const loginEmail=document.getElementById("loginEmail");
 const loginPassword=document.getElementById("loginPassword");
 const loginError=document.getElementById("loginError");
-const userEmail=document.getElementById("userEmail");
 const signOutBtn=document.getElementById("signOutBtn");
 const settingsDialog=document.getElementById("settingsDialog");
 const caseDocId=document.getElementById("caseDocId");
@@ -520,8 +512,7 @@ function caseLabel(item){const name=item.data?.name||"Patient name missing";cons
 function visibleCaseLabels(){const current={id:caseId,...snapshot};const merged=[current,...cases.filter(item=>item.id!==caseId)];return merged.map(caseLabel);}
 function rememberCurrentCase(){cases=[{id:caseId,...snapshot},...cases.filter(item=>item.id!==caseId)];}
 function sendSnapshot(type="snapshot",extra={}){post({type,workspaceId,caseId,cases:visibleCaseLabels(),...snapshot,...extra});}
-function renderFrame(){frame.srcdoc=mode==="desktop"?desktopDocument:mobileDocument;frame.title=mode==="desktop"?"desktop stroke workspace":"mobile stroke workspace";mobileBtn.classList.toggle("active",mode==="mobile");desktopBtn.classList.toggle("active",mode==="desktop");}
-function switchMode(next){if(next===mode)return;if(!confirm("Switch views? Save any open draft first. Unsaved text will be discarded."))return;mode=next;history.replaceState(null,"",next==="desktop"?"#admin":"#mobile");renderFrame();setTimeout(()=>sendSnapshot(),150);}
+function renderFrame(){frame.srcdoc=mode==="desktop"?desktopDocument:mobileDocument;frame.title=mode==="desktop"?"desktop stroke workspace":"mobile stroke workspace";}
 function newCaseId(){const stamp=new Date().toISOString().replace(/[-:TZ.]/g,"").slice(0,14);return "ST-"+stamp+"-"+Math.random().toString(36).slice(2,6).toUpperCase();}
 function connect(){if(unsubscribeCase){unsubscribeCase();unsubscribeCase=null;}document.getElementById("caseTitle").textContent="WOYZ · Case "+caseId;if(!currentUser){setStatus("Sign in required");sendSnapshot();return;}setStatus("Connecting…");unsubscribeCase=onSnapshot(ref(),docSnap=>{if(docSnap.exists()){writeSnapshot(docSnap.data());setStatus(snapshot.version?"Synced · v"+snapshot.version:"Firestore ready");}else{writeSnapshot({data:{},version:0,updatedAt:null});setStatus("Firestore ready");}sendSnapshot();},error=>{setStatus("Firestore unavailable",true,error.code||error.message);sendSnapshot();});}
 function connectList(){if(unsubscribeList){unsubscribeList();unsubscribeList=null;}if(!currentUser)return;unsubscribeList=onSnapshot(caseCollection(),listSnap=>{cases=listSnap.docs.map(item=>({id:item.id,...cleanSnapshot(item.data())})).sort((a,b)=>String(b.updatedAtText||"").localeCompare(String(a.updatedAtText||"")));if(cases.length&&!cases.some(item=>item.id===caseId)){caseId=cases[0].id;writeUrlState();connect();}sendSnapshot();},error=>{setStatus("Case list unavailable",true,error.code||error.message);sendSnapshot();});}
@@ -568,14 +559,12 @@ async function generateRegistrationFromAudio(message){
   }catch(error){setStatus("Gemini failed",true,error.message||String(error));post({type:"voiceRegistrationError",error:error.message||"Gemini registration failed"});}
 }
 window.addEventListener("message",event=>{if(event.source!==frame.contentWindow||event.data?.channel!=="woyz-case-v1")return;const message=event.data;if(message.type==="ready")sendSnapshot();if(message.type==="save")saveField(message);if(message.type==="createCase")createCase();if(message.type==="selectCase")selectCase(message.caseId);if(message.type==="voiceRegistration")generateRegistrationFromAudio(message);});
-mobileBtn.addEventListener("click",()=>switchMode("mobile"));
-desktopBtn.addEventListener("click",()=>switchMode("desktop"));
 document.getElementById("settingsBtn").addEventListener("click",()=>{caseDocId.value=caseId;workspaceCodeInput.value=defaultWorkspaceId;geminiKeyInput.value=localStorage.getItem(geminiStoreKey)||"";settingsDialog.showModal();});
 settingsDialog.addEventListener("close",()=>{if(settingsDialog.returnValue!=="save")return;caseId=cleanId(caseDocId.value.trim(),"ST-024");workspaceId=defaultWorkspaceId;workspaceCodeInput.value=defaultWorkspaceId;writeUrlState();localStorage.setItem(geminiStoreKey,geminiKeyInput.value.trim());connectList();connect();});
 document.getElementById("clearGeminiBtn").addEventListener("click",()=>{geminiKeyInput.value="";localStorage.removeItem(geminiStoreKey);});
 loginForm.addEventListener("submit",async event=>{event.preventDefault();loginError.textContent="";setStatus("Signing in…");try{await signInWithEmailAndPassword(auth,loginEmail.value.trim(),loginPassword.value);}catch(error){loginError.textContent=error.message||"Sign in failed";setStatus("Sign in failed",true,error.code||error.message);}});
 signOutBtn.addEventListener("click",()=>signOut(auth));
-onAuthStateChanged(auth,user=>{currentUser=user;if(user){authScreen.hidden=true;userEmail.textContent=user.email||"";signOutBtn.hidden=false;connectList();connect();renderFrame();return;}authScreen.hidden=false;userEmail.textContent="";signOutBtn.hidden=true;if(unsubscribeCase){unsubscribeCase();unsubscribeCase=null;}if(unsubscribeList){unsubscribeList();unsubscribeList=null;}setStatus("Sign in required");sendSnapshot();});
+onAuthStateChanged(auth,user=>{currentUser=user;if(user){authScreen.hidden=true;signOutBtn.hidden=false;connectList();connect();renderFrame();return;}authScreen.hidden=false;signOutBtn.hidden=true;if(unsubscribeCase){unsubscribeCase();unsubscribeCase=null;}if(unsubscribeList){unsubscribeList();unsubscribeList=null;}setStatus("Sign in required");sendSnapshot();});
 renderFrame();
 </script>
 </body>
