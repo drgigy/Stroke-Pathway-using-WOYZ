@@ -655,6 +655,7 @@ const firebaseConfig={projectId:"minutes-woyz-3",appId:"1:25423577451:web:a98bbf
 const app=initializeApp(firebaseConfig);
 const auth=getAuth(app);
 let secondaryAuth=null;
+const adminUids=new Set(["sigghUtd6RTdgEEghn5bH0I1Zq72"]);
 const adminStatus=document.getElementById("adminStatus");
 const loginPanel=document.getElementById("loginPanel");
 const createPanel=document.getElementById("createPanel");
@@ -670,6 +671,7 @@ document.getElementById("loginForm").addEventListener("submit",async event=>{eve
 signOutBtn.addEventListener("click",()=>signOut(auth));
 document.getElementById("createForm").addEventListener("submit",async event=>{
   event.preventDefault();
+  if(!auth.currentUser||!adminUids.has(auth.currentUser.uid)){setCreateMessage("This account is not allowed to create users.");return;}
   setCreateMessage("Creating user…",true);
   try{
     if(!secondaryAuth){
@@ -694,8 +696,10 @@ onAuthStateChanged(auth,user=>{
     loginPanel.hidden=false;createPanel.hidden=true;usersPanel.hidden=true;signOutBtn.hidden=true;
     return;
   }
-  adminStatus.textContent=user.email||"Signed in";
-  loginPanel.hidden=true;createPanel.hidden=false;usersPanel.hidden=false;signOutBtn.hidden=false;
+  const allowed=adminUids.has(user.uid);
+  adminStatus.textContent=allowed?(user.email||"Signed in"):"Not authorized";
+  loginPanel.hidden=true;createPanel.hidden=!allowed;usersPanel.hidden=false;signOutBtn.hidden=false;
+  if(!allowed)usersPanel.querySelector("p").textContent="Signed in, but this account is not configured as a WOYZ user administrator.";
 });
 </script>
 </body>
