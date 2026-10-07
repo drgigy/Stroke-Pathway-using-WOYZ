@@ -73,8 +73,6 @@ const sharedCaseControls = `<script>
       '#stroke-mobile-home .woyz-mobile-header-controls button[aria-label="Settings"]{width:38px!important;padding:6px 0!important}',
       '#stroke-mobile-home .top{padding:12px 14px!important}',
       '#stroke-mobile-home .body{height:calc(100vh - 214px)!important;min-height:0!important;overflow:hidden!important;display:flex!important;flex-direction:column!important;padding:12px 10px!important}',
-      '#stroke-mobile-home:has(#mh-content .stages){height:auto!important;max-height:none!important;min-height:0!important}',
-      '#stroke-mobile-home:has(#mh-content .stages) .body{height:auto!important;min-height:0!important;overflow:visible!important}',
       '#stroke-mobile-home .patient{flex:0 0 auto!important}',
       '#stroke-mobile-home #mh-status{flex:0 0 auto!important}',
       '#stroke-mobile-home #mh-content{flex:1 1 auto!important;min-height:0!important;overflow-y:auto!important;overscroll-behavior:contain!important;scrollbar-gutter:stable!important;padding-bottom:18px!important}',
