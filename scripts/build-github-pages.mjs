@@ -40,7 +40,25 @@ const sharedCaseControls = `<script>
   const voiceStages=['Registration','Initial Assessment','Scan','NIH Stroke Scale','Decision','Checklist','IVT','Thrombectomy','Timings','Inpatient review','Discharge','Follow-up'];
   const esc=value=>String(value??'').replace(/[&<>"']/g,match=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[match]));
   function post(message){parent.postMessage({channel:'woyz-case-v1',...message},'*');}
-  const voiceState={recorder:null,stream:null,context:null,analyser:null,source:null,chunks:[],bars:[],raf:0,remaining:300,timer:0,recording:false,paused:false,dock:null,status:null,start:null,pause:null,resume:null,extend:null,stop:null,level:null};
+  const voiceState={recorder:null,stream:null,context:null,analyser:null,source:null,chunks:[],bars:[],raf:0,remaining:300,timer:0,recording:false,paused:false,dock:null,status:null,start:null,pause:null,resume:null,extend:null,stop:null,level:null,inline:null};
+  function todayDisplay(){return new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});}
+  function applyMobileReferenceLayout(){
+    if(root.id!=='stroke-mobile-home'||document.querySelector('#woyzMobileReferenceStyle'))return;
+    const style=document.createElement('style');
+    style.id='woyzMobileReferenceStyle';
+    style.textContent='html,body{height:100%;overflow:hidden!important}#stroke-mobile-home{height:100vh!important;max-height:100vh!important;overflow:hidden!important}#stroke-mobile-home .shared-editor{display:none!important}#stroke-mobile-home #mh-content{max-height:calc(100vh - 310px)!important;overflow:auto!important;overscroll-behavior:contain!important;padding-bottom:118px!important}#stroke-mobile-home #mh-content .dictation-guide,#stroke-mobile-home #mh-content .box,#stroke-mobile-home #mh-content .assessment-list{max-height:none!important;overflow:visible!important}.woyz-inline-recorder{display:flex!important;align-items:center!important;justify-content:flex-end!important;gap:8px!important;flex-wrap:nowrap!important}.woyz-recording-label{display:none;color:#b42318;font-weight:900;font-size:15px;white-space:nowrap}.woyz-inline-recorder.recording .woyz-recording-label{display:inline-flex}.woyz-inline-recorder button{min-height:40px!important;border-radius:12px!important;font-size:14px!important;font-weight:850!important}.woyz-inline-recorder.recording #mh-record{display:none!important}.woyz-inline-recorder:not(.recording) .woyz-record-pause,.woyz-inline-recorder:not(.recording) .woyz-record-resume,.woyz-inline-recorder:not(.recording) .woyz-record-stop{display:none!important}.woyz-inline-recorder.recording .woyz-record-pause,.woyz-inline-recorder.recording .woyz-record-stop{display:inline-flex!important}.woyz-inline-recorder.paused .woyz-record-pause{display:none!important}.woyz-inline-recorder.paused .woyz-record-resume{display:inline-flex!important}.woyz-record-status{font-size:13px;color:#60746b;font-weight:800;white-space:nowrap}.woyz-record-stop{background:#ff514a!important;color:white!important;border-color:#ff514a!important}';
+    document.head.append(style);
+  }
+  function updateVisibleDates(){
+    const today=todayDisplay();
+    const walker=document.createTreeWalker(root,NodeFilter.SHOW_TEXT);
+    let node;
+    while((node=walker.nextNode())){
+      if(/\\b\\d{2}\\s+[A-Z][a-z]{2}\\s+20\\d{2}\\b/.test(node.nodeValue)){
+        node.nodeValue=node.nodeValue.replace(/\\b\\d{2}\\s+[A-Z][a-z]{2}\\s+20\\d{2}\\b/g,today);
+      }
+    }
+  }
   function ensureVoicePlugin(){
     if(document.querySelector('#registrationVoiceDock'))return;
     root.style.position='relative';
@@ -89,7 +107,11 @@ const sharedCaseControls = `<script>
     stopVoiceTracks();
     voiceState.dock?.classList.remove('visible');
   }
-  function setVoiceStatus(text){if(voiceState.status)voiceState.status.textContent=text;}
+  function setVoiceStatus(text){
+    if(voiceState.status)voiceState.status.textContent=text;
+    const inlineStatus=root.querySelector('.woyz-record-status');
+    if(inlineStatus)inlineStatus.textContent=text;
+  }
   function setVoiceTimer(){
     const timer=voiceState.dock?.querySelector('#registrationVoiceTimer');
     if(!timer)return;
@@ -101,6 +123,8 @@ const sharedCaseControls = `<script>
     if(!voiceState.start)return;
     voiceState.dock?.classList.toggle('recording',voiceState.recording);
     voiceState.dock?.classList.toggle('paused',voiceState.recording&&voiceState.paused);
+    voiceState.inline?.classList.toggle('recording',voiceState.recording);
+    voiceState.inline?.classList.toggle('paused',voiceState.recording&&voiceState.paused);
     voiceState.start.disabled=voiceState.recording;
     voiceState.pause.disabled=!voiceState.recording||voiceState.paused;
     voiceState.resume.disabled=!voiceState.recording||!voiceState.paused;
@@ -202,7 +226,8 @@ const sharedCaseControls = `<script>
   }
   function ensureMobileControls(){
     const list=root.querySelector('#mh-patients');
-    ensureVoicePlugin();
+    applyMobileReferenceLayout();
+    ensureInlineRecorder();
     if(!list||root.querySelector('#mh-new-firestore'))return;
     const button=document.createElement('button');
     button.id='mh-new-firestore';
@@ -210,6 +235,41 @@ const sharedCaseControls = `<script>
     button.textContent='New patient';
     button.style.cssText='width:100%;margin:10px 0 4px;padding:12px;border:0;border-radius:8px;background:#0f8a5f;color:white;font-weight:800';
     list.before(button);
+  }
+  function ensureInlineRecorder(){
+    if(root.id!=='stroke-mobile-home')return;
+    const start=root.querySelector('#mh-record');
+    if(!start||start.dataset.inlineRecorder==='true')return;
+    start.dataset.inlineRecorder='true';
+    start.textContent='Start';
+    const holder=start.parentElement;
+    holder.classList.add('woyz-inline-recorder');
+    const label=document.createElement('span');
+    label.className='woyz-recording-label';
+    label.textContent='Recording';
+    const pause=document.createElement('button');
+    pause.type='button';pause.className='woyz-record-pause';pause.textContent='Pause';
+    const resume=document.createElement('button');
+    resume.type='button';resume.className='woyz-record-resume';resume.textContent='Resume';
+    const stop=document.createElement('button');
+    stop.type='button';stop.className='woyz-record-stop';stop.textContent='Stop & transcribe';
+    const status=document.createElement('span');
+    status.className='woyz-record-status';
+    status.textContent='Ready';
+    holder.prepend(label);
+    start.after(pause,resume,stop,status);
+    voiceState.inline=holder;
+    voiceState.status=status;
+    voiceState.start=start;
+    voiceState.pause=pause;
+    voiceState.resume=resume;
+    voiceState.extend={disabled:false};
+    voiceState.stop=stop;
+    start.addEventListener('click',event=>{event.preventDefault();event.stopPropagation();const stage=currentStageFromContent();if(stage){selectedStageIndex=stage.index;selectedStageName=stage.name;selectedVoiceKind=stage.kind||'stage';}startVoiceRecording();});
+    pause.addEventListener('click',pauseVoiceRecording);
+    resume.addEventListener('click',resumeVoiceRecording);
+    stop.addEventListener('click',finishVoiceRecording);
+    updateVoiceButtons();
   }
   function openPatientListByDefault(){
     if(openedDefaultList)return;
@@ -225,7 +285,7 @@ const sharedCaseControls = `<script>
     return index>=0?{index,name:voiceStages[index],kind:'stage'}:null;
   }
   function updateVoiceAvailability(){
-    ensureVoicePlugin();
+    ensureInlineRecorder();
     const stage=currentStageFromContent();
     if(stage){
       selectedStageIndex=stage.index;
@@ -255,6 +315,31 @@ const sharedCaseControls = `<script>
     if(!rows||!cases.length)return;
     rows.innerHTML=cases.map(item=>'<tr><td>'+esc(item.name||'Unknown patient')+' · '+esc(item.id)+'</td><td>'+esc(item.uhid||'No UHID')+'</td><td>Shared</td><td>v'+Number(item.version||0)+'</td></tr>').join('');
   }
+  function renderDesktopClinicalNote(){
+    if(root.id!=='stroke-review')return;
+    const note=root.querySelector('#sr-note');
+    if(!note)return;
+    const name=caseData.name||'Patient name missing';
+    const registration=[
+      ['Name',caseData.name],['UHID',caseData.uhid],['Age',caseData.age],['Sex',caseData.sex],['Mobile',caseData.mobile],['Diagnosis',caseData.diagnosis],['Contact',caseData.contact]
+    ].filter(([,value])=>value&&value!=='NIL');
+    const stageMarkup=voiceStages.slice(1).map((stage,offset)=>{
+      const index=offset+1;
+      const raw=caseData['stage_'+index];
+      const parsed=stageStructuredValue(raw||'');
+      const fields=parsed.fields||[];
+      const summary=parsed.summary&&parsed.summary!=='NIL'?parsed.summary:(raw&&raw!=='NIL'?raw:'Not yet recorded');
+      const fieldRows=fields.length?'<dl class="woyz-note-fields">'+fields.map(item=>'<div><dt>'+esc(item.label)+'</dt><dd>'+esc(item.value)+'</dd></div>').join('')+'</dl>':'';
+      return '<div class="event"><div class="time">'+(index+1)+'</div><div><h3>'+esc(stage)+'</h3><p class="saved-value">'+esc(summary)+'</p>'+fieldRows+'</div></div>';
+    }).join('');
+    note.innerHTML='<div class="note-title"><h2>Chronological clinical note</h2><small>'+esc(name)+' · '+esc(caseId)+' · '+todayDisplay()+'</small></div><div class="event"><div class="time">1</div><div><h3>Registration</h3>'+(registration.length?'<dl class="woyz-note-fields">'+registration.map(([label,value])=>'<div><dt>'+esc(label)+'</dt><dd>'+esc(value)+'</dd></div>').join('')+'</dl>':'<p class="saved-value">Not yet recorded</p>')+'</div></div>'+stageMarkup+'<h3>Consultant comments</h3><p class="saved-value">'+esc(caseData.consultant||'Missing')+'</p><h3>Diagnosis and treatment summary</h3><p class="saved-value">'+esc(caseData.discharge||caseData.diagnosis||'Missing')+'</p>';
+    if(!document.querySelector('#woyzDesktopNoteStyle')){
+      const style=document.createElement('style');
+      style.id='woyzDesktopNoteStyle';
+      style.textContent='.woyz-note-fields{display:grid;gap:8px;margin:8px 0 0}.woyz-note-fields div{display:grid;grid-template-columns:minmax(150px,220px) 1fr;gap:12px;border-top:1px solid #dce8df;padding-top:8px}.woyz-note-fields dt{font-weight:850;color:#1f5f51}.woyz-note-fields dd{margin:0;color:#203c33;white-space:pre-wrap}@media(max-width:760px){.woyz-note-fields div{grid-template-columns:1fr}}';
+      document.head.append(style);
+    }
+  }
   function renderCaseIdentity(){
     const active=cases.find(item=>item.id===caseId);
     const mobileId=root.querySelector('#mh-id');
@@ -270,6 +355,7 @@ const sharedCaseControls = `<script>
     content.querySelectorAll('.shared-stage-display').forEach(item=>{item.hidden=true;});
     content.querySelector('.woyz-stage-fill')?.remove();
     content.querySelectorAll('.woyz-line-value').forEach(item=>item.remove());
+    if(root.id==='stroke-mobile-home')return;
     if(heading!=='Registration')return renderStageFill(heading,content);
     hydrateRegistrationGuide();
     let box=content.querySelector('.woyz-registration-values');
@@ -360,7 +446,7 @@ const sharedCaseControls = `<script>
   }
   root.addEventListener('click',event=>{
     const recorder=event.target.closest?.('#mh-record');
-    if(recorder){event.preventDefault();event.stopImmediatePropagation();setTimeout(openVoiceDockForStage,0);return;}
+    if(recorder){event.preventDefault();event.stopImmediatePropagation();const stage=currentStageFromContent();if(stage){selectedStageIndex=stage.index;selectedStageName=stage.name;selectedVoiceKind=stage.kind||'stage';}startVoiceRecording();return;}
     const create=event.target.closest?.('#mh-new-firestore');
     if(create){event.preventDefault();event.stopImmediatePropagation();post({type:'createCase'});return;}
     const select=event.target.closest?.('[data-firestore-case]');
@@ -382,16 +468,17 @@ const sharedCaseControls = `<script>
     }
     if(event.data.type==='voiceRegistrationSaved'){setVoiceStatus('Saved to Firestore');setTimeout(closeVoiceDock,450);}
     if(event.data.type==='voiceRegistrationError')setVoiceStatus(event.data.error||'Voice registration failed');
-    setTimeout(()=>{renderMobileCases();renderDesktopCases();renderCaseIdentity();renderRegistrationValues();replaceRecorderCopy();updateVoiceAvailability();},0);
+    setTimeout(()=>{renderMobileCases();renderDesktopCases();renderDesktopClinicalNote();renderCaseIdentity();renderRegistrationValues();replaceRecorderCopy();updateVisibleDates();updateVoiceAvailability();},0);
     setTimeout(openPatientListByDefault,80);
   });
+  applyMobileReferenceLayout();
   ensureMobileControls();
-  ensureVoicePlugin();
   renderCaseIdentity();
   replaceRecorderCopy();
+  updateVisibleDates();
   updateVoiceAvailability();
   setTimeout(openPatientListByDefault,250);
-  setInterval(()=>{renderMobileCases();renderCaseIdentity();renderRegistrationValues();replaceRecorderCopy();updateVoiceAvailability();},1000);
+  setInterval(()=>{renderMobileCases();renderDesktopClinicalNote();renderCaseIdentity();renderRegistrationValues();replaceRecorderCopy();updateVisibleDates();updateVoiceAvailability();},1000);
 })();
 </script>`;
 
@@ -420,6 +507,7 @@ const page = `<!doctype html>
   .bar button{min-height:30px;border:1px solid rgb(255 255 255 / .28);border-radius:7px;background:rgb(255 255 255 / .94);color:#183b32;padding:4px 10px;font-size:13px;font-weight:750;text-decoration:none;line-height:1}
   .bar button.active{background:#0f8a5f;color:white;box-shadow:inset 0 0 0 1px rgb(255 255 255 / .36)}
   .bar .spacer{flex:1 1 auto}
+  .bar .today-date{font-size:13px;font-weight:850;color:rgb(255 255 255 / .92);white-space:nowrap}
   .bar .settings{width:32px;padding:4px 0}
   .bar .link{display:inline-grid;place-items:center;min-height:30px;border:1px solid rgb(255 255 255 / .28);border-radius:7px;background:rgb(255 255 255 / .94);color:#183b32;padding:4px 10px;font-size:13px;font-weight:750;text-decoration:none;line-height:1}
   .status{display:none;font-size:12px;opacity:.78;white-space:nowrap}
@@ -454,6 +542,7 @@ const page = `<!doctype html>
     <strong id="caseTitle" hidden>WOYZ · Shared case ST-024</strong>
     <span id="status" class="status" role="status">Connecting…</span>
     <span class="spacer"></span>
+    <span id="todayDate" class="today-date"></span>
     <button id="signOutBtn" type="button" hidden>Sign out</button>
     <button id="settingsBtn" class="settings" type="button" aria-label="Settings">⚙</button>
   </div>
@@ -518,6 +607,7 @@ const loginEmail=document.getElementById("loginEmail");
 const loginPassword=document.getElementById("loginPassword");
 const loginError=document.getElementById("loginError");
 const signOutBtn=document.getElementById("signOutBtn");
+const todayDate=document.getElementById("todayDate");
 const settingsDialog=document.getElementById("settingsDialog");
 const caseDocId=document.getElementById("caseDocId");
 const workspaceCodeInput=document.getElementById("workspaceCode");
@@ -536,6 +626,7 @@ let snapshot={data:{},version:0,updatedAt:null,updatedAtText:null};
 let saving=false;
 
 function nowText(){return new Date().toLocaleTimeString();}
+function todayDisplay(){return new Date().toLocaleDateString("en-GB",{day:"2-digit",month:"short",year:"numeric"});}
 function randomId(prefix){const bytes=new Uint8Array(12);crypto.getRandomValues(bytes);return prefix+Array.from(bytes,b=>b.toString(36).padStart(2,"0")).join("").slice(0,22);}
 function cleanId(value,fallback){return String(value||fallback).replace(/[^A-Za-z0-9_-]/g,"-").slice(0,64);}
 function initialMode(){return responsiveModeQuery.matches?"mobile":"desktop";}
@@ -621,6 +712,7 @@ document.getElementById("clearGeminiBtn").addEventListener("click",()=>{geminiKe
 loginForm.addEventListener("submit",async event=>{event.preventDefault();loginError.textContent="";setStatus("Signing in…");try{await signInWithEmailAndPassword(auth,loginEmail.value.trim(),loginPassword.value);}catch(error){loginError.textContent=error.message||"Sign in failed";setStatus("Sign in failed",true,error.code||error.message);}});
 signOutBtn.addEventListener("click",()=>signOut(auth));
 responsiveModeQuery.addEventListener("change",syncResponsiveMode);
+todayDate.textContent=todayDisplay();
 onAuthStateChanged(auth,user=>{currentUser=user;if(user){authScreen.hidden=true;signOutBtn.hidden=false;connectList();connect();renderFrame();return;}authScreen.hidden=false;signOutBtn.hidden=true;if(unsubscribeCase){unsubscribeCase();unsubscribeCase=null;}if(unsubscribeList){unsubscribeList();unsubscribeList=null;}setStatus("Sign in required");sendSnapshot();});
 renderFrame();
 </script>
