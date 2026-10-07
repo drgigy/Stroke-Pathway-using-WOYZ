@@ -58,6 +58,15 @@ const sharedCaseControls = `<script>
     controls.querySelector('#woyzMobileSignOut').addEventListener('click',()=>post({type:'requestSignOut'}));
     controls.querySelector('#woyzMobileSettings').addEventListener('click',()=>post({type:'requestSettings'}));
   }
+  function ensureMobileTopPatient(){
+    if(root.id!=='stroke-mobile-home'||root.querySelector('#woyzMobilePatientChip'))return;
+    const nav=root.querySelector('.top');
+    if(!nav)return;
+    const chip=document.createElement('span');
+    chip.id='woyzMobilePatientChip';
+    chip.className='woyz-mobile-patient-chip';
+    nav.insertBefore(chip,nav.querySelector('small'));
+  }
   function applyMobileReferenceLayout(){
     if(root.id!=='stroke-mobile-home'||document.querySelector('#woyzMobileReferenceStyle'))return;
     const style=document.createElement('style');
@@ -71,9 +80,13 @@ const sharedCaseControls = `<script>
       '#stroke-mobile-home .woyz-mobile-header-controls input{width:124px!important;min-height:38px!important;border:1px solid rgb(255 255 255 / .28)!important;border-radius:10px!important;background:rgb(255 255 255 / .95)!important;color:#183b32!important;padding:6px 6px!important;font:700 13px system-ui!important}',
       '#stroke-mobile-home .woyz-mobile-header-controls button{min-height:38px!important;border:1px solid rgb(255 255 255 / .28)!important;border-radius:10px!important;background:rgb(255 255 255 / .95)!important;color:#183b32!important;padding:6px 8px!important;font:800 13px system-ui!important;white-space:nowrap!important}',
       '#stroke-mobile-home .woyz-mobile-header-controls button[aria-label="Settings"]{width:38px!important;padding:6px 0!important}',
-      '#stroke-mobile-home .top{padding:12px 14px!important}',
-      '#stroke-mobile-home .body{height:calc(100vh - 214px)!important;min-height:0!important;overflow:hidden!important;display:flex!important;flex-direction:column!important;padding:12px 10px!important}',
+      '#stroke-mobile-home .top{padding:10px 14px!important;flex-wrap:wrap!important}',
+      '#stroke-mobile-home .top small{display:none!important}',
+      '#stroke-mobile-home .woyz-mobile-patient-chip{flex:1 1 220px!important;min-width:0!important;margin-left:auto!important;color:#203c33!important;font-size:15px!important;font-weight:800!important;line-height:1.25!important;text-align:right!important;overflow:hidden!important;text-overflow:ellipsis!important;white-space:nowrap!important}',
+      '#stroke-mobile-home .body{height:calc(100vh - 202px)!important;min-height:0!important;overflow:hidden!important;display:flex!important;flex-direction:column!important;padding:10px 10px 12px!important}',
       '#stroke-mobile-home .patient{flex:0 0 auto!important}',
+      '#stroke-mobile-home .patient-identity{display:none!important}',
+      '#stroke-mobile-home .patient:has(.recorder[hidden]),#stroke-mobile-home .patient:not(:has(.recorder)){display:none!important}',
       '#stroke-mobile-home #mh-status{flex:0 0 auto!important}',
       '#stroke-mobile-home #mh-content{flex:1 1 auto!important;min-height:0!important;overflow-y:auto!important;overscroll-behavior:contain!important;scrollbar-gutter:stable!important;padding-bottom:18px!important}',
       '#stroke-mobile-home #mh-content:has(.stages){display:flex!important;flex-direction:column!important;padding-bottom:0!important}',
@@ -103,6 +116,7 @@ const sharedCaseControls = `<script>
     ].join('');
     document.head.append(style);
     ensureMobileHeaderControls();
+    ensureMobileTopPatient();
   }
   function updateVisibleDates(){
     const today=todayDisplay();
@@ -402,6 +416,9 @@ const sharedCaseControls = `<script>
     const mobileId=root.querySelector('#mh-id');
     const uhid=caseData.uhid||active?.uhid;
     if(mobileId)mobileId.textContent='Episode '+caseId+' · UHID '+(uhid&&uhid!=='No UHID'&&uhid!=='NIL'?uhid:'missing');
+    ensureMobileTopPatient();
+    const chip=root.querySelector('#woyzMobilePatientChip');
+    if(chip)chip.textContent=(caseData.name||active?.name||'Patient name missing')+' · '+caseId+' · UHID '+(uhid&&uhid!=='No UHID'&&uhid!=='NIL'?uhid:'missing');
     const dock=root.querySelector('.dock-target');
     if(dock)dock.textContent=(caseData.name||active?.name||'Patient name missing')+' · '+caseId;
   }
@@ -531,6 +548,7 @@ const sharedCaseControls = `<script>
   });
   applyMobileReferenceLayout();
   ensureMobileHeaderControls();
+  ensureMobileTopPatient();
   ensureMobileControls();
   renderCaseIdentity();
   replaceRecorderCopy();
