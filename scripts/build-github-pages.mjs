@@ -102,16 +102,18 @@ const sharedCaseControls = `<script>
       '#stroke-mobile-home #mh-content:has(.dictation-guide) .stage-navigation button,#stroke-mobile-home #mh-content:has(.kpi-register)>button[data-back]{min-height:58px!important}',
       '#stroke-mobile-home #mh-content:has(.kpi-register) .kpi-note,#stroke-mobile-home #mh-content:has(.kpi-register) #mh-kpi-entry{flex:0 0 auto!important}',
       '#stroke-mobile-home #mh-content:has(.kpi-register) #mh-kpi-recorder{padding:10px 0 8px!important;justify-content:center!important}',
-      '.woyz-inline-recorder{display:flex!important;align-items:center!important;justify-content:flex-end!important;gap:8px!important;flex-wrap:nowrap!important}',
-      '.woyz-recording-label{display:none;color:#b42318;font-weight:900;font-size:15px;white-space:nowrap}',
-      '.woyz-inline-recorder.recording .woyz-recording-label{display:inline-flex}',
-      '.woyz-inline-recorder button{min-height:40px!important;border-radius:12px!important;font-size:14px!important;font-weight:850!important}',
+      '.woyz-inline-recorder{display:flex!important;align-items:center!important;justify-content:flex-end!important;gap:8px!important;flex-wrap:wrap!important;max-width:100%!important;overflow:hidden!important}',
+      '.woyz-recording-label{display:none;color:#b42318;font-weight:900;font-size:14px;white-space:nowrap}',
+      '.woyz-inline-recorder.recording .woyz-recording-label{display:inline-flex!important;flex:1 1 auto!important;min-width:88px!important}',
+      '.woyz-inline-recorder button{min-height:40px!important;border-radius:12px!important;font-size:14px!important;font-weight:850!important;min-width:0!important}',
+      '.woyz-inline-recorder.recording button{padding:8px 10px!important;font-size:13px!important}',
       '.woyz-inline-recorder.recording #mh-record{display:none!important}',
       '.woyz-inline-recorder:not(.recording) .woyz-record-pause,.woyz-inline-recorder:not(.recording) .woyz-record-resume,.woyz-inline-recorder:not(.recording) .woyz-record-stop{display:none!important}',
       '.woyz-inline-recorder.recording .woyz-record-pause,.woyz-inline-recorder.recording .woyz-record-stop{display:inline-flex!important}',
       '.woyz-inline-recorder.paused .woyz-record-pause{display:none!important}',
       '.woyz-inline-recorder.paused .woyz-record-resume{display:inline-flex!important}',
-      '.woyz-record-status{font-size:13px;color:#60746b;font-weight:800;white-space:nowrap}',
+      '.woyz-record-status{font-size:13px;color:#60746b;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}',
+      '.woyz-inline-recorder.recording .woyz-record-status{flex:1 1 100%!important;text-align:right!important;font-size:12px!important}',
       '.woyz-record-stop{background:#ff514a!important;color:white!important;border-color:#ff514a!important}'
     ].join('');
     document.head.append(style);
@@ -323,7 +325,7 @@ const sharedCaseControls = `<script>
     const resume=document.createElement('button');
     resume.type='button';resume.className='woyz-record-resume';resume.textContent='Resume';
     const stop=document.createElement('button');
-    stop.type='button';stop.className='woyz-record-stop';stop.textContent='Stop & transcribe';
+    stop.type='button';stop.className='woyz-record-stop';stop.textContent='Stop + transcribe';
     const status=document.createElement('span');
     status.className='woyz-record-status';
     status.textContent='Ready';
