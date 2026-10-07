@@ -37,11 +37,27 @@ const sharedCaseControls = `<script>
   let selectedStageName='';
   let selectedVoiceKind='stage';
   let openedDefaultList=false;
+  let selectedDateISO=new Date().toISOString().slice(0,10);
   const voiceStages=['Registration','Initial Assessment','Scan','NIH Stroke Scale','Decision','Checklist','IVT','Thrombectomy','Timings','Inpatient review','Discharge','Follow-up'];
   const esc=value=>String(value??'').replace(/[&<>"']/g,match=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[match]));
   function post(message){parent.postMessage({channel:'woyz-case-v1',...message},'*');}
   const voiceState={recorder:null,stream:null,context:null,analyser:null,source:null,chunks:[],bars:[],raf:0,remaining:300,timer:0,recording:false,paused:false,dock:null,status:null,start:null,pause:null,resume:null,extend:null,stop:null,level:null,inline:null};
-  function todayDisplay(){return new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});}
+  function todayDisplay(){return new Date(selectedDateISO+'T00:00:00').toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});}
+  function ensureMobileHeaderControls(){
+    if(root.id!=='stroke-mobile-home'||root.querySelector('#woyzMobileHeaderControls'))return;
+    const header=root.querySelector('header');
+    if(!header)return;
+    const controls=document.createElement('div');
+    controls.id='woyzMobileHeaderControls';
+    controls.className='woyz-mobile-header-controls';
+    controls.innerHTML='<input id="woyzMobileDate" aria-label="Select pathway date" type="date"><button id="woyzMobileSignOut" type="button">Sign out</button><button id="woyzMobileSettings" type="button" aria-label="Settings">⚙</button>';
+    header.append(controls);
+    const input=controls.querySelector('#woyzMobileDate');
+    input.value=selectedDateISO;
+    input.addEventListener('change',()=>{selectedDateISO=input.value||new Date().toISOString().slice(0,10);updateVisibleDates();post({type:'setSelectedDate',selectedDateISO});});
+    controls.querySelector('#woyzMobileSignOut').addEventListener('click',()=>post({type:'requestSignOut'}));
+    controls.querySelector('#woyzMobileSettings').addEventListener('click',()=>post({type:'requestSettings'}));
+  }
   function applyMobileReferenceLayout(){
     if(root.id!=='stroke-mobile-home'||document.querySelector('#woyzMobileReferenceStyle'))return;
     const style=document.createElement('style');
@@ -50,9 +66,13 @@ const sharedCaseControls = `<script>
       'html,body{height:100%;overflow:hidden!important}',
       '#stroke-mobile-home{height:100vh!important;max-height:100vh!important;width:calc(100% - 12px)!important;max-width:none!important;margin:0 6px!important;overflow:hidden!important;border-radius:18px!important}',
       '#stroke-mobile-home .shared-editor{display:none!important}',
-      '#stroke-mobile-home header{padding:16px 18px!important}',
+      '#stroke-mobile-home header{padding:13px 12px!important;display:flex!important;align-items:center!important;justify-content:space-between!important;gap:8px!important}',
+      '#stroke-mobile-home .woyz-mobile-header-controls{display:flex!important;align-items:center!important;justify-content:flex-end!important;gap:6px!important;flex:0 0 auto!important}',
+      '#stroke-mobile-home .woyz-mobile-header-controls input{width:124px!important;min-height:38px!important;border:1px solid rgb(255 255 255 / .28)!important;border-radius:10px!important;background:rgb(255 255 255 / .95)!important;color:#183b32!important;padding:6px 6px!important;font:700 13px system-ui!important}',
+      '#stroke-mobile-home .woyz-mobile-header-controls button{min-height:38px!important;border:1px solid rgb(255 255 255 / .28)!important;border-radius:10px!important;background:rgb(255 255 255 / .95)!important;color:#183b32!important;padding:6px 8px!important;font:800 13px system-ui!important;white-space:nowrap!important}',
+      '#stroke-mobile-home .woyz-mobile-header-controls button[aria-label="Settings"]{width:38px!important;padding:6px 0!important}',
       '#stroke-mobile-home .top{padding:12px 14px!important}',
-      '#stroke-mobile-home .body{height:calc(100vh - 220px)!important;min-height:0!important;overflow:hidden!important;display:flex!important;flex-direction:column!important;padding:12px 10px!important}',
+      '#stroke-mobile-home .body{height:calc(100vh - 214px)!important;min-height:0!important;overflow:hidden!important;display:flex!important;flex-direction:column!important;padding:12px 10px!important}',
       '#stroke-mobile-home .patient{flex:0 0 auto!important}',
       '#stroke-mobile-home #mh-status{flex:0 0 auto!important}',
       '#stroke-mobile-home #mh-content{flex:1 1 auto!important;min-height:0!important;overflow-y:auto!important;overscroll-behavior:contain!important;scrollbar-gutter:stable!important;padding-bottom:18px!important}',
@@ -80,6 +100,7 @@ const sharedCaseControls = `<script>
       '.woyz-record-stop{background:#ff514a!important;color:white!important;border-color:#ff514a!important}'
     ].join('');
     document.head.append(style);
+    ensureMobileHeaderControls();
   }
   function updateVisibleDates(){
     const today=todayDisplay();
@@ -90,6 +111,8 @@ const sharedCaseControls = `<script>
         node.nodeValue=node.nodeValue.replace(/\\b\\d{2}\\s+[A-Z][a-z]{2}\\s+20\\d{2}\\b/g,today);
       }
     }
+    const headerDate=root.querySelector('#woyzMobileDate');
+    if(headerDate&&headerDate.value!==selectedDateISO)headerDate.value=selectedDateISO;
   }
   function ensureVoicePlugin(){
     if(document.querySelector('#registrationVoiceDock'))return;
@@ -489,6 +512,7 @@ const sharedCaseControls = `<script>
   },true);
   window.addEventListener('message',event=>{
     if(event.source!==parent||event.data?.channel!=='woyz-case-v1')return;
+    if(event.data.selectedDateISO)selectedDateISO=String(event.data.selectedDateISO);
     if(event.data.caseId)caseId=event.data.caseId;
     if(event.data.data&&typeof event.data.data==='object')caseData=event.data.data;
     if(Array.isArray(event.data.cases))cases=event.data.cases;
@@ -504,6 +528,7 @@ const sharedCaseControls = `<script>
     setTimeout(openPatientListByDefault,80);
   });
   applyMobileReferenceLayout();
+  ensureMobileHeaderControls();
   ensureMobileControls();
   renderCaseIdentity();
   replaceRecorderCopy();
@@ -539,7 +564,7 @@ const page = `<!doctype html>
   .bar button{min-height:30px;border:1px solid rgb(255 255 255 / .28);border-radius:7px;background:rgb(255 255 255 / .94);color:#183b32;padding:4px 10px;font-size:13px;font-weight:750;text-decoration:none;line-height:1}
   .bar button.active{background:#0f8a5f;color:white;box-shadow:inset 0 0 0 1px rgb(255 255 255 / .36)}
   .bar .spacer{flex:1 1 auto}
-  .bar .today-date{font-size:13px;font-weight:850;color:rgb(255 255 255 / .92);white-space:nowrap}
+  .bar .today-date{width:132px;min-height:30px;border:1px solid rgb(255 255 255 / .28);border-radius:7px;background:rgb(255 255 255 / .94);color:#183b32;padding:4px 8px;font:750 13px system-ui;line-height:1}
   .bar .settings{width:32px;padding:4px 0}
   .bar .link{display:inline-grid;place-items:center;min-height:30px;border:1px solid rgb(255 255 255 / .28);border-radius:7px;background:rgb(255 255 255 / .94);color:#183b32;padding:4px 10px;font-size:13px;font-weight:750;text-decoration:none;line-height:1}
   .status{display:none;font-size:12px;opacity:.78;white-space:nowrap}
@@ -565,7 +590,8 @@ const page = `<!doctype html>
   .settings-panel menu{display:flex;justify-content:flex-end;gap:8px;margin:0;padding:0}
   .settings-panel button{border:1px solid #cfe0d5;border-radius:7px;background:white;color:#14231a;padding:8px 12px;font-weight:750}
   .settings-panel .primary{border-color:#0f8a5f;background:#0f8a5f;color:white}
-  @media(max-width:720px){.bar{gap:6px;padding:7px 9px}.bar strong{font-size:14px}.bar button,.bar a{min-height:28px;padding:3px 8px;font-size:12px}.bar .settings{width:30px}.notice{padding:7px 10px}iframe{height:calc(100vh - 42px)}}
+  @media(max-width:1100px){.bar{display:none}.notice{display:none}iframe{height:100vh}}
+  @media(min-width:1101px) and (max-width:1400px){.bar{gap:6px;padding:7px 9px}.bar strong{font-size:14px}.bar button,.bar a{min-height:28px;padding:3px 8px;font-size:12px}.bar .settings{width:30px}.notice{padding:7px 10px}iframe{height:calc(100vh - 42px)}}
 </style>
 </head>
 <body>
@@ -574,7 +600,7 @@ const page = `<!doctype html>
     <strong id="caseTitle" hidden>WOYZ · Shared case ST-024</strong>
     <span id="status" class="status" role="status">Connecting…</span>
     <span class="spacer"></span>
-    <span id="todayDate" class="today-date"></span>
+    <input id="todayDate" class="today-date" aria-label="Select pathway date" type="date">
     <button id="signOutBtn" type="button" hidden>Sign out</button>
     <button id="settingsBtn" class="settings" type="button" aria-label="Settings">⚙</button>
   </div>
@@ -650,6 +676,7 @@ const responsiveModeQuery=window.matchMedia("(max-width:1100px)");
 let mode=initialMode();
 let workspaceId=initialWorkspaceId();
 let caseId=initialCaseId();
+let selectedDateISO=new Date().toISOString().slice(0,10);
 let currentUser=null;
 let unsubscribeCase=null;
 let unsubscribeList=null;
@@ -658,7 +685,7 @@ let snapshot={data:{},version:0,updatedAt:null,updatedAtText:null};
 let saving=false;
 
 function nowText(){return new Date().toLocaleTimeString();}
-function todayDisplay(){return new Date().toLocaleDateString("en-GB",{day:"2-digit",month:"short",year:"numeric"});}
+function todayDisplay(){return new Date(selectedDateISO+"T00:00:00").toLocaleDateString("en-GB",{day:"2-digit",month:"short",year:"numeric"});}
 function randomId(prefix){const bytes=new Uint8Array(12);crypto.getRandomValues(bytes);return prefix+Array.from(bytes,b=>b.toString(36).padStart(2,"0")).join("").slice(0,22);}
 function cleanId(value,fallback){return String(value||fallback).replace(/[^A-Za-z0-9_-]/g,"-").slice(0,64);}
 function initialMode(){return responsiveModeQuery.matches?"mobile":"desktop";}
@@ -674,7 +701,7 @@ function post(message){frame.contentWindow?.postMessage({channel:"woyz-case-v1",
 function caseLabel(item){const name=item.data?.name||"Patient name missing";const uhid=item.data?.uhid||"No UHID";return {id:item.id,name,uhid,version:item.version||0};}
 function visibleCaseLabels(){const current={id:caseId,...snapshot};const merged=[current,...cases.filter(item=>item.id!==caseId)];return merged.map(caseLabel);}
 function rememberCurrentCase(){cases=[{id:caseId,...snapshot},...cases.filter(item=>item.id!==caseId)];}
-function sendSnapshot(type="snapshot",extra={}){post({type,workspaceId,caseId,cases:visibleCaseLabels(),...snapshot,...extra});}
+function sendSnapshot(type="snapshot",extra={}){post({type,workspaceId,caseId,selectedDateISO,cases:visibleCaseLabels(),...snapshot,...extra});}
 function renderFrame(){frame.srcdoc=mode==="desktop"?desktopDocument:mobileDocument;frame.title=mode==="desktop"?"desktop stroke workspace":"mobile stroke workspace";}
 function syncResponsiveMode(){const next=initialMode();if(next===mode)return;mode=next;renderFrame();setTimeout(()=>sendSnapshot(),150);}
 function newCaseId(){const stamp=new Date().toISOString().replace(/[-:TZ.]/g,"").slice(0,14);return "ST-"+stamp+"-"+Math.random().toString(36).slice(2,6).toUpperCase();}
@@ -737,14 +764,15 @@ async function generateRegistrationFromAudio(message){
     await savePatch(patch,message.mutationId||crypto.randomUUID());
   }catch(error){setStatus("Gemini failed",true,error.message||String(error));post({type:"voiceRegistrationError",error:error.message||"Gemini registration failed"});}
 }
-window.addEventListener("message",event=>{if(event.source!==frame.contentWindow||event.data?.channel!=="woyz-case-v1")return;const message=event.data;if(message.type==="ready")sendSnapshot();if(message.type==="save")saveField(message);if(message.type==="createCase")createCase();if(message.type==="selectCase")selectCase(message.caseId);if(message.type==="voiceRegistration")generateRegistrationFromAudio(message);});
+window.addEventListener("message",event=>{if(event.source!==frame.contentWindow||event.data?.channel!=="woyz-case-v1")return;const message=event.data;if(message.type==="ready")sendSnapshot();if(message.type==="save")saveField(message);if(message.type==="createCase")createCase();if(message.type==="selectCase")selectCase(message.caseId);if(message.type==="voiceRegistration")generateRegistrationFromAudio(message);if(message.type==="requestSignOut")signOut(auth);if(message.type==="requestSettings")document.getElementById("settingsBtn").click();if(message.type==="setSelectedDate"){selectedDateISO=String(message.selectedDateISO||selectedDateISO);todayDate.value=selectedDateISO;sendSnapshot();}});
 document.getElementById("settingsBtn").addEventListener("click",()=>{caseDocId.value=caseId;workspaceCodeInput.value=defaultWorkspaceId;geminiKeyInput.value=localStorage.getItem(geminiStoreKey)||"";settingsDialog.showModal();});
 settingsDialog.addEventListener("close",()=>{if(settingsDialog.returnValue!=="save")return;caseId=cleanId(caseDocId.value.trim(),"ST-024");workspaceId=defaultWorkspaceId;workspaceCodeInput.value=defaultWorkspaceId;writeUrlState();localStorage.setItem(geminiStoreKey,geminiKeyInput.value.trim());connectList();connect();});
 document.getElementById("clearGeminiBtn").addEventListener("click",()=>{geminiKeyInput.value="";localStorage.removeItem(geminiStoreKey);});
 loginForm.addEventListener("submit",async event=>{event.preventDefault();loginError.textContent="";setStatus("Signing in…");try{await signInWithEmailAndPassword(auth,loginEmail.value.trim(),loginPassword.value);}catch(error){loginError.textContent=error.message||"Sign in failed";setStatus("Sign in failed",true,error.code||error.message);}});
 signOutBtn.addEventListener("click",()=>signOut(auth));
 responsiveModeQuery.addEventListener("change",syncResponsiveMode);
-todayDate.textContent=todayDisplay();
+todayDate.value=selectedDateISO;
+todayDate.addEventListener("change",()=>{selectedDateISO=todayDate.value||new Date().toISOString().slice(0,10);sendSnapshot();});
 onAuthStateChanged(auth,user=>{currentUser=user;if(user){authScreen.hidden=true;signOutBtn.hidden=false;connectList();connect();renderFrame();return;}authScreen.hidden=false;signOutBtn.hidden=true;if(unsubscribeCase){unsubscribeCase();unsubscribeCase=null;}if(unsubscribeList){unsubscribeList();unsubscribeList=null;}setStatus("Sign in required");sendSnapshot();});
 renderFrame();
 </script>
