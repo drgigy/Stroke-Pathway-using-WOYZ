@@ -18,6 +18,12 @@
 .protocol-page-button, .protocol-expand-button { height: 36px; min-width: 28px; flex: 0 0 auto; padding: 0 4px; border: 1px solid #c8d9d3; border-radius: 6px; background: #fff; color: #205e50; font: 700 14px Inter, sans-serif; cursor: pointer; }
 .protocol-page-button[aria-current="page"] { background: #205e50; color: #fff; border-color: #205e50; }
 .protocol-expand-button { width: 36px; font-size: 26px; }
+.protocol-step-controls { display: flex; gap: 4px; margin-right: auto; flex: 0 0 auto; }
+.protocol-step-button { width: 36px; height: 36px; padding: 0; border: 1px solid #c8d9d3; border-radius: 6px; background: #fff; color: #205e50; font: 700 26px Inter, sans-serif; cursor: pointer; }
+.protocol-step-button:disabled { opacity: .4; cursor: default; }
+.protocol-current-title { min-width: 0; flex: 1 1 160px; margin-left: auto; color: #205e50; font: 700 14px/1.3 Inter, sans-serif; text-align: right; overflow-wrap: anywhere; }
+.protocol-current-title[hidden] { display: none !important; }
+.protocol-title-mobile { display: none; }
 #mainScroll.protocol-scroll { padding: 0; background: #fff; }
 .protocol-page-sheet { width: 100%; max-width: 1100px; margin: 0 auto; }
 .protocol-page-sheet img { display: block; width: 100%; height: auto; }
@@ -60,7 +66,11 @@ body[data-page="admin"] .topbar-title { min-width: 130px; overflow-wrap: anywher
 @media (max-width: 600px) {
   .device-dialog { padding: 16px; }
   .login-screen { padding: 16px; }
-  body:not([data-page="admin"]) .mobile-visit-row { padding-right: 52px; }
+  body:not([data-page="admin"]) .mobile-visit-row { padding-right: 8px; }
+  .protocol-title-desktop { display: none; }
+  .protocol-title-mobile { display: block; }
+  .protocol-page-buttons { gap: 1px; }
+  .protocol-page-button { min-width: 26px; padding: 0 2px; }
   .sidebar-controls #mobileHomeBtn { display: inline-flex; padding: 0 12px; border: 1px solid #c8d9d3; background: #fff; color: #205e50; }
   .sidebar-controls .settings-btn { border: 1px solid #c8d9d3; }
 }

@@ -19,6 +19,8 @@ The user home screen offers Start New Code 7. Each activation creates a fresh, e
 
 Code 7 cases now open the original nine-page Rajagiri Hospital stroke protocol as a read-only reference, starting on page 1. The expansion control immediately below the main toolbar reveals numbered buttons 1-9 to its left. Page changes do not write to the case. User, administrator, and dashboard case views share this viewer. The original JPEG page streams were extracted without recompression, cropping, OCR, or edits. `protocol/stroke-protocol.pdf` is byte-identical to the supplied PDF. `protocol.html` reproduces all nine images in order; the standalone deliverable additionally embeds the images in one HTML file. `protocol/source-manifest.json` records source and image checksums. The scans are unchanged, including source scan artifacts and page dimensions. This step does not add editable fields or clinical data extraction to the protocol.
 
+The active protocol page name appears in the top bar, beside List/Home on mobile. Previous and Next buttons move one page at a time, synchronize with numbered selection, and are disabled at the first and last page respectively. These controls do not modify the original forms or case data.
+
 ## Access
 
 Staff browsers use Firebase Anonymous Authentication. The device UID identifies its approval request under `deviceApprovals/{uid}`. Staff enter their name and department, share their displayed code, and wait for administrator approval. Approval opens the workspace automatically. Each new browser profile requires approval. A shared browser profile shares one device identity and access. Clearing its Firebase/browser storage requires a new request.
