@@ -11,7 +11,7 @@ Shared clinical notes foundation for the Stroke Pathway rebuild.
 - Shared review dashboard: `dashboard.html`
 - Shared staff workspace: `user.html`
 
-This application is derived from the supplied WOYZ Notes handover dated 7 November 2026. It keeps the notes application's OP/IP workflow, date navigation, dictation, review notes, editable patient timelines, printing, templates, and browser-local Gemini key settings. It replaces the original login and group-mapping model. No master-admin page is used.
+This application is derived from the supplied WOYZ Notes handover dated 7 November 2026. It retains dictation, review notes, editable patient timelines, printing, and browser-local Gemini key settings. Every page lists all non-deleted case entries from all dates and authors, newest creation first. OP/IP selection, Today/All switches, date navigation, the home template chooser, Anonymize, and Select credential/Layout settings are not displayed. Legacy dates, visit-type metadata, print preferences, and clinical content are preserved without data migration. No master-admin page is used.
 
 ## Access
 

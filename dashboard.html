@@ -613,7 +613,7 @@ function prescriptionTextFromNote(text){
 }
 
 function selectedAdminNote(){
-  return allNotes.find(item => item.id === selectedNoteId && item.userId === selectedUserId) || null;
+  return allNotes.find(item => item.id === selectedNoteId) || null;
 }
 
 function selectedTimelineNote(){
@@ -845,8 +845,8 @@ function moveAdminDate(days){
 }
 
 function visibleNotes(){
-  const selectedDate = dateInputValue(selectedVisitDate);
-  return allNotes.filter(note => note.data?.deleted !== true).filter(note => noteMatchesSelectedScope(note, selectedDate));
+  return allNotes.filter(note => note.data?.deleted !== true)
+    .sort((a,b) => noteCreatedTime(b) - noteCreatedTime(a));
 }
 
 function updateVisitToggle(){
@@ -857,7 +857,7 @@ function updateVisitToggle(){
 
 function noteMeta(note){
   const patient = note.data.patientData || {};
-  const pieces = [noteVisitType(note), userLabel(note.userId, 0)];
+  const pieces = [userLabel(note.userId, 0)];
   if (patient.uhid) pieces.push(`UHID ${patient.uhid}`);
   if (patient.sex) pieces.push(compactSex(patient.sex));
   if (patient.age) pieces.push(cleanAge(patient.age));
@@ -875,6 +875,7 @@ function noteTime(note){
 function noteCreatedTime(note){
   return note.data.createdAt?.toMillis?.()
     || note.data.createdAtValue?.toMillis?.()
+    || Date.parse(note.data.visitDate || '')
     || noteTime(note);
 }
 
@@ -988,8 +989,8 @@ function renderUsers(){
 function renderEntries(){
   entryList.innerHTML = '';
   const selectedUser = users.find(user => user.uid === selectedUserId);
-  const notes = visibleNotes().filter(note => note.userId === selectedUserId);
-  notesLabel.textContent = selectedUser ? selectedUser.label : 'Notes';
+  const notes = visibleNotes();
+  notesLabel.textContent = 'Cases';
   notes.forEach((note, index) => {
     const button = document.createElement('button');
     const serialNumber = notes.length - index;
@@ -1004,7 +1005,7 @@ function renderEntries(){
         <div class="entry-name">${escapeHtml(notePatientName(note))}</div>
         <div class="entry-meta">${escapeHtml(noteMeta(note))}</div>
       </span>
-      <span class="entry-owner">${escapeHtml(noteOwnerCode(note, selectedUser?.label))}</span>
+      <span class="entry-owner">${escapeHtml(noteOwnerCode(note, userLabel(note.userId, index)))}</span>
     `;
     button.addEventListener('click', () => {
       selectedNoteId = note.id;
@@ -1058,17 +1059,13 @@ function renderAdminAllEntries(seedNote){
 
 function renderSelectedNote(){
   const selectedUser = users.find(user => user.uid === selectedUserId);
-  const notes = visibleNotes().filter(note => note.userId === selectedUserId);
+  const notes = visibleNotes();
   const dateNote = notes.find(item => item.id === selectedNoteId);
   const note = dateNote || selectedAdminNote();
-  topbarTitle.textContent = selectedUser ? selectedUser.label : 'Admin notes';
-  topbarMeta.textContent = selectedUser ? `${selectedVisitType} · ${notes.length} note${notes.length === 1 ? '' : 's'}` : `Select a user · ${selectedVisitType}`;
-  if (!selectedUser){
-    showEmpty('No users yet', 'Notes will appear here after users save them.');
-    return;
-  }
+  topbarTitle.textContent = 'Cases';
+  topbarMeta.textContent = `${notes.length} ${notes.length === 1 ? 'entry' : 'entries'}`;
   if (!notes.length){
-    showEmpty('No notes', `${selectedUser.label} has no notes yet.`);
+    showEmpty('No cases yet', '');
     return;
   }
   if (!note){

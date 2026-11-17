@@ -2176,7 +2176,7 @@
       </div>
     </div>
 
-    <div class="sidebar-section-label">Records</div>
+    <div class="sidebar-section-label">Cases</div>
     <div class="entry-list" id="entryList"></div>
     <div class="privacy-row">
       <button class="privacy-switch" id="anonymizeToggle" type="button" role="switch" aria-checked="false" aria-label="Toggle anonymized display"></button>
@@ -2788,7 +2788,7 @@ let printCloseTimer = null;
 let emailCloseTimer = null;
 let timelineCloseTimer = null;
 let pendingEmailMode = 'visit';
-let anonymizeEnabled = localStorage.getItem(ANONYMIZE_STORAGE) === 'true';
+let anonymizeEnabled = false;
 let pendingContinuationStart = null;
 let continuationState = {
   open:false,
@@ -2874,10 +2874,6 @@ To,
 Thank you`;
 
 function renderEntries(){
-  if (searchScope === 'all'){
-    renderAllPatientEntries();
-    return;
-  }
   renderTodayEntries();
 }
 
@@ -2891,10 +2887,6 @@ function clearTimelineSelection(){
 }
 
 function renderTodayEntries(){
-  if (selectedVisitType === 'OP'){
-    renderOpPatientEntries();
-    return;
-  }
   entryList.innerHTML = '';
   const visibleRecords = records
     .map((record, index) => ({record, index}))
@@ -2915,7 +2907,7 @@ function renderTodayEntries(){
     const entryName = anonymizeEnabled && (namedDraft || !(r.isDraft || generatedEntry))
       ? `${displayPatientName(r)}${modeSuffix}`
       : (r.isDraft || generatedEntry) ? draftEntryName : r.name;
-    const entryMeta = compactPatientMetaText((r.isDraft || generatedEntry) && !namedDraft ? r.createdAt : patientMetaLine(r));
+    const entryMeta = compactPatientMetaText([(r.isDraft || generatedEntry) && !namedDraft ? '' : patientMetaLine(r), r.createdAt || r.visitDate].filter(Boolean).join(' · '));
     const ownerCode = ownerInitials(noteOwnerUid(r)) || ((r.isDraft || generatedEntry) ? (namedDraft ? initials(r.patientData.name) : 'D') : initials(r.name));
     btn.innerHTML = `
       <span class="entry-avatar">${escapeHtml(serialNumber)}</span>
@@ -3618,15 +3610,7 @@ function openIpTimelineForRecord(record, date = null){
 }
 
 function openDefaultOpView(){
-  if (selectedVisitType !== 'OP') return false;
-  const activeRecord = activeIndex !== null ? records[activeIndex] : null;
-  if (activeRecord?.isDraft){
-    selectEntry(activeIndex);
-    return true;
-  }
-  if (openOpTimelineForRecord(activeRecord)) return true;
-  const firstSavedOpRecord = records.find(record => !record.isDraft && noteVisitType(record) === 'OP');
-  return openOpTimelineForRecord(firstSavedOpRecord);
+  return false;
 }
 
 function renderTimelineMenu(){
@@ -4098,13 +4082,7 @@ function noteMatchesSelectedVisitType(note){
 }
 
 function noteMatchesSelectedScope(note, selectedDate = dateInputValue(selectedVisitDate)){
-  if (note?.isDeleted) return false;
-  if (!noteMatchesSelectedVisitType(note)) return false;
-  if (selectedVisitType !== 'IP') return note.visitDate === selectedDate;
-  const admissionDate = note.admissionDate || note.visitDate || selectedDate;
-  const dischargeDate = note.dischargeDate || null;
-  if (admissionDate > selectedDate) return false;
-  return !dischargeDate || dischargeDate >= selectedDate;
+  return !note?.isDeleted;
 }
 
 function updateVisitToggle(){
@@ -4197,8 +4175,8 @@ function subscribeToSelectedDate(){
     captureActiveEditorState();
     const previousId = activeIndex !== null ? `${noteOwnerUid(records[activeIndex])}:${records[activeIndex]?.firestoreId}` : null;
     records = Array.from(ownerRecords.values()).flat().map(applyLocalDirtyRecord).filter(note => noteMatchesSelectedScope(note, selectedDate)).sort((a,b) => {
-      const aTime = a.createdAtValue?.toMillis?.() || 0;
-      const bTime = b.createdAtValue?.toMillis?.() || 0;
+      const aTime = a.createdAtValue?.toMillis?.() || Date.parse(a.visitDate || '') || 0;
+      const bTime = b.createdAtValue?.toMillis?.() || Date.parse(b.visitDate || '') || 0;
       return bTime - aTime;
     });
     renderEntries();
@@ -4234,12 +4212,10 @@ function subscribeToSelectedDate(){
       if (openDefaultOpView()) return;
       selectEntry(0);
     }
-    else if (receivedOwners >= owners.length) showEmptyDate(selectedVisitType === 'IP' ? 'No active IP notes for this date.' : `No ${selectedVisitType} notes saved for this date.`);
+    else if (receivedOwners >= owners.length) showEmptyDate('No cases yet.');
   };
   owners.forEach(ownerUid => {
-    const notesQuery = selectedVisitType === 'IP'
-      ? query(collection(db,'workspaces','stroke','notes'),where('visitType','==','IP'))
-      : query(collection(db,'workspaces','stroke','notes'),where('visitDate','==',selectedDate));
+    const notesQuery = collection(db,'workspaces','stroke','notes');
     const unsubscribe = onSnapshot(notesQuery,async snapshot => {
       receivedOwners += ownerRecords.has(ownerUid) ? 0 : 1;
       ownerRecords.set(ownerUid, snapshot.docs.map(docSnap => noteFromSnapshot(docSnap, ownerUid)));
@@ -4328,22 +4304,7 @@ function showMobileHomeScreen(){
   setMobileBottomActionsVisible(false);
   mainScroll.innerHTML = `
     <div class="empty-state">
-      <div class="home-brand" aria-label="WOYZ Notes">
-        <span class="home-brand-pill"><span class="home-brand-dot"></span>WOYZ</span>
-        <span>Notes</span>
-      </div>
-      <div class="empty-sub">Please select template to create a new note</div>
-      <div class="home-tool-actions" aria-label="Homepage tools">
-        <button class="home-tool-btn primary" type="button" data-home-voice-mode="Visit Note">Visit Note</button>
-        <button class="home-tool-btn" type="button" data-home-voice-mode="Medical certificate">Certificate</button>
-        <button class="home-tool-btn" type="button" data-home-voice-mode="Reply letter">Reply Letter</button>
-        <div class="home-tools-wrap">
-          <button class="home-tool-btn" type="button" data-home-tools-toggle>Tools</button>
-          <div class="home-tools-panel">
-            <button class="home-tool-btn" type="button" data-home-mmse-open>MMSE</button>
-          </div>
-        </div>
-      </div>
+      <div class="empty-title">No record selected</div>
     </div>`;
 }
 
