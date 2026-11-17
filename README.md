@@ -1,0 +1,37 @@
+# WOYZ Stroke Notes
+
+Shared clinical notes foundation for the Stroke Pathway rebuild.
+
+## Deployment Targets
+
+- GitHub repository: `drgigy/Stroke-Pathway-using-WOYZ`
+- Firebase project: `minutes-woyz-3`
+- Firestore database: `(default)`, region `asia-south1`
+- Administrator: `index.html`
+- Shared staff workspace: `user.html`
+
+This application is derived from the supplied WOYZ Notes handover dated 7 November 2026. It keeps the notes application's OP/IP workflow, date navigation, dictation, review notes, editable patient timelines, printing, templates, and browser-local Gemini key settings. It replaces the original login and group-mapping model. No master-admin page is used.
+
+## Access
+
+Staff browsers use Firebase Anonymous Authentication. The device UID identifies its approval request under `deviceApprovals/{uid}`. Staff enter their name and department, share their displayed code, and wait for administrator approval. Approval opens the workspace automatically. Each new browser profile requires approval. A shared browser profile shares one device identity and access. Clearing its Firebase/browser storage requires a new request.
+
+The administrator signs in using Email/Password and must have the `admin: true` custom claim assigned through a trusted administrative environment. Public clients cannot grant this role. Device approval, blocking, revocation and unblocking are managed through the Devices control on `index.html`. Unblocking returns a device to pending. Approval is checked against the server before opening the user workspace. Offline access is locked; clinical records are not stored in the service-worker cache or a persistent Firestore cache.
+
+All approved devices can read, create, edit and delete notes in one shared collection: `workspaces/stroke/notes/{noteId}`. The notes themselves contain patient identity, visit date and type, transcription, and timeline information. Creator UID, creator name and creation timestamp are retained; changes include the latest editor UID and server timestamp. The administrator sees every author's notes and combined patient timelines. Personal credential and print-layout preferences use `users/{uid}`.
+
+`firestore.rules` enforces device approval and administration on the server. Pending devices cannot read clinical notes, enumerate other requests, or approve themselves. A blocked device loses protected reads and writes even if it retains an older authentication token.
+
+## Configuration
+
+`firebase-config.js` contains the public Firebase web-app configuration for this project. Never put private keys, administrative credentials, password setup links, or service-account material in this repository. The administrator password setup file is stored privately outside the repository.
+
+Gemini dictation requires an authorization key entered through Settings on each browser. No key is bundled. Printing remains available. Email delivery and Ask WOYZ are disabled because their original backend services belong to other applications and are not included in the handover. No original backend is contacted by this rebuild.
+
+## Local Preview
+
+Run `python3 -m http.server 8097 --bind 127.0.0.1` from this directory, then open `http://127.0.0.1:8097/` for administration or `http://127.0.0.1:8097/user.html` for device access. The preview connects to the configured Firebase project.
+
+Run `node scripts/check-syntax.mjs` before publishing. Deploy Firestore rules with `firebase deploy --only firestore:rules --project minutes-woyz-3`. Publish the static root files through the repository's GitHub Pages configuration. Increment the service worker cache name when changing the shell. Cache cleanup is limited to this application's prefix.
+
+The previous application, Git history, Firestore data, rules, and authentication exports remain backed up outside this repository in the parent project's backup directory. This foundation does not yet implement the twelve stroke-pathway forms.

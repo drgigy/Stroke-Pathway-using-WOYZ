@@ -1,0 +1,23 @@
+* { letter-spacing: 0 !important; }
+.device-code { font-family: monospace; font-size: 20px; font-weight: 700; overflow-wrap: anywhere; }
+.device-dialog { width: min(720px, calc(100% - 24px)); max-height: 85dvh; padding: 24px; border: 1px solid #b9cbc4; border-radius: 8px; color: #183a31; background: #fff; overflow: auto; }
+.device-dialog::backdrop { background: #17262270; }
+.device-dialog header, .device-dialog nav, .device-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.device-dialog header { justify-content: space-between; margin-bottom: 16px; }
+.device-dialog h2 { margin: 0; font-size: 22px; }
+.device-dialog [aria-pressed="true"] { background: #205e50; color: #fff; }
+.device-row { padding: 18px 0; border-top: 1px solid #d3dfd9; }
+.device-row p { margin: 8px 0 12px; overflow-wrap: anywhere; }
+.login-card { border-radius: 8px; }
+body[data-page="admin"] .main-topbar { height: auto; min-height: 64px; flex-wrap: wrap; padding: 12px 16px; gap: 8px; flex-shrink: 0; }
+body[data-page="admin"] .main-topbar > .spacer { min-width: 0; }
+body[data-page="admin"] .main-topbar .btn { white-space: nowrap; flex-shrink: 0; }
+body[data-page="admin"] .main-topbar > a { text-decoration: none; }
+body[data-page="admin"] .topbar-title { min-width: 130px; overflow-wrap: anywhere; }
+#deviceStatus { font-size: 14px; line-height: 1.5; overflow-wrap: anywhere; }
+@media (max-width: 600px) {
+  .device-dialog { padding: 16px; }
+  .login-screen { padding: 16px; }
+  body:not([data-page="admin"]) .app:not(.sidebar-open) .settings-wrap { display: block; position: absolute; left: 112px; top: 8px; z-index: 50; }
+  body:not([data-page="admin"]) .app:not(.sidebar-open) .settings-btn { width: 34px; height: 34px; }
+}
