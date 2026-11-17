@@ -2532,6 +2532,7 @@ import { getFirestore, collection, query, where, onSnapshot, addDoc, deleteDoc, 
 import { firebaseConfig } from './firebase-config.js';
 import { mountDeviceAccess } from './access.js';
 import { mountSidebarControls } from './sidebar-controls.js';
+import { showProtocolCase, hideProtocolViewer } from './protocol-viewer.js';
 
 const firebaseApp = initializeApp(firebaseConfig);
 const auth = getAuth(firebaseApp);
@@ -4275,6 +4276,7 @@ function subscribeToAllRecords(){
 }
 
 function showEmptyDate(message = 'No notes saved for this date.'){
+  hideProtocolViewer({reset:true});
   activeIndex = null;
   selectedOpTimelineKey = null;
   selectedOpTimelineEntryId = 'all';
@@ -4294,6 +4296,7 @@ function showEmptyDate(message = 'No notes saved for this date.'){
 }
 
 function showMobileHomeScreen(){
+  hideProtocolViewer({reset:true});
   activeIndex = null;
   clearTimelineSelection();
   updateContinueNoteButton();
@@ -4407,6 +4410,7 @@ function updateRecordSearchPlaceholder(){
 }
 
 function applyDeviceAccess(user, details){
+  hideProtocolViewer({reset:true});
   currentUser = user;
   deviceDetails = details || null;
   if (userProfileUnsubscribe) userProfileUnsubscribe();
@@ -4515,6 +4519,7 @@ function removeNilSectionsForCopy(text){
 }
 
 function selectEntry(i,{preserveDirtyEditor = false} = {}){
+  hideProtocolViewer();
   mobileHomeDefaultPending = false;
   mobileHomeDefaultActive = false;
   activeIndex = i;
@@ -5567,6 +5572,7 @@ function resizeNoteEditor(editor){
 }
 
 function renderVoiceDraftTemplate(draft){
+  hideProtocolViewer();
   const title = draft.selectedMode || 'Visit Note';
   const templateText = templateWithPatientData(newVoiceTemplateForMode(draft.selectedMode, draft.visitType || selectedVisitType), draft.patientData);
   mainScroll.innerHTML = `
@@ -5598,6 +5604,14 @@ function renderVoiceWorkspace(){
 }
 
 function renderGeneratedNote(draft){
+  if (draft.noteType === 'code7') {
+    setMobileBottomActionsVisible(false);
+    saveDraftBtn.classList.remove('visible');
+    copyBtn.style.display = 'none';
+    showProtocolCase(mainScroll, draft.firestoreId);
+    return;
+  }
+  hideProtocolViewer();
   setMobileBottomActionsVisible(true);
   const title = draft.selectedMode || 'Visit Note';
   const displayText = anonymizeTextForRecord(displayNoteTextForRecord(draft, draft.transcription), draft);

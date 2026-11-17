@@ -15,7 +15,9 @@ This application is derived from the supplied WOYZ Notes handover dated 7 Novemb
 
 The user page's large recording and + Note sidebar buttons are not displayed. On mobile, its top navigation contains List and a red Home button, which returns to Start New Code 7. Back, Settings, and Logout sit inside the list panel; Back closes the panel without changing the selected case. Administrator and dashboard Settings/Logout controls are also inside their case-list sidebars.
 
-The user home screen offers Start New Code 7. Each activation creates a fresh, empty shared draft with today's date and creator metadata, then opens it for editing. Existing manual drafts and cases are not reused or overwritten. The same home screen opens on desktop and mobile.
+The user home screen offers Start New Code 7. Each activation creates a fresh, empty shared draft with today's date and creator metadata, then opens the protocol reference. Existing manual drafts and cases are not reused or overwritten. The same home screen opens on desktop and mobile.
+
+Code 7 cases now open the original nine-page Rajagiri Hospital stroke protocol as a read-only reference, starting on page 1. The expansion control immediately below the main toolbar reveals numbered buttons 1-9 to its left. Page changes do not write to the case. User, administrator, and dashboard case views share this viewer. The original JPEG page streams were extracted without recompression, cropping, OCR, or edits. `protocol/stroke-protocol.pdf` is byte-identical to the supplied PDF. `protocol.html` reproduces all nine images in order; the standalone deliverable additionally embeds the images in one HTML file. `protocol/source-manifest.json` records source and image checksums. The scans are unchanged, including source scan artifacts and page dimensions. This step does not add editable fields or clinical data extraction to the protocol.
 
 ## Access
 

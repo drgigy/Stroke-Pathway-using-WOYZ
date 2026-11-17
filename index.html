@@ -284,6 +284,7 @@ import { getFirestore, collection, collectionGroup, doc, getDoc, onSnapshot, ser
 import { firebaseConfig } from './firebase-config.js';
 import { mountDeviceManager } from './access.js';
 import { mountSidebarControls } from './sidebar-controls.js';
+import { showProtocolCase, hideProtocolViewer } from './protocol-viewer.js';
 
 
 const app = initializeApp(firebaseConfig);
@@ -961,6 +962,7 @@ function hideAdminTimelineMenu(){
 }
 
 function showEmpty(title, message){
+  hideProtocolViewer({reset:true});
   copyBtn.style.display = 'none';
   hideAdminPrintMenu();
   hideAdminTimelineMenu();
@@ -1062,6 +1064,7 @@ function renderAdminAllEntries(seedNote){
 }
 
 function renderSelectedNote(){
+  hideProtocolViewer();
   const selectedUser = users.find(user => user.uid === selectedUserId);
   const notes = visibleNotes();
   const dateNote = notes.find(item => item.id === selectedNoteId);
@@ -1076,6 +1079,15 @@ function renderSelectedNote(){
     selectedNoteId = notes[0].id;
     selectedTimelineEntryId = 'all';
     renderSelectedNote();
+    return;
+  }
+  if (note.data.noteType === 'code7') {
+    copyBtn.style.display = 'none';
+    saveNoteBtn.style.display = 'none';
+    dischargeBtn.style.display = 'none';
+    hideAdminPrintMenu();
+    hideAdminTimelineMenu();
+    showProtocolCase(mainScroll, note.id);
     return;
   }
   const timelineNotes = orderedPatientTimelineNotes(note);
@@ -1215,6 +1227,7 @@ loginForm.addEventListener('submit', async event => {
 let adminAuthGeneration = 0;
 mountDeviceManager({auth,db});
 onAuthStateChanged(auth, async user => {
+  hideProtocolViewer({reset:true});
   const generation = ++adminAuthGeneration;
   notesUnsubscribe?.(); profilesUnsubscribe?.(); clearScopedSubscriptions();
   notesUnsubscribe = null; profilesUnsubscribe = null;
