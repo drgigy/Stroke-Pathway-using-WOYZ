@@ -2,7 +2,7 @@
 #visitToggle, #mobileVisitToggle, #adminVisitToggle, #searchScopeToggle,
 .privacy-row, #credentialBtn, #layoutBtn, .home-tool-actions,
 #dateNav, #adminDateNav, .user-rail { display: none !important; }
-.note-action-row { display: none !important; }
+.note-action-row, #topbarDocActions { display: none !important; }
 .sidebar-controls { position: relative; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; padding-top: 12px; border-top: 1px solid #d3dfd9; flex-shrink: 0; }
 .sidebar-controls .settings-wrap, .sidebar-controls .admin-settings { display: block !important; position: static !important; order: 0 !important; top: auto !important; left: auto !important; right: auto !important; margin: 0 !important; }
 .sidebar-controls .settings-btn { display: inline-flex; gap: 6px; align-items: center; justify-content: center; width: auto !important; height: 38px !important; padding: 0 10px; border: 1px solid #c8d9d3; border-radius: 8px; background: #fff; color: #205e50; font: 700 13px Inter, sans-serif; }
