@@ -2196,6 +2196,7 @@
       <div class="mobile-visit-row">
         <div class="mobile-topbar-actions">
           <button class="mobile-list-btn" id="mobileListBtn" type="button">List</button>
+          <button class="mobile-home-btn" id="userHomeBtn" type="button">Home</button>
           <button class="mobile-home-btn" id="mobileHomeBtn" type="button">Home</button>
         </div>
         <div class="visit-toggle" id="mobileVisitToggle" aria-label="Mobile visit type">
@@ -7557,6 +7558,12 @@ searchScopeToggle.addEventListener('click', event => {
 });
 mobileMenuBtn.addEventListener('click', openMobileSidebar);
 mobileListBtn.addEventListener('click', openMobileSidebar);
+document.getElementById('userHomeBtn').addEventListener('click', () => {
+  captureActiveEditorState();
+  mobileHomeDefaultActive = true;
+  closeMobileSidebar();
+  showMobileHomeScreen();
+});
 mobileHomeBtn.addEventListener('click', closeMobileSidebar);
 topbarPatient.addEventListener('click', openMobileSidebar);
 topbarPatient.addEventListener('keydown', event => {

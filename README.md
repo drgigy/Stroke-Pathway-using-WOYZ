@@ -13,7 +13,7 @@ Shared clinical notes foundation for the Stroke Pathway rebuild.
 
 This application is derived from the supplied WOYZ Notes handover dated 7 November 2026. It retains dictation, review notes, editable patient timelines, printing, and browser-local Gemini key settings. Every page lists all non-deleted case entries from all dates and authors, newest creation first. OP/IP selection, Today/All switches, date navigation, the home template chooser, Anonymize, and Select credential/Layout settings are not displayed. Legacy dates, visit-type metadata, print preferences, and clinical content are preserved without data migration. No master-admin page is used.
 
-The user page's large recording and + Note sidebar buttons are not displayed. On mobile, its top navigation contains only List. Back, Settings, and Logout sit inside the list panel; Back closes the panel without changing the selected case. Administrator and dashboard Settings/Logout controls are also inside their case-list sidebars.
+The user page's large recording and + Note sidebar buttons are not displayed. On mobile, its top navigation contains List and a red Home button, which returns to Start New Code 7. Back, Settings, and Logout sit inside the list panel; Back closes the panel without changing the selected case. Administrator and dashboard Settings/Logout controls are also inside their case-list sidebars.
 
 The user home screen offers Start New Code 7. Each activation creates a fresh, empty shared draft with today's date and creator metadata, then opens it for editing. Existing manual drafts and cases are not reused or overwritten. The same home screen opens on desktop and mobile.
 
