@@ -8,6 +8,7 @@ Shared clinical notes foundation for the Stroke Pathway rebuild.
 - Firebase project: `minutes-woyz-3`
 - Firestore database: `(default)`, region `asia-south1`
 - Administrator: `index.html`
+- Shared review dashboard: `dashboard.html`
 - Shared staff workspace: `user.html`
 
 This application is derived from the supplied WOYZ Notes handover dated 7 November 2026. It keeps the notes application's OP/IP workflow, date navigation, dictation, review notes, editable patient timelines, printing, templates, and browser-local Gemini key settings. It replaces the original login and group-mapping model. No master-admin page is used.
@@ -17,6 +18,10 @@ This application is derived from the supplied WOYZ Notes handover dated 7 Novemb
 Staff browsers use Firebase Anonymous Authentication. The device UID identifies its approval request under `deviceApprovals/{uid}`. Staff enter their name and department, share their displayed code, and wait for administrator approval. Approval opens the workspace automatically. Each new browser profile requires approval. A shared browser profile shares one device identity and access. Clearing its Firebase/browser storage requires a new request.
 
 The administrator signs in using Email/Password and must have the `admin: true` custom claim assigned through a trusted administrative environment. Public clients cannot grant this role. Device approval, blocking, revocation and unblocking are managed through the Devices control on `index.html`. Unblocking returns a device to pending. Approval is checked against the server before opening the user workspace. Offline access is locked; clinical records are not stored in the service-worker cache or a persistent Firestore cache.
+
+`dashboard.html` provides the same notes review interface as `index.html`, without Workspace or Devices controls. It accepts Email/Password accounts in this Firebase project, including accounts added through Firebase Console Authentication. These accounts can view all shared cases, edit notes, copy, print, and mark discharge; they cannot manage device approvals or access the administrator page without the admin claim. There is no public sign-up form. Password-authenticated accounts have shared review access by design; the page is not restricted to an email allowlist. Anonymous accounts still require device approval for clinical access.
+
+After changing the main page, run `node scripts/build-dashboard.mjs` to synchronize the dashboard layout. Its differences are limited to login access and the two omitted controls.
 
 All approved devices can read, create, edit and delete notes in one shared collection: `workspaces/stroke/notes/{noteId}`. The notes themselves contain patient identity, visit date and type, transcription, and timeline information. Creator UID, creator name and creation timestamp are retained; changes include the latest editor UID and server timestamp. The administrator sees every author's notes and combined patient timelines. Personal credential and print-layout preferences use `users/{uid}`.
 
