@@ -2530,6 +2530,7 @@ import { browserLocalPersistence, getAuth, onAuthStateChanged, setPersistence, s
 import { getFirestore, collection, query, where, onSnapshot, addDoc, deleteDoc, doc, getDoc, getDocs, setDoc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-firestore.js';
 import { firebaseConfig } from './firebase-config.js';
 import { mountDeviceAccess } from './access.js';
+import { mountSidebarControls } from './sidebar-controls.js';
 
 const firebaseApp = initializeApp(firebaseConfig);
 const auth = getAuth(firebaseApp);
@@ -2903,7 +2904,7 @@ function renderTodayEntries(){
     const namedDraft = (r.isDraft || generatedEntry) && r.patientData?.name && r.patientData.name !== 'NIL';
     const manualNote = r.noteType === 'manual' || r.selectedMode === 'Manual note';
     const modeSuffix = r.everSaved && ['Reply letter','Medical certificate'].includes(r.selectedMode) ? ` (${r.selectedMode})` : '';
-    const draftEntryName = namedDraft ? `${r.patientData.name}${modeSuffix}` : `${manualNote ? 'Manual note' : 'Visit Note'} draft${modeSuffix}`;
+    const draftEntryName = namedDraft ? `${r.patientData.name}${modeSuffix}` : r.noteType === 'code7' ? (r.isDraft ? 'Code 7 draft' : 'Code 7') : `${manualNote ? 'Manual note' : 'Visit Note'} draft${modeSuffix}`;
     const entryName = anonymizeEnabled && (namedDraft || !(r.isDraft || generatedEntry))
       ? `${displayPatientName(r)}${modeSuffix}`
       : (r.isDraft || generatedEntry) ? draftEntryName : r.name;
@@ -3016,6 +3017,7 @@ function patientSearchKey(record){
   const identity = patientIdentity(record);
   const uhid = normalizePatientToken(identity.uhid);
   if (uhid && uhid !== 'nil') return `uhid:${uhid}`;
+  if (record.noteType === 'code7' && (!record.patientData?.name || normalizePatientToken(record.patientData.name) === 'nil')) return `case:${record.firestoreId}`;
   const name = normalizePatientToken(identity.name || record?.name);
   const sex = normalizePatientToken(identity.sex);
   const age = normalizePatientToken(identity.age);
@@ -4304,7 +4306,7 @@ function showMobileHomeScreen(){
   setMobileBottomActionsVisible(false);
   mainScroll.innerHTML = `
     <div class="empty-state">
-      <div class="empty-title">No record selected</div>
+      <button class="code7-start" type="button" data-start-code7>Start New Code 7</button>
     </div>`;
 }
 
@@ -4437,7 +4439,7 @@ function applyDeviceAccess(user, details){
     });
     selectedVisitDate = new Date();
     updateDateNavigation();
-    mobileHomeDefaultPending = window.matchMedia('(max-width:600px)').matches;
+    mobileHomeDefaultPending = true;
     mobileHomeDefaultActive = mobileHomeDefaultPending;
     sharedOwnerIds = ['shared'];
     if (mobileHomeDefaultActive) showMobileHomeScreen();
@@ -7244,8 +7246,9 @@ async function createVoiceDraft(mode = null){
   });
 }
 
-async function createManualDraft(){
+async function createManualDraft(options = {}){
   if (!currentUser) return;
+  const code7 = options.code7 === true;
   return withDraftCreationLock(async () => {
     if (searchScope === 'all'){
       searchScope = 'today';
@@ -7253,8 +7256,8 @@ async function createManualDraft(){
       updateSearchScopeToggle();
       subscribeToSelectedDate();
     }
-    if (selectExistingLocalDraft({visitType:selectedVisitType,fallbackToAny:false,predicate:isManualDraftRecord})) return;
-    const existingDraft = await existingDraftSnapshotForCurrentUser({visitType:selectedVisitType,fallbackToAny:false,predicate:isManualDraftRecord});
+    if (!code7 && selectExistingLocalDraft({visitType:selectedVisitType,fallbackToAny:false,predicate:isManualDraftRecord})) return;
+    const existingDraft = code7 ? null : await existingDraftSnapshotForCurrentUser({visitType:selectedVisitType,fallbackToAny:false,predicate:isManualDraftRecord});
     if (existingDraft){
       selectExistingDraftSnapshot(existingDraft);
       return;
@@ -7263,10 +7266,10 @@ async function createManualDraft(){
     stopMediaTracks();
     const now = new Date();
     const createdAt = now.toLocaleDateString('en-GB', {day:'2-digit', month:'short', year:'numeric'}) + ', ' + now.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
-    const selectedDateString = dateInputValue(selectedVisitDate);
+    const selectedDateString = dateInputValue(code7 ? now : selectedVisitDate);
     const newDraftRef = doc(userNotesCollection());
     const draftData = {
-      heading: 'Manual note draft',
+      heading: code7 ? 'Code 7 draft' : 'Manual note draft',
       createdAt:null,
       createdAtLabel:createdAt,
       visitDate:selectedDateString,
@@ -7276,13 +7279,24 @@ async function createManualDraft(){
       everSaved:false,
       saved:false,
       kind:'generated',
-      noteType:'manual',
-      selectedMode:'Manual note',
-      status:'Type your note',
-      transcription:MANUAL_NOTE_TEMPLATE,
+      noteType:code7 ? 'code7' : 'manual',
+      selectedMode:code7 ? 'Code 7' : 'Manual note',
+      status:code7 ? 'Draft' : 'Type your note',
+      transcription:code7 ? '' : MANUAL_NOTE_TEMPLATE,
       patientData:{name:'NIL',age:'NIL',uhid:'NIL',sex:'NIL'}
     };
     pendingSelectId = newDraftRef.id;
+    if (code7) {
+      try {
+        await setDoc(newDraftRef,{...draftData,...creationMetadata()});
+        selectLocalDraftFromSnapshot(await getDoc(newDraftRef));
+        closeMobileSidebar();
+      } catch (error) {
+        pendingSelectId = null;
+        throw error;
+      }
+      return;
+    }
     selectLocalDraftFromSnapshot({id:newDraftRef.id,data:()=>draftData});
     setDoc(newDraftRef,{...draftData,...creationMetadata()},{merge:true}).catch(error => {
       console.error('Manual draft save failed:', error);
@@ -7543,10 +7557,7 @@ searchScopeToggle.addEventListener('click', event => {
 });
 mobileMenuBtn.addEventListener('click', openMobileSidebar);
 mobileListBtn.addEventListener('click', openMobileSidebar);
-mobileHomeBtn.addEventListener('click', () => {
-  closeMobileSidebar();
-  showMobileHomeScreen();
-});
+mobileHomeBtn.addEventListener('click', closeMobileSidebar);
 topbarPatient.addEventListener('click', openMobileSidebar);
 topbarPatient.addEventListener('keydown', event => {
   if (event.key === 'Enter' || event.key === ' '){
@@ -8229,6 +8240,15 @@ deleteBtn.addEventListener('click', async () => {
 });
 
 
+mainScroll.addEventListener('click', async event => {
+  const button = event.target.closest('[data-start-code7]');
+  if (!button) return;
+  button.disabled = true;
+  try { await createManualDraft({code7:true}); }
+  catch (error) { window.alert('Unable to create the Code 7 draft. Please check your connection and try again.'); }
+  finally { button.disabled = false; }
+});
+mountSidebarControls({settings:settingsWrap,logout:signoutBtn,back:mobileHomeBtn});
 entryList.addEventListener('click', event => { if (event.target.closest('.entry')) requestAnimationFrame(closeMobileSidebar); });
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(console.warn);
 </script>

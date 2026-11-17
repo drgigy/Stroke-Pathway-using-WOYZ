@@ -281,6 +281,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.16.0/fireba
 import { browserLocalPersistence, getAuth, onAuthStateChanged, setPersistence, signInWithEmailAndPassword, signOut } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js';
 import { getFirestore, collection, collectionGroup, doc, getDoc, onSnapshot, serverTimestamp, setDoc, updateDoc } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-firestore.js';
 import { firebaseConfig } from './firebase-config.js';
+import { mountSidebarControls } from './sidebar-controls.js';
 
 
 const app = initializeApp(firebaseConfig);
@@ -549,13 +550,14 @@ function removeNilSectionsForCopy(text){
 
 function notePatientName(note){
   const name = note.data.patientData?.name;
-  return name && name !== 'NIL' ? name : 'Untitled note';
+  return name && name !== 'NIL' ? name : note.data.noteType === 'code7' ? (note.data.isDraft ? 'Code 7 draft' : 'Code 7') : 'Untitled note';
 }
 
 function patientTimelineKey(note){
   const patient = note?.data?.patientData || {};
   const uhid = String(patient.uhid || '').trim().toLowerCase();
   if (uhid && uhid !== 'nil') return `uhid:${uhid}`;
+  if (note.data.noteType === 'code7' && (!patient.name || String(patient.name).trim().toLowerCase() === 'nil')) return `case:${note.path || note.id}`;
   return [
     patient.name,
     cleanAge(patient.age),
@@ -1655,6 +1657,7 @@ document.addEventListener('click', event => {
 });
 
 signoutBtn.addEventListener('click', () => signOut(auth));
+mountSidebarControls({settings:document.querySelector('.admin-settings'),logout:signoutBtn});
 </script>
 <script>
 if ('serviceWorker' in navigator) {
