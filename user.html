@@ -4465,7 +4465,7 @@ function applyDeviceAccess(user, details){
   selectedIpTimelineDate = null;
   updateSearchScopeToggle();
   if (user){
-    setDoc(doc(db,'users',user.uid),{credentialName:details.name,email:user.email || '',emailUpdatedAt:serverTimestamp()},{merge:true}).catch(console.warn);
+    setDoc(doc(db,'users',user.uid),{email:user.email || '',emailUpdatedAt:serverTimestamp()},{merge:true}).catch(console.warn);
     appShell.classList.add('authenticated');
     userEmail.textContent = details.name;
     userProfileUnsubscribe = onSnapshot(doc(db,'users',user.uid), snapshot => {
