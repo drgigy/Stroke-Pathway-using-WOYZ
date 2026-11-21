@@ -46,6 +46,8 @@ function ensureToolbar() {
   const pages = document.createElement('div');
   pages.id = 'protocolPageButtons';
   pages.className = 'protocol-page-buttons';
+  pages.setAttribute('role', 'group');
+  pages.setAttribute('aria-label', 'Choose a protocol page');
   for (const [index, page] of protocolPages.entries()) {
     const button = document.createElement('button');
     button.type = 'button';
@@ -53,7 +55,12 @@ function ensureToolbar() {
     button.textContent = String(page.number);
     button.dataset.protocolPage = String(page.number);
     button.setAttribute('aria-label', `Protocol page ${page.number}`);
-    button.addEventListener('click', () => { currentPage = index; renderPage(); });
+    button.addEventListener('click', () => {
+      currentPage = index;
+      expanded = false;
+      renderPage();
+      toggle.focus({ preventScroll: true });
+    });
     pages.append(button);
   }
   const toggle = document.createElement('button');
@@ -61,7 +68,25 @@ function ensureToolbar() {
   toggle.id = 'protocolExpandBtn';
   toggle.className = 'protocol-expand-button';
   toggle.setAttribute('aria-controls', pages.id);
-  toggle.addEventListener('click', () => { expanded = !expanded; updateToolbar(); });
+  toggle.addEventListener('click', () => {
+    expanded = !expanded;
+    updateToolbar();
+    if (expanded) pages.querySelector('[aria-current="page"]')?.focus({ preventScroll: true });
+  });
+  toolbar.addEventListener('keydown', event => {
+    if (event.key === 'Escape' && expanded) {
+      expanded = false;
+      updateToolbar();
+      toggle.focus({ preventScroll: true });
+      event.preventDefault();
+    }
+  });
+  document.addEventListener('pointerdown', event => {
+    if (expanded && !toolbar.hidden && !toolbar.contains(event.target)) {
+      expanded = false;
+      updateToolbar();
+    }
+  });
   toolbar.append(pages, toggle);
   const topbar = document.querySelector('.main-topbar');
   const mobileRow = topbar.querySelector('.mobile-visit-row');
@@ -79,7 +104,8 @@ function ensureToolbar() {
     headingRows.push(row);
     titleElements.push(title);
   }
-  topbar.after(toolbar);
+  topbar.parentElement.classList.add('protocol-viewer-host');
+  topbar.parentElement.append(toolbar);
 }
 
 function updateToolbar() {
@@ -91,8 +117,8 @@ function updateToolbar() {
   for (const { button, direction } of stepButtons) button.disabled = direction === -1 ? currentPage === 0 : currentPage === protocolPages.length - 1;
   toolbar.querySelector('#protocolPageButtons').hidden = !expanded;
   const toggle = toolbar.querySelector('#protocolExpandBtn');
-  toggle.textContent = expanded ? '\u203a' : '\u2039';
-  toggle.title = expanded ? 'Hide protocol pages' : 'Show protocol pages';
+  toggle.textContent = expanded ? '\u00d7' : String(currentPage + 1);
+  toggle.title = expanded ? 'Close page picker' : `Choose page (${currentPage + 1} of ${protocolPages.length})`;
   toggle.setAttribute('aria-label', toggle.title);
   toggle.setAttribute('aria-expanded', String(expanded));
   for (const [index, button] of [...toolbar.querySelectorAll('[data-protocol-page]')].entries()) {
@@ -133,6 +159,7 @@ export function showProtocolCase(target, caseId) {
 
 export function hideProtocolViewer({ reset = false } = {}) {
   if (toolbar) toolbar.hidden = true;
+  expanded = false;
   for (const title of titleElements) title.hidden = true;
   for (const row of headingRows) row.hidden = true;
   container?.classList.remove('protocol-scroll');
