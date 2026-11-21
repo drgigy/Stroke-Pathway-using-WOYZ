@@ -1,10 +1,13 @@
 import { protocolPages } from './protocol-pages.js';
+import { cancelProtocolDictation, mountProtocolDictationControls, onProtocolDictationChange, protocolDictationBusy, setProtocolDictationContext } from './protocol-dictation.js';
 
 let toolbar;
 let container;
 let currentCase = null;
 let currentPage = 0;
 let expanded = false;
+let caseDictations = {};
+let showDictations = false;
 const pageTitles = [
   'Stroke Protocol Form',
   'Quality Assessment Timings',
@@ -31,7 +34,7 @@ function stepButton(direction, suffix) {
   button.setAttribute('aria-label', label);
   button.addEventListener('click', () => {
     const next = Math.max(0, Math.min(protocolPages.length - 1, currentPage + direction));
-    if (next !== currentPage) { currentPage = next; renderPage(); }
+    if (!protocolDictationBusy() && next !== currentPage) { currentPage = next; renderPage(); }
   });
   stepButtons.push({ button, direction });
   return button;
@@ -52,10 +55,14 @@ function ensureToolbar() {
     const button = document.createElement('button');
     button.type = 'button';
     button.className = 'protocol-page-button';
-    button.textContent = String(page.number);
+    const number = document.createElement('span');
+    number.className = 'protocol-page-number'; number.textContent = String(page.number);
+    const name = document.createElement('span'); name.textContent = pageTitles[index];
+    button.append(number, name);
     button.dataset.protocolPage = String(page.number);
     button.setAttribute('aria-label', `Protocol page ${page.number}`);
     button.addEventListener('click', () => {
+      if (protocolDictationBusy()) return;
       currentPage = index;
       expanded = false;
       renderPage();
@@ -87,7 +94,7 @@ function ensureToolbar() {
       updateToolbar();
     }
   });
-  toolbar.append(pages, toggle);
+  toolbar.append(toggle, pages);
   const topbar = document.querySelector('.main-topbar');
   const mobileRow = topbar.querySelector('.mobile-visit-row');
   for (const [target, suffix] of [[topbar, mobileRow ? 'desktop' : 'primary'], ...(mobileRow ? [[mobileRow, 'mobile']] : [])]) {
@@ -100,12 +107,17 @@ function ensureToolbar() {
     navigation.className = 'protocol-heading-nav';
     navigation.append(stepButton(-1, suffix), title, stepButton(1, suffix));
     row.append(navigation);
+    mountProtocolDictationControls(row);
     target.append(row);
     headingRows.push(row);
     titleElements.push(title);
   }
   topbar.parentElement.classList.add('protocol-viewer-host');
   topbar.parentElement.append(toolbar);
+  const positionPicker = () => topbar.parentElement.style.setProperty('--protocol-top', `${topbar.getBoundingClientRect().height}px`);
+  new ResizeObserver(positionPicker).observe(topbar);
+  positionPicker();
+  onProtocolDictationChange(() => { if (!toolbar.hidden) updateToolbar(); });
 }
 
 function updateToolbar() {
@@ -114,7 +126,8 @@ function updateToolbar() {
     title.hidden = false;
   }
   for (const row of headingRows) row.hidden = false;
-  for (const { button, direction } of stepButtons) button.disabled = direction === -1 ? currentPage === 0 : currentPage === protocolPages.length - 1;
+  for (const { button, direction } of stepButtons) button.disabled = protocolDictationBusy() || (direction === -1 ? currentPage === 0 : currentPage === protocolPages.length - 1);
+  for (const row of headingRows) row.classList.toggle('protocol-dictation-active', protocolDictationBusy());
   toolbar.querySelector('#protocolPageButtons').hidden = !expanded;
   const toggle = toolbar.querySelector('#protocolExpandBtn');
   toggle.textContent = expanded ? '\u00d7' : String(currentPage + 1);
@@ -122,6 +135,7 @@ function updateToolbar() {
   toggle.setAttribute('aria-label', toggle.title);
   toggle.setAttribute('aria-expanded', String(expanded));
   for (const [index, button] of [...toolbar.querySelectorAll('[data-protocol-page]')].entries()) {
+    button.disabled = protocolDictationBusy();
     if (index === currentPage) button.setAttribute('aria-current', 'page');
     else button.removeAttribute('aria-current');
   }
@@ -144,12 +158,46 @@ function renderPage() {
   container.replaceChildren(sheet);
   container.scrollTop = 0;
   updateToolbar();
+  renderSavedDictations(sheet);
+  const caseId = currentCase, pageNumber = currentPage + 1;
+  setProtocolDictationContext({ caseId, pageNumber, title: pageTitles[currentPage], imageSrc: page.src,
+    onSaved(id, entry) {
+      if (currentCase !== caseId) return;
+      const key = `page${pageNumber}`;
+      caseDictations = { ...caseDictations, [key]: { ...caseDictations[key], [id]: entry } };
+      const activeSheet = container.querySelector('.protocol-page-sheet');
+      if (activeSheet) renderSavedDictations(activeSheet);
+    }
+  });
 }
 
-export function showProtocolCase(target, caseId) {
+function renderSavedDictations(sheet) {
+  sheet.querySelector('.protocol-saved-dictations')?.remove();
+  if (!showDictations) return;
+  const entries = Object.entries(caseDictations[`page${currentPage + 1}`] || {});
+  if (!entries.length) return;
+  const section = document.createElement('section'); section.className = 'protocol-saved-dictations';
+  const heading = document.createElement('h2'); heading.textContent = `Page ${currentPage + 1}: ${pageTitles[currentPage]} — saved dictations`;
+  section.append(heading);
+  for (const [id, entry] of entries.sort((a, b) => (a[1].createdAt?.seconds || 0) - (b[1].createdAt?.seconds || 0))) {
+    if (typeof entry.text !== 'string') continue;
+    const article = document.createElement('article'); article.dataset.dictationId = id;
+    const label = document.createElement('p'); label.className = 'protocol-dictation-label'; label.textContent = 'Dictation · clinical review required';
+    const text = document.createElement('div'); text.className = 'protocol-dictation-text'; text.textContent = entry.text;
+    article.append(label, text); section.append(article);
+  }
+  sheet.append(section);
+}
+
+export function showProtocolCase(target, caseId, options = {}) {
   ensureToolbar();
-  if (currentCase !== caseId) { currentPage = 0; expanded = false; }
+  if (currentCase !== caseId) {
+    if (protocolDictationBusy()) { toolbar.hidden = false; renderPage(); return; }
+    currentPage = 0; expanded = false;
+  }
   currentCase = caseId;
+  caseDictations = options.dictations || {};
+  showDictations = options.showDictations === true;
   toolbar.dataset.caseId = caseId;
   container = target;
   container.classList.add('protocol-scroll');
@@ -158,6 +206,7 @@ export function showProtocolCase(target, caseId) {
 }
 
 export function hideProtocolViewer({ reset = false } = {}) {
+  if (reset) { cancelProtocolDictation(); caseDictations = {}; }
   if (toolbar) toolbar.hidden = true;
   expanded = false;
   for (const title of titleElements) title.hidden = true;

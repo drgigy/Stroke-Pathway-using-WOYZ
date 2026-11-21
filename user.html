@@ -2533,6 +2533,7 @@ import { firebaseConfig } from './firebase-config.js';
 import { mountDeviceAccess } from './access.js';
 import { mountSidebarControls } from './sidebar-controls.js';
 import { showProtocolCase, hideProtocolViewer } from './protocol-viewer.js';
+import { configureProtocolDictation } from './protocol-dictation.js';
 
 const firebaseApp = initializeApp(firebaseConfig);
 const auth = getAuth(firebaseApp);
@@ -2540,6 +2541,7 @@ const authPersistenceReady = setPersistence(auth, browserLocalPersistence).catch
   console.warn('Unable to enable persistent login:', error);
 });
 const db = getFirestore(firebaseApp);
+configureProtocolDictation({auth,db});
 
 const sampleRecords = [];
 
@@ -5608,7 +5610,7 @@ function renderGeneratedNote(draft){
     setMobileBottomActionsVisible(false);
     saveDraftBtn.classList.remove('visible');
     copyBtn.style.display = 'none';
-    showProtocolCase(mainScroll, draft.firestoreId);
+    showProtocolCase(mainScroll, draft.firestoreId, {dictations:draft.protocolDictations});
     return;
   }
   hideProtocolViewer();
@@ -6014,7 +6016,7 @@ function renderContinuationDock(){
 
 function selectedRecordCanContinue(){
   const record = reviewContinuationRecord();
-  return Boolean(record && !record.voiceDraft && (record.transcription || record.kind === 'generated'));
+  return Boolean(record && record.noteType !== 'code7' && !record.voiceDraft && (record.transcription || record.kind === 'generated'));
 }
 
 function newVoiceTemplateForMode(mode, visitType = selectedVisitType){
@@ -8007,6 +8009,7 @@ document.addEventListener('keydown', event => {
   const isTyping = ['INPUT','TEXTAREA'].includes(document.activeElement?.tagName)
     || document.activeElement?.isContentEditable;
   const draft = activeIndex !== null ? records[activeIndex] : null;
+  if (draft?.noteType === 'code7') return;
   if (!continuationState.open && (isTyping || !draft?.isDraft)) return;
   event.preventDefault();
   event.stopImmediatePropagation();

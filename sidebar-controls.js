@@ -1,8 +1,9 @@
-export function mountSidebarControls({ settings, logout, back }) {
+export function mountSidebarControls({ settings, logout, back, additional = [] }) {
   const sidebar = document.querySelector('.sidebar');
   const controls = document.createElement('nav');
   controls.className = 'sidebar-controls';
   controls.setAttribute('aria-label', 'Case list controls');
+  controls.append(...additional);
   if (back) {
     back.textContent = 'Back';
     back.setAttribute('aria-label', 'Back to case');

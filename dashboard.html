@@ -284,6 +284,7 @@ import { firebaseConfig } from './firebase-config.js';
 import { mountDashboardAccess } from './dashboard-access.js';
 import { mountSidebarControls } from './sidebar-controls.js';
 import { showProtocolCase, hideProtocolViewer } from './protocol-viewer.js';
+import { configureProtocolDictation } from './protocol-dictation.js';
 
 
 const app = initializeApp(firebaseConfig);
@@ -292,6 +293,7 @@ const authPersistenceReady = setPersistence(auth, browserLocalPersistence).catch
   console.warn('Unable to enable persistent login:', error);
 });
 const db = getFirestore(app);
+configureProtocolDictation({auth,db});
 
 const loginScreen = document.getElementById('loginScreen');
 const loginForm = document.getElementById('loginForm');
@@ -1086,7 +1088,7 @@ function renderSelectedNote(){
     dischargeBtn.style.display = 'none';
     hideAdminPrintMenu();
     hideAdminTimelineMenu();
-    showProtocolCase(mainScroll, note.id);
+    showProtocolCase(mainScroll, note.id, {dictations:note.data.protocolDictations,showDictations:true});
     return;
   }
   const timelineNotes = orderedPatientTimelineNotes(note);
@@ -1670,7 +1672,7 @@ document.addEventListener('click', event => {
 });
 
 signoutBtn.addEventListener('click', () => signOut(auth));
-mountSidebarControls({settings:document.querySelector('.admin-settings'),logout:signoutBtn});
+mountSidebarControls({settings:document.querySelector('.admin-settings'),logout:signoutBtn,additional:[...document.querySelectorAll('#devicesBtn, .main-topbar > a[href="./user.html"]')]});
 </script>
 <script>
 if ('serviceWorker' in navigator) {
