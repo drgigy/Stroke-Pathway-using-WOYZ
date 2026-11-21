@@ -283,6 +283,7 @@ import { browserLocalPersistence, getAuth, onAuthStateChanged, setPersistence, s
 import { getFirestore, collection, collectionGroup, doc, getDoc, onSnapshot, serverTimestamp, setDoc, updateDoc } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-firestore.js';
 import { firebaseConfig } from './firebase-config.js';
 import { mountDeviceManager } from './access.js';
+import { mountDashboardManager } from './dashboard-access.js';
 import { mountSidebarControls } from './sidebar-controls.js';
 import { showProtocolCase, hideProtocolViewer } from './protocol-viewer.js';
 
@@ -1180,6 +1181,7 @@ function clearScopedSubscriptions(){
 function subscribeToAllNotes(){
   if (notesUnsubscribe) notesUnsubscribe();
   notesUnsubscribe = onSnapshot(collection(db,'workspaces','stroke','notes'), snapshot => {
+    if (!currentAdminUid) return;
     allNotes = snapshot.docs.map(doc => {
       const userId = doc.data().createdBy || 'unknown';
       return {
@@ -1200,6 +1202,7 @@ function subscribeToAllNotes(){
 function subscribeToUserProfiles(){
   if (profilesUnsubscribe) profilesUnsubscribe();
   profilesUnsubscribe = onSnapshot(collection(db,'users'), snapshot => {
+    if (!currentAdminUid) return;
     userProfiles = Object.fromEntries(snapshot.docs.map(doc => [doc.id, doc.data()]));
     render();
   }, error => {
@@ -1226,6 +1229,7 @@ loginForm.addEventListener('submit', async event => {
 
 let adminAuthGeneration = 0;
 mountDeviceManager({auth,db});
+mountDashboardManager({auth,db});
 onAuthStateChanged(auth, async user => {
   hideProtocolViewer({reset:true});
   const generation = ++adminAuthGeneration;

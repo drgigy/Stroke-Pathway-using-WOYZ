@@ -1,5 +1,5 @@
-const CACHE = 'woyz-stroke-notes-20261117-11';
-const ASSETS = ['./index.html', './dashboard.html', './user.html', './access.js', './sidebar-controls.js', './protocol-viewer.js', './protocol-pages.js', './shared.css', './firebase-config.js', './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png'];
+const CACHE = 'woyz-stroke-notes-20261121-approval';
+const ASSETS = ['./index.html', './dashboard.html', './user.html', './access.js', './dashboard-access.js', './sidebar-controls.js', './protocol-viewer.js', './protocol-pages.js', './shared.css', './firebase-config.js', './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png'];
 self.addEventListener('install', event => event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(ASSETS)).then(() => self.skipWaiting())));
 self.addEventListener('activate', event => event.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(key => key.startsWith('woyz-stroke-notes-') && key !== CACHE).map(key => caches.delete(key)))).then(() => self.clients.claim())));
 self.addEventListener('fetch', event => {

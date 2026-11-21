@@ -9,10 +9,26 @@ service cloud.firestore {
     function access() { return admin() || approved(); }
     function dashboard() {
       return request.auth != null
-        && request.auth.token.get('firebase', {}).get('sign_in_provider', '') == 'password';
+        && request.auth.token.get('firebase', {}).get('sign_in_provider', '') == 'password'
+        && exists(/databases/$(database)/documents/dashboardApprovals/$(request.auth.uid))
+        && get(/databases/$(database)/documents/dashboardApprovals/$(request.auth.uid)).data.status == 'approved';
     }
     function reviewAccess() { return access() || dashboard(); }
     function self(uid) { return request.auth != null && request.auth.uid == uid; }
+    match /dashboardApprovals/{uid} {
+      allow get: if self(uid) || admin();
+      allow list: if admin();
+      // Signing in can request approval, but cannot grant or restore it.
+      allow create: if self(uid)
+        && request.auth.token.get('firebase', {}).get('sign_in_provider', '') == 'password'
+        && request.resource.data.keys().hasOnly(['email', 'status', 'createdAt'])
+        && request.resource.data.email == request.auth.token.email
+        && request.resource.data.status == 'pending' && request.resource.data.createdAt == request.time;
+      allow update: if admin()
+        && request.resource.data.status in ['pending', 'approved', 'blocked']
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'reviewedBy', 'reviewedAt'])
+        && request.resource.data.reviewedBy == request.auth.uid && request.resource.data.reviewedAt == request.time;
+    }
     function validDevice() {
       return request.resource.data.name is string && request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 100
         && request.resource.data.department is string && request.resource.data.department.size() > 0 && request.resource.data.department.size() <= 100

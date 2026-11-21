@@ -281,6 +281,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.16.0/fireba
 import { browserLocalPersistence, getAuth, onAuthStateChanged, setPersistence, signInWithEmailAndPassword, signOut } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js';
 import { getFirestore, collection, collectionGroup, doc, getDoc, onSnapshot, serverTimestamp, setDoc, updateDoc } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-firestore.js';
 import { firebaseConfig } from './firebase-config.js';
+import { mountDashboardAccess } from './dashboard-access.js';
 import { mountSidebarControls } from './sidebar-controls.js';
 import { showProtocolCase, hideProtocolViewer } from './protocol-viewer.js';
 
@@ -1178,6 +1179,7 @@ function clearScopedSubscriptions(){
 function subscribeToAllNotes(){
   if (notesUnsubscribe) notesUnsubscribe();
   notesUnsubscribe = onSnapshot(collection(db,'workspaces','stroke','notes'), snapshot => {
+    if (!currentAdminUid) return;
     allNotes = snapshot.docs.map(doc => {
       const userId = doc.data().createdBy || 'unknown';
       return {
@@ -1198,6 +1200,7 @@ function subscribeToAllNotes(){
 function subscribeToUserProfiles(){
   if (profilesUnsubscribe) profilesUnsubscribe();
   profilesUnsubscribe = onSnapshot(collection(db,'users'), snapshot => {
+    if (!currentAdminUid) return;
     userProfiles = Object.fromEntries(snapshot.docs.map(doc => [doc.id, doc.data()]));
     render();
   }, error => {
@@ -1222,32 +1225,29 @@ loginForm.addEventListener('submit', async event => {
   }
 });
 
-let adminAuthGeneration = 0;
-onAuthStateChanged(auth, async user => {
-  hideProtocolViewer({reset:true});
-  const generation = ++adminAuthGeneration;
-  notesUnsubscribe?.(); profilesUnsubscribe?.(); clearScopedSubscriptions();
-  notesUnsubscribe = null; profilesUnsubscribe = null;
-  allNotes = []; userProfiles = {}; selectedUserId = null; selectedNoteId = null;
-  currentAdminUid = null;
-  appShell.classList.remove('authenticated');
-  loginScreen.classList.remove('hidden');
-  document.getElementById('mainScroll').replaceChildren();
-  userEmail.textContent = '';
-  if (!user) return;
-  try {
-    const token = await user.getIdTokenResult(true);
-    if (generation !== adminAuthGeneration) return;
-    if (token.claims.admin !== true && token.claims.firebase?.sign_in_provider !== 'password') { loginError.textContent = 'Sign in with your dashboard email and password.'; return; }
+mountDashboardAccess({ auth, db,
+  onLocked(message) {
+    currentAdminUid = null;
+    notesUnsubscribe?.(); profilesUnsubscribe?.(); clearScopedSubscriptions();
+    notesUnsubscribe = null; profilesUnsubscribe = null;
+    users = []; selectedUserId = null; selectedNoteId = null; selectedTimelineEntryId = 'all';
+    hideProtocolViewer({reset:true});
+    appShell.classList.remove('authenticated');
+    loginScreen.classList.remove('hidden');
+    for (const element of [mainScroll, entryList, userRail, topbarTitle, topbarMeta, adminTimelineMenu]) element.replaceChildren();
+    userEmail.textContent = '';
+    loginError.textContent = message;
+  },
+  onAccess(user) {
     currentAdminUid = user.uid;
     loginScreen.classList.add('hidden');
     appShell.classList.add('authenticated');
-    userEmail.textContent = user.email || 'Administrator';
-    selectedVisitDate = new Date();
-    adminDateTouched = true;
+    loginError.textContent = '';
+    userEmail.textContent = user.email || 'Dashboard';
+    selectedVisitDate = new Date(); adminDateTouched = true;
     updateDateNavigation();
     subscribeToUserProfiles(); subscribeToAllNotes();
-  } catch { loginError.textContent = 'Unable to verify administrator access.'; }
+  }
 });
 
 adminPreviousDateBtn.addEventListener('click', () => moveAdminDate(-1));
