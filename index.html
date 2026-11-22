@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-page-mode="review">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
@@ -265,7 +265,6 @@
         <button class="btn timeline-btn" id="adminTimelineBtn" type="button" aria-label="Patient timeline" aria-haspopup="true" aria-expanded="false">Timeline</button>
         <div class="timeline-menu" id="adminTimelineMenu"></div>
       </div>
-      <a class="btn" href="./user.html">Workspace</a>
       <div class="admin-settings">
         <button class="btn" id="adminSettingsBtn" aria-expanded="false">Settings</button>
         <div class="settings-menu" id="adminSettingsMenu">
@@ -287,9 +286,8 @@ import { getFirestore, collection, collectionGroup, doc, getDoc, onSnapshot, ser
 import { firebaseConfig } from './firebase-config.js';
 import { mountSidebarControls } from './sidebar-controls.js';
 import { showProtocolCase, hideProtocolViewer } from './protocol-viewer.js';
-import { configureProtocolDictation } from './protocol-dictation.js';
+import { isReviewPage } from './page-mode.js';
 import { mountDashboardAccess } from './dashboard-access.js';
-import { isMasterAdmin } from './roles.js';
 
 
 const app = initializeApp(firebaseConfig);
@@ -298,7 +296,6 @@ const authPersistenceReady = setPersistence(auth, browserLocalPersistence).catch
   console.warn('Unable to enable persistent login:', error);
 });
 const db = getFirestore(app);
-configureProtocolDictation({auth,db});
 
 const loginScreen = document.getElementById('loginScreen');
 const loginForm = document.getElementById('loginForm');
@@ -1058,7 +1055,7 @@ function renderAdminAllEntries(seedNote){
     return `
       <article class="admin-all-entry">
         <h2 class="admin-all-entry-title">${escapeHtml(noteTimelineTitle(note))}</h2>
-        <div class="note-editor" data-admin-all-entry-id="${escapeHtml(note.id)}" data-admin-all-entry-user="${escapeHtml(note.userId)}" contenteditable="true" role="textbox" aria-label="Editable ${escapeHtml(noteTimelineTitle(note))}">${richNoteHtml(text, {includeMalayalam:layout.includeMalayalam !== false})}</div>
+        <div class="note-editor" data-admin-all-entry-id="${escapeHtml(note.id)}" data-admin-all-entry-user="${escapeHtml(note.userId)}" contenteditable="false" aria-readonly="true" role="textbox" aria-label="Review ${escapeHtml(noteTimelineTitle(note))}">${richNoteHtml(text, {includeMalayalam:layout.includeMalayalam !== false})}</div>
       </article>
     `;
   }).join('');
@@ -1110,7 +1107,7 @@ function renderSelectedNote(){
   adminTimelineWrap.classList.toggle('visible', timelineNotes.length > 0);
   renderAdminTimelineMenu();
   if (!hasText) closeAdminPrintMenu();
-  saveNoteBtn.style.display = 'inline-flex';
+  saveNoteBtn.style.display = 'none';
   updateDischargeButton(selectedTimelineEntryId === 'all' ? note : timelineNote);
   updatePrescriptionPrintButton(selectedTimelineEntryId === 'all' ? null : timelineNote);
   saveNoteBtn.textContent = 'Save';
@@ -1123,7 +1120,7 @@ function renderSelectedNote(){
   }
 	  mainScroll.innerHTML = `
 	    <h1 class="note-title">${escapeHtml(title)}</h1>
-	    <div class="note-editor" id="adminNoteEditor" contenteditable="true" role="textbox" aria-label="Editable admin note">${richNoteHtml(text, {includeMalayalam:layout.includeMalayalam !== false})}</div>
+	    <div class="note-editor" id="adminNoteEditor" contenteditable="false" aria-readonly="true" role="textbox" aria-label="Review admin note">${richNoteHtml(text, {includeMalayalam:layout.includeMalayalam !== false})}</div>
 	  `;
   document.getElementById('adminNoteEditor')?.addEventListener('input', () => updatePrescriptionPrintButton(timelineNote));
 }
@@ -1242,18 +1239,14 @@ mountDashboardAccess({ auth, db,
     appShell.classList.remove('authenticated'); loginScreen.classList.remove('hidden');
     for (const element of [mainScroll, entryList, userRail, topbarTitle, topbarMeta, adminTimelineMenu]) element.replaceChildren();
     userEmail.textContent = ''; loginError.textContent = message;
-    document.querySelector('[data-master-admin-link]')?.setAttribute('hidden', '');
   },
-  async onAccess(user) {
+  onAccess(user) {
     currentAdminUid = user.uid;
     loginScreen.classList.add('hidden'); appShell.classList.add('authenticated');
     loginError.textContent = ''; userEmail.textContent = user.email || 'User';
     selectedVisitDate = new Date(); adminDateTouched = true; updateDateNavigation();
     subscribeToUserProfiles(); subscribeToAllNotes();
-    try {
-      const token = await user.getIdTokenResult();
-      if (auth.currentUser?.uid === user.uid && currentAdminUid === user.uid) document.querySelector('[data-master-admin-link]')?.toggleAttribute('hidden', !isMasterAdmin(user, token));
-    } catch {}
+
   }
 });
 
@@ -1297,7 +1290,7 @@ copyBtn.addEventListener('click', async () => {
   if (!text) return;
   try{ await navigator.clipboard.writeText(text); }catch(error){}
   try{
-    if (note) await updateDoc(doc(db,note.path),{
+    if (!isReviewPage && note) await updateDoc(doc(db,note.path),{
       adminCopiedAt:serverTimestamp(),
       adminCopiedBy:currentAdminUid || '',updatedBy:currentAdminUid,updatedAt:serverTimestamp()
     });
@@ -1313,6 +1306,7 @@ copyBtn.addEventListener('click', async () => {
 });
 
 dischargeBtn.addEventListener('click', async () => {
+  if (isReviewPage) return;
   const note = selectedTimelineNote();
   if (!canToggleDischargeNote(note)) return;
   const selectedDateString = dateInputValue(selectedVisitDate);
@@ -1589,6 +1583,7 @@ rxPrintBtn.addEventListener('click', () => {
 });
 
 saveNoteBtn.addEventListener('click', async () => {
+  if (isReviewPage) return;
   const note = selectedTimelineNote();
   const editor = document.getElementById('adminNoteEditor');
   const allEditors = adminAllEntryEditors();
@@ -1677,8 +1672,7 @@ document.addEventListener('click', event => {
 });
 
 signoutBtn.addEventListener('click', () => signOut(auth));
-const masterAdminLink = document.createElement('a'); masterAdminLink.className = 'btn'; masterAdminLink.href = './master-admin.html'; masterAdminLink.textContent = 'Master admin'; masterAdminLink.dataset.masterAdminLink = ''; masterAdminLink.hidden = true;
-mountSidebarControls({settings:document.querySelector('.admin-settings'),logout:signoutBtn,additional:[masterAdminLink,...document.querySelectorAll('.main-topbar > a[href="./user.html"]')]});
+mountSidebarControls({settings:document.querySelector('.admin-settings'),logout:signoutBtn});
 </script>
 
 </body>

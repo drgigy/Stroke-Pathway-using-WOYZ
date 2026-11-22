@@ -1,3 +1,4 @@
+import { isReviewPage } from './page-mode.js';
 import { configureSharedKey, getDictationKey } from './shared-key.js';
 import { doc, serverTimestamp, updateDoc } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-firestore.js';
 import { protocolReferences } from './protocol-reference.js';
@@ -9,6 +10,7 @@ const observers = new Set();
 const busy = () => Boolean(session);
 
 export function configureProtocolDictation(options) {
+  if (isReviewPage) return;
   config = options;
   configureSharedKey(options);
   // Keep a recording on its original page until it has been saved or access ends.
@@ -37,10 +39,12 @@ export async function fillSavedProtocolDictation(id, entry) {
   finish();
 }
 export function setProtocolDictationContext(value) {
+  if (isReviewPage) return;
   if (!busy() && (context?.caseId !== value.caseId || context?.pageNumber !== value.pageNumber)) { phase = 'idle'; message = ''; }
   context = value; render();
 }
 export function mountProtocolDictationControls(parent) {
+  if (isReviewPage) return;
   const group = document.createElement('div');
   group.className = 'protocol-dictation';
   group.innerHTML = '<span class="protocol-recording-status" role="status" aria-live="polite"></span><button type="button" class="protocol-record-start">Start dictation</button><button type="button" class="protocol-record-pause" hidden>Pause</button><button type="button" class="protocol-record-stop" hidden>Stop &amp; transcribe</button>';

@@ -1,3 +1,4 @@
+import { isReviewPage } from './page-mode.js';
 import { protocolPages } from './protocol-pages.js';
 import { renderFilledProtocolForm } from './protocol-form-overlay.js';
 import { orderedDictations } from './protocol-field-output.js';
@@ -99,7 +100,7 @@ function ensureToolbar() {
     navigation.className = 'protocol-heading-nav';
     navigation.append(stepButton(-1, suffix), title, stepButton(1, suffix));
     row.append(navigation);
-    mountProtocolDictationControls(row);
+    if (!isReviewPage) mountProtocolDictationControls(row);
     target.append(row);
     headingRows.push(row);
     titleElements.push(title);
@@ -152,6 +153,7 @@ function renderPage() {
   container.scrollTop = 0;
   updateToolbar();
   renderSavedDictations(sheet);
+  if (isReviewPage) return;
   const caseId = currentCase, pageNumber = currentPage + 1;
   setProtocolDictationContext({ caseId, pageNumber, title: pageTitles[currentPage], imageSrc: page.src,
     onSaved(id, entry) {
@@ -179,7 +181,7 @@ function renderSavedDictations(sheet) {
     const label = document.createElement('p'); label.className = 'protocol-dictation-label'; label.textContent = 'Dictation · clinical review required';
     const text = document.createElement('div'); text.className = 'protocol-dictation-text'; text.textContent = entry.text;
     article.append(label, text);
-    if (!entry.fields) {
+    if (!isReviewPage && !entry.fields) {
       const fill = document.createElement('button'); fill.type = 'button'; fill.className = 'btn protocol-fill-earlier';
       fill.textContent = 'Fill this dictation into form';
       fill.addEventListener('click', () => fillSavedProtocolDictation(id, entry)); article.append(fill);

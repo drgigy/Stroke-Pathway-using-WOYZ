@@ -132,3 +132,5 @@ body[data-page="admin"] .topbar-title { min-width: 130px; overflow-wrap: anywher
 .account-login { margin-top: 16px; border-top: 1px solid #d3dfd9; padding-top: 16px; }
 .account-login summary { cursor: pointer; font-weight: 700; color: #205e50; }
 .account-login form { display: grid; gap: 10px; margin-top: 14px; }
+
+html[data-page-mode="review"] #saveNoteBtn, html[data-page-mode="review"] #dischargeBtn { display: none !important; }
