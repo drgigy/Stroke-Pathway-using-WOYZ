@@ -2,7 +2,10 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#205e50">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="apple-touch-icon" sizes="180x180" href="./icons/apple-touch-icon.png">
 <title>WOYZ Admin</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
@@ -1674,22 +1677,6 @@ document.addEventListener('click', event => {
 signoutBtn.addEventListener('click', () => signOut(auth));
 mountSidebarControls({settings:document.querySelector('.admin-settings'),logout:signoutBtn,additional:[...document.querySelectorAll('#devicesBtn, .main-topbar > a[href="./user.html"]')]});
 </script>
-<script>
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    let refreshingForUpdate = false;
-    navigator.serviceWorker.addEventListener('controllerchange', () => {
-      if (refreshingForUpdate) return;
-      refreshingForUpdate = true;
-      window.location.reload();
-    });
-    navigator.serviceWorker.register('./sw.js', {updateViaCache:'none'}).then(registration => {
-      registration.update();
-    }).catch(error => {
-      console.warn('Service worker registration failed:', error);
-    });
-  });
-}
-</script>
+
 </body>
 </html>

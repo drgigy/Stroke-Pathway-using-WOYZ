@@ -50,7 +50,7 @@ export function mountDashboardAccess({ auth, db, onAccess, onLocked }) {
   window.addEventListener('online', () => verify(auth.currentUser));
 }
 
-export function mountDashboardManager({ auth, db }) {
+export function mountDashboardManager({ auth, db, host }) {
   let unsubscribe, records = [], filter = 'pending';
   const dialog = document.createElement('dialog');
   dialog.className = 'device-dialog';
@@ -61,7 +61,7 @@ export function mountDashboardManager({ auth, db }) {
   document.body.append(dialog);
   const button = document.createElement('button');
   button.className = 'btn'; button.id = 'dashboardUsersBtn'; button.textContent = 'Dashboard users';
-  document.querySelector('.sidebar').append(button);
+  (host || document.querySelector('.sidebar')).append(button);
   const status = dialog.querySelector('[data-status]'), list = dialog.querySelector('[data-users]');
   function render() {
     list.replaceChildren();

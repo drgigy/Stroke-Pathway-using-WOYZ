@@ -92,7 +92,7 @@ export function mountDeviceAccess({ auth, db, onAccess }) {
   });
 }
 
-export function mountDeviceManager({ auth, db }) {
+export function mountDeviceManager({ auth, db, host }) {
   let unsubscribe;
   let filter = 'pending';
   const dialog = document.createElement('dialog');
@@ -103,7 +103,8 @@ export function mountDeviceManager({ auth, db }) {
   document.body.append(dialog);
   const button = document.createElement('button');
   button.className = 'btn'; button.textContent = 'Devices'; button.id = 'devicesBtn';
-  document.getElementById('adminSettingsBtn').parentElement.before(button);
+  if (host) host.append(button);
+  else document.getElementById('adminSettingsBtn').parentElement.before(button);
   const list = dialog.querySelector('#deviceList');
   const status = dialog.querySelector('#deviceManagerStatus');
   let devices = [];
@@ -137,5 +138,5 @@ export function mountDeviceManager({ auth, db }) {
   dialog.querySelector('[data-close]').addEventListener('click', () => dialog.close());
   dialog.querySelectorAll('[data-filter]').forEach(b => b.addEventListener('click', () => { filter = b.dataset.filter; render(); }));
   dialog.addEventListener('close', () => unsubscribe?.());
-  onAuthStateChanged(auth, user => { if (!user) { unsubscribe?.(); if (dialog.open) dialog.close(); list.replaceChildren(); devices = []; } });
+  onAuthStateChanged(auth, () => { unsubscribe?.(); if (dialog.open) dialog.close(); list.replaceChildren(); devices = []; });
 }

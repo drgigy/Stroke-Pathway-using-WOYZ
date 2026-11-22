@@ -6,9 +6,9 @@
 <meta name="theme-color" content="#1F5F52">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="WOYZ Notes">
+<meta name="apple-mobile-web-app-title" content="WOYZ Stroke">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<title>WOYZ Notes</title>
+<title>WOYZ Stroke</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -4468,6 +4468,7 @@ function applyDeviceAccess(user, details){
     userEmail.textContent = '';
   }
 }
+window.addEventListener('woyz-key-status', () => { authKeyBtn.style.display = localStorage.getItem(GEMINI_KEY_STORAGE) ? 'none' : 'flex'; });
 authPersistenceReady.then(() => mountDeviceAccess({auth,db,onAccess:applyDeviceAccess}));
 
 function noteText(r){
@@ -8274,7 +8275,7 @@ mainScroll.addEventListener('click', async event => {
 });
 mountSidebarControls({settings:settingsWrap,logout:signoutBtn,back:mobileHomeBtn});
 entryList.addEventListener('click', event => { if (event.target.closest('.entry')) requestAnimationFrame(closeMobileSidebar); });
-if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(console.warn);
+// PWA registration is handled by pwa.js.
 </script>
 </body>
 </html>

@@ -1,14 +1,35 @@
 {
-  "name": "WOYZ Stroke Notes",
-  "short_name": "WOYZ Notes",
+  "name": "WOYZ Stroke",
+  "short_name": "WOYZ Stroke",
   "start_url": "./user.html",
   "scope": "./",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#205e50",
   "icons": [
-    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
-    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
-    { "src": "icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
-  ]
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "icons/maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "id": "./user.html",
+  "description": "Shared Rajagiri stroke protocol forms and Code 7 dictation.",
+  "lang": "en",
+  "categories": [
+    "medical",
+    "productivity"
+  ],
+  "prefer_related_applications": false
 }

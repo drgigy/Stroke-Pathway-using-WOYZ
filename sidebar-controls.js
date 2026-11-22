@@ -1,3 +1,4 @@
+import { mountPwa } from './pwa.js';
 export function mountSidebarControls({ settings, logout, back, additional = [] }) {
   const sidebar = document.querySelector('.sidebar');
   const controls = document.createElement('nav');
@@ -20,4 +21,5 @@ export function mountSidebarControls({ settings, logout, back, additional = [] }
   logoutButton.addEventListener('click', () => logout.click());
   controls.append(logoutButton);
   sidebar.append(controls);
+  mountPwa();
 }

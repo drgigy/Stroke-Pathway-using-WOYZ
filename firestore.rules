@@ -49,6 +49,20 @@ service cloud.firestore {
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'reviewedBy', 'reviewedAt'])
         && request.resource.data.reviewedBy == request.auth.uid && request.resource.data.reviewedAt == request.time;
     }
+    // Shared Gemini key is delivered only to server-approved identities.
+    // The key never lives in public configuration, approval records or source files.
+    match /runtimeSecrets/gemini {
+      allow get: if reviewAccess();
+      allow list: if false;
+      allow create, update: if admin()
+        && request.resource.data.keys().hasOnly(['key', 'enabled', 'version', 'updatedBy', 'updatedAt'])
+        && request.resource.data.key is string && request.resource.data.key.size() <= 256
+        && request.resource.data.enabled is bool
+        && ((!request.resource.data.enabled && request.resource.data.key == '')
+          || (request.resource.data.enabled && request.resource.data.key.size() >= 20))
+        && request.resource.data.version is string && request.resource.data.version.size() <= 64
+        && request.resource.data.updatedBy == request.auth.uid && request.resource.data.updatedAt == request.time;
+    }
     match /users/{uid} {
       allow read: if reviewAccess();
       allow create, update: if access() && self(uid)

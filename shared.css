@@ -119,3 +119,11 @@ body[data-page="admin"] .topbar-title { min-width: 130px; overflow-wrap: anywher
 .protocol-field-review dt { font-weight: 700; }
 .protocol-field-review dd { margin: 4px 0 0; white-space: pre-wrap; }
 @media print { .protocol-filled-field { background: transparent; } .protocol-field-review { display: none; } }
+
+.shared-key-status { margin: 8px; color: #205e50; font: 13px/1.4 Arial,sans-serif; }
+.shared-key-form { max-width: 100%; }
+.shared-key-form p { margin: 4px 0; font: 12px/1.4 Arial,sans-serif; }
+
+.pwa-install[hidden], .pwa-update[hidden] { display: none !important; }
+.pwa-help p { line-height: 1.5; }
+.sidebar-controls .settings-menu { max-height: min(75dvh,650px); overflow-y: auto; }

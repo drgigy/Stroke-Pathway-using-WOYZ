@@ -1,8 +1,8 @@
+import { configureSharedKey, getDictationKey } from './shared-key.js';
 import { doc, serverTimestamp, updateDoc } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-firestore.js';
 import { protocolReferences } from './protocol-reference.js';
 import { fieldContract, fieldResponseSchema, validateFieldOutput, protocolFieldSource, protocolFieldVersion } from './protocol-field-output.js';
 
-const KEY_STORAGE = 'stroke_notes_gemini_key';
 let config, context, session, phase = 'idle', message = '';
 const controls = new Set();
 const observers = new Set();
@@ -10,21 +10,7 @@ const busy = () => Boolean(session);
 
 export function configureProtocolDictation(options) {
   config = options;
-  const menu = document.getElementById('adminSettingsMenu');
-  if (menu && !menu.querySelector('[data-protocol-key]')) {
-    const form = document.createElement('form');
-    form.dataset.protocolKey = '';
-    form.className = 'protocol-key-form';
-    form.innerHTML = '<label>Authorization key<input type="password" autocomplete="off" aria-label="Authorization key"></label><button type="submit" class="btn">Save key</button><span role="status"></span>';
-    form.addEventListener('submit', event => {
-      event.preventDefault(); event.stopPropagation();
-      const input = form.querySelector('input'), status = form.querySelector('[role="status"]');
-      if (!input.value.trim()) { status.textContent = 'Enter a key.'; return; }
-      localStorage.setItem(KEY_STORAGE, input.value.trim()); input.value = ''; status.textContent = 'Key saved in this browser.';
-    });
-    form.addEventListener('click', event => event.stopPropagation());
-    menu.append(form);
-  }
+  configureSharedKey(options);
   // Keep a recording on its original page until it has been saved or access ends.
   document.addEventListener('click', event => {
     if (busy() && event.target.closest('.entry, .user-pill, [data-start-code7], #userHomeBtn, #mobileHomeBtn, #newNoteBtn')) {
@@ -42,9 +28,11 @@ export function configureProtocolDictation(options) {
 
 export function onProtocolDictationChange(callback) { observers.add(callback); }
 export function protocolDictationBusy() { return busy(); }
-export function fillSavedProtocolDictation(id, entry) {
+export async function fillSavedProtocolDictation(id, entry) {
   if (busy() || !context || !config?.auth.currentUser || !/^[A-Za-z0-9_-]{1,128}$/.test(id) || typeof entry?.text !== 'string') return;
-  if (!localStorage.getItem(KEY_STORAGE)) { message = 'Add your authorization key in Settings before filling saved dictation.'; render(); return; }
+  const original = context, uid = config.auth.currentUser.uid;
+  if (!await getDictationKey()) { message = 'Shared dictation key unavailable. Ask your administrator to configure it, then retry.'; render(); return; }
+  if (busy() || context !== original || config.auth.currentUser?.uid !== uid) return;
   session = { ...context, uid: config.auth.currentUser.uid, id, sourceEntry: entry, recordedAt: entry.recordedAt || new Date().toISOString(), abort: new AbortController() };
   finish();
 }
@@ -99,9 +87,11 @@ export function cancelProtocolDictation() {
 
 async function start() {
   if (busy() || !context || !config?.auth.currentUser) return;
-  if (!localStorage.getItem(KEY_STORAGE)) {
-    message = 'Add your authorization key in Settings before starting dictation.'; render(); return;
+  const original = context, uid = config.auth.currentUser.uid;
+  if (!await getDictationKey()) {
+    message = 'Shared dictation key unavailable. Ask your administrator to configure it, then retry.'; render(); return;
   }
+  if (busy() || context !== original || config.auth.currentUser?.uid !== uid) return;
   if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) {
     message = 'Microphone recording is unavailable in this browser. Open the HTTPS app in Safari or Chrome.'; render(); return;
   }
@@ -205,7 +195,7 @@ function base64(blob) {
 }
 
 async function transcribe(active, audio) {
-  const key = localStorage.getItem(KEY_STORAGE);
+  const key = await getDictationKey();
   if (!key) throw new Error('missing-key');
   if (audio && audio.size > 14 * 1024 * 1024) throw new Error('audio-too-large');
   const reference = protocolReferences[active.pageNumber - 1];

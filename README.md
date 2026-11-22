@@ -7,11 +7,12 @@ Shared clinical notes foundation for the Stroke Pathway rebuild.
 - GitHub repository: `drgigy/Stroke-Pathway-using-WOYZ`
 - Firebase project: `minutes-woyz-3`
 - Firestore database: `(default)`, region `asia-south1`
-- Administrator: `index.html`
+- Administrator case workspace: `index.html`
+- Device/dashboard approval and shared-key management: `master-admin.html`
 - Shared review dashboard: `dashboard.html`
 - Shared staff workspace: `user.html`
 
-This application is derived from the supplied WOYZ Notes handover dated 7 November 2026. It retains dictation, review notes, editable patient timelines, printing, and browser-local Gemini key settings. Every page lists all non-deleted case entries from all dates and authors, newest creation first. OP/IP selection, Today/All switches, date navigation, the home template chooser, Anonymize, and Select credential/Layout settings are not displayed. Legacy dates, visit-type metadata, print preferences, and clinical content are preserved without data migration. No master-admin page is used.
+This application is derived from the supplied WOYZ Notes handover dated 7 November 2026. It retains dictation, review notes, editable patient timelines, printing, and browser-local Gemini key settings. Every page lists all non-deleted case entries from all dates and authors, newest creation first. OP/IP selection, Today/All switches, date navigation, the home template chooser, Anonymize, and Select credential/Layout settings are not displayed. Legacy dates, visit-type metadata, print preferences, and clinical content are preserved without data migration. Access and key settings are managed separately in `master-admin.html`, using the existing Firebase `admin: true` account; the page does not introduce a new role or administrator account.
 
 The user page's large recording and + Note sidebar buttons are not displayed. On mobile, its top navigation contains List and a red Home button, which returns to Start New Code 7. Back, Settings, and Logout sit inside the list panel; Back closes the panel without changing the selected case. Administrator and dashboard Settings/Logout controls are also inside their case-list sidebars.
 
@@ -68,3 +69,17 @@ Each take stores its field values, source hash, schema version and author alongs
 Earlier free-text takes have a **Fill this dictation into form** action. It maps the already-saved text without recording new audio, and updates only that take's field-mapping metadata; its original text, author and creation time are preserved. This requires the existing authorization key. Read-only blank form navigation does not trigger Gemini or write data.
 
 `node scripts/check-protocol-fields.mjs` checks PDF provenance, field bounds, strict output validation and page/source isolation. `scripts/build-protocol-fields.py` documents the checked PDF-point placements; a different protocol PDF requires reviewing these positions and labels before generating a new field-map version.
+
+## Shared dictation key
+
+Open `master-admin.html` with the existing administrator login. Enter the Gemini key once under **Shared Gemini key → Save for approved devices**, or choose **Share this browser’s saved key** when it is already configured locally. The value is saved in the exact Firestore document `runtimeSecrets/gemini`. Only administrators may create or update it; only administrators, approved devices and explicitly approved dashboard users may get it. Collection listing is denied. The key is never written to repository files, manifests, approval records or service-worker caches.
+
+Clients verify approval against the server before subscribing to the key document. An approved installation receives key changes automatically and stores the key in its own local storage. Managed copies are removed on lock/revocation, sign-out, offline notification or key disablement while the app is running, and are cleared before a fresh approval check at startup. A closed/offline device cannot receive a server change until it reconnects. A key delivered to a browser is readable on that device; this is deliberate client-side key distribution, not server-only secret storage. Rotate the key at its provider if an issued copy must be invalidated. Legacy manually configured browser keys remain a fallback for approved identities when no shared key is configured.
+
+The **Devices** and **Dashboard users** management controls have moved out of `index.html` into `master-admin.html`. The case workspace links to **Master admin** inside List. Existing case-sharing and approval rules are otherwise unchanged.
+
+## Phone installation
+
+The staff app is installable from `user.html` using `manifest.webmanifest`, PNG and maskable icons, the Apple touch icon and `sw.js`. Inside **List → Install app**, Android uses its native install prompt when available; otherwise the app shows browser-specific instructions. On iPhone/iPad, open the staff page in Safari and use **Share → Add to Home Screen → Add**. Request device approval from the installed app if it has a separate browser identity. Existing administrator and dashboard pages link to the same manifest.
+
+The service worker caches only public application files and blank protocol SVGs. It does not cache Gemini requests, Firestore responses, keys, audio or filled case records. An offline launch shows a reconnect screen; approved access, shared cases and dictation require connectivity. App updates expose an **Update app** control instead of reloading a recording.
