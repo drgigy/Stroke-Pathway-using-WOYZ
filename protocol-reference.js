@@ -1,4 +1,4 @@
-// Field labels checked against the supplied Rajagiri scans. These describe the
+// Field labels checked against the supplied Stroke_Protocol_Form.pdf. These describe the
 // blank form, not patient facts or treatment recommendations. No form default is
 // to be copied into a dictation, and no score, timing or consent may be inferred.
 export const protocolReferences = [
@@ -47,11 +47,11 @@ CT collateral reference figure: Site of Occlusion; Phase 1; Phase 2; Phase 3; Go
 Collateral score table: Good (5, 4); Intermediate (3, 2); Poor (1, 0).
 The image/score descriptions are references only. Do not interpret a scan, assign a region, compute a score or infer a collateral grade; record only what is dictated.`,
   `Page 5 — COUNSELLING FORM
-Name; UHID No; Diagnosis.
+Name; UHID No.; Diagnosis.
 Diagram reference labels: Middle cerebral artery; Vertebral artery; Common carotid artery; Arch of aorta. Body outline for reference.
 Treatment.
-Expected Outome and Complications (printed spelling preserved).
-Surrogates name; Relationship with patient; Signature; Date.
+Expected Outcome and Complications.
+Surrogate's name; Relationship with patient; Signature; Date.
 Dr.; Signature; Date.
 Do not assume counselling, understanding, consent or a signature from the blank form.`,
   `Page 6 — THROMBOLYTIC CHECKLIST FOR STROKE
@@ -60,14 +60,14 @@ Cautions / Warnings Yes / No: bleeding disorder or high bleeding risk/GI or GU b
 Expanded Treatment (3-4.5 hrs) Criteria: All of the above EXCEPT ABSOLUTE CONTRAINDICATIONS; Age >80 years; oral anticoagulants regardless of INR; NIHSS >25; combination of previous stroke and diabetes mellitus. These are blank-form labels, not patient conditions.
 REASONS FOR NON-TREATMENT WITH THROMBOLYTICS: Time; Patient/family Refused; Uncontrolled Hypertension; No IV access; CT finding; Platelet count; Stroke severity; Abnormal aPTT/PT/INR; Blood Glucose; Active internal bleeding; Recent IC surgery/Head trauma/Stroke.
 Preserve every dictated number, unit, date, time, yes/no/unknown and explanation. Do not decide eligibility or apply any printed cutoff to the patient.`,
-  `Page 7 — INFORMED CONSENT FOR INTRAVENOUS THROMBOLYSIS: ALTLEPLASE / TENECTEPLASE (printed heading spelling preserved)
+  `Page 7 — INFORMED CONSENT FOR INTRAVENOUS THROMBOLYSIS: ALTEPLASE / TENECTEPLASE
 PATIENT LABEL.
 Explanation to patient/family member/guardian: condition, procedure, expected benefits, alternatives, risks/complications. Additional comments if any.
 Doctor explaining; patient/family/guardian understanding and consent, only if explicitly dictated.
 Risk discussion fields: Death/stroke/permanent neurological injury (Paralysis, coma, etc.); Bleeding in other parts of the body; Allergic reaction to medications; Need for blood transfusions to replace clotting factors; Other unexpected complications. The source repeats the death/stroke/injury box; do not invent a second event or assume any event occurred.
-Dr. has explained the above; Patient / Family Member / Guardian's name; Relationship with Patient; Patient / Family Member / Guardian's Signature; Witnesse's Name & Signature; Date.
+Dr. has explained the above; Patient / Family Member / Guardian's name; Relationship with Patient; Patient / Family Member / Guardian's Signature; Witness's Name & Signature; Date.
 Never insert boilerplate confirmation that consent was obtained, a procedure was explained, questions were answered or someone signed. Such statements must be clearly dictated.`,
-  `Page 8 — Malayalam INFORMED CONSENT FOR INTRAVENOUS THROMBOLYSIS: ALTLEPLASE / TENECTEPLASE
+  `Page 8 — Malayalam INFORMED CONSENT FOR INTRAVENOUS THROMBOLYSIS: ALTEPLASE / TENECTEPLASE
 PATIENT LABEL; ശ്രീ./ശ്രീമതി.; UHID No.; വയസ്സ്; സ്ത്രീ/പുരുഷൻ; explaining doctor.
 Fields for dictated explanation of the diagnosis/procedure, available treatments, benefits, risks and complications, discussion and questions, and any explicit consent or refusal.
 രോഗി / കുടുംബാംഗം / രക്ഷകർത്താവ് പേര്; രോഗി / കുടുംബാംഗം / രക്ഷകർത്താവ് ഒപ്പ്; സ്ട്രോക്ക് സ്പെഷ്യലിസ്റ്റ് പേര്; സ്ട്രോക്ക് സ്പെഷ്യലിസ്റ്റ് ഒപ്പ്; തീയതി.

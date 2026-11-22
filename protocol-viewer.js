@@ -8,17 +8,7 @@ let currentPage = 0;
 let expanded = false;
 let caseDictations = {};
 let showDictations = false;
-const pageTitles = [
-  'Stroke Protocol Form',
-  'Quality Assessment Timings',
-  'Radiology Form',
-  'mRS / ASPECTS',
-  'Counselling Form',
-  'Thrombolytic Checklist',
-  'Thrombolysis Consent (English)',
-  'Thrombolysis Consent (Malayalam)',
-  'NIHSS'
-];
+const pageTitles = protocolPages.map(page => page.title);
 const titleElements = [];
 const headingRows = [];
 const stepButtons = [];
