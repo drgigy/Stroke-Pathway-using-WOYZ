@@ -1,3 +1,4 @@
+import { isMasterAdmin } from './roles.js';
 import { onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js';
 import { collection, doc, getDocFromServer, onSnapshot, serverTimestamp, setDoc, updateDoc } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-firestore.js';
 
@@ -15,9 +16,9 @@ export function mountDashboardAccess({ auth, db, onAccess, onLocked }) {
     try {
       const token = await user.getIdTokenResult(true);
       if (current !== generation) return;
-      if (token.claims.admin === true) { granted = true; onAccess(user); return; }
+      if (isMasterAdmin(user, token)) { granted = true; onAccess(user); return; }
       if (token.claims.firebase?.sign_in_provider !== 'password') {
-        lock('Sign in with your dashboard email and password.'); return;
+        lock('Sign in with your email and password.'); return;
       }
       const ref = doc(db, 'dashboardApprovals', user.uid);
       const snapshot = await getDocFromServer(ref);
@@ -54,13 +55,13 @@ export function mountDashboardManager({ auth, db, host }) {
   let unsubscribe, records = [], filter = 'pending';
   const dialog = document.createElement('dialog');
   dialog.className = 'device-dialog';
-  dialog.innerHTML = `<header><h2>Dashboard users</h2><button class="btn" data-close>Close</button></header>
-    <p>Users appear here after signing in to the dashboard. Only approved users can access shared cases.</p>
+  dialog.innerHTML = `<header><h2>Users</h2><button class="btn" data-close>Close</button></header>
+    <p>Users appear here after signing in to the user or admin page. Only approved users can access shared cases.</p>
     <nav aria-label="Dashboard approval status"><button class="btn" data-filter="pending">Pending</button><button class="btn" data-filter="approved">Approved</button><button class="btn" data-filter="blocked">Blocked</button></nav>
     <p role="status" data-status></p><div data-users></div>`;
   document.body.append(dialog);
   const button = document.createElement('button');
-  button.className = 'btn'; button.id = 'dashboardUsersBtn'; button.textContent = 'Dashboard users';
+  button.className = 'btn'; button.id = 'dashboardUsersBtn'; button.textContent = 'Users';
   (host || document.querySelector('.sidebar')).append(button);
   const status = dialog.querySelector('[data-status]'), list = dialog.querySelector('[data-users]');
   function render() {

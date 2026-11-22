@@ -1,29 +1,38 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    function admin() { return request.auth != null && request.auth.token.get('admin', false) == true; }
+    function admin() {
+      return request.auth != null && request.auth.uid == 'C7uoRRiH1XdpJzLDZMCZHLsmpNv1'
+        && request.auth.token.get('admin', false) == true;
+    }
     function approved() {
       return request.auth != null && exists(/databases/$(database)/documents/deviceApprovals/$(request.auth.uid))
         && get(/databases/$(database)/documents/deviceApprovals/$(request.auth.uid)).data.status == 'approved';
     }
-    function access() { return admin() || approved(); }
+    function access() { return admin() || approved() || dashboard(); }
     function dashboard() {
       return request.auth != null
         && request.auth.token.get('firebase', {}).get('sign_in_provider', '') == 'password'
         && exists(/databases/$(database)/documents/dashboardApprovals/$(request.auth.uid))
         && get(/databases/$(database)/documents/dashboardApprovals/$(request.auth.uid)).data.status == 'approved';
     }
-    function reviewAccess() { return access() || dashboard(); }
+    function reviewAccess() { return access(); }
     function self(uid) { return request.auth != null && request.auth.uid == uid; }
     match /dashboardApprovals/{uid} {
       allow get: if self(uid) || admin();
       allow list: if admin();
-      // Signing in can request approval, but cannot grant or restore it.
-      allow create: if self(uid)
+      // Only drgigy can provision an immediately enabled account. Other sign-ins can request access only.
+      allow create: if (self(uid)
         && request.auth.token.get('firebase', {}).get('sign_in_provider', '') == 'password'
         && request.resource.data.keys().hasOnly(['email', 'status', 'createdAt'])
         && request.resource.data.email == request.auth.token.email
-        && request.resource.data.status == 'pending' && request.resource.data.createdAt == request.time;
+        && request.resource.data.status == 'pending' && request.resource.data.createdAt == request.time)
+        || (admin()
+          && request.resource.data.keys().hasOnly(['email', 'status', 'createdBy', 'createdAt', 'reviewedBy', 'reviewedAt'])
+          && request.resource.data.email is string && request.resource.data.email.size() <= 254
+          && request.resource.data.status == 'approved'
+          && request.resource.data.createdBy == request.auth.uid && request.resource.data.reviewedBy == request.auth.uid
+          && request.resource.data.createdAt == request.time && request.resource.data.reviewedAt == request.time);
       allow update: if admin()
         && request.resource.data.status in ['pending', 'approved', 'blocked']
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'reviewedBy', 'reviewedAt'])

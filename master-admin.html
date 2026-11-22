@@ -1,11 +1,12 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#205e50"><title>WOYZ Stroke · Master admin</title><link rel="manifest" href="./manifest.webmanifest"><link rel="apple-touch-icon" sizes="180x180" href="./icons/apple-touch-icon.png"><link rel="stylesheet" href="./shared.css"><style>
-*{box-sizing:border-box}body{margin:0;background:#f4f5f3;color:#193d33;font:16px/1.5 system-ui,sans-serif}.btn{display:inline-flex;align-items:center;justify-content:center;min-height:42px;padding:9px 15px;border:1px solid #bdd1c8;border-radius:9px;background:#fff;color:#205e50;font:600 15px system-ui,sans-serif;text-decoration:none;cursor:pointer}.btn:disabled{opacity:.5;cursor:wait}main{max-width:800px;margin:auto;padding:max(24px,env(safe-area-inset-top)) max(20px,env(safe-area-inset-right)) max(24px,env(safe-area-inset-bottom)) max(20px,env(safe-area-inset-left))}header{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}h1{font-size:26px;margin:0}h2{font-size:20px;margin:0 0 12px}section,form.login-card{margin:20px 0;padding:22px;border:1px solid #ccdcd4;border-radius:14px;background:#fff}.login-card{max-width:430px}.login-card label{display:block;margin:12px 0}.login-card input{display:block;width:100%;min-height:44px;margin-top:6px;padding:8px;border:1px solid #bdd1c8;border-radius:6px;font:inherit}.management-controls{display:flex;gap:12px;flex-wrap:wrap}.protocol-key-form{padding:0;font-size:15px}.protocol-key-form input{min-height:44px;font:inherit;padding:8px}.protocol-key-form p{font-size:14px}.shared-key-status{margin:0 0 14px}.error{color:#b12626}[hidden]{display:none!important}
+*{box-sizing:border-box}body{margin:0;background:#f4f5f3;color:#193d33;font:16px/1.5 system-ui,sans-serif}.btn{display:inline-flex;align-items:center;justify-content:center;min-height:42px;padding:9px 15px;border:1px solid #bdd1c8;border-radius:9px;background:#fff;color:#205e50;font:600 15px system-ui,sans-serif;text-decoration:none;cursor:pointer}.btn:disabled{opacity:.5;cursor:wait}main{max-width:800px;margin:auto;padding:max(24px,env(safe-area-inset-top)) max(20px,env(safe-area-inset-right)) max(24px,env(safe-area-inset-bottom)) max(20px,env(safe-area-inset-left))}header{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}h1{font-size:26px;margin:0}h2{font-size:20px;margin:0 0 12px}section,form.login-card{margin:20px 0;padding:22px;border:1px solid #ccdcd4;border-radius:14px;background:#fff}.login-card{max-width:430px}.account-create-form{display:grid;gap:12px}.account-create-form input{display:block;width:100%;min-height:44px;padding:8px;border:1px solid #bdd1c8;border-radius:6px;font:inherit}.login-card label{display:block;margin:12px 0}.login-card input{display:block;width:100%;min-height:44px;margin-top:6px;padding:8px;border:1px solid #bdd1c8;border-radius:6px;font:inherit}.management-controls{display:flex;gap:12px;flex-wrap:wrap}.protocol-key-form{padding:0;font-size:15px}.protocol-key-form input{min-height:44px;font:inherit;padding:8px}.protocol-key-form p{font-size:14px}.shared-key-status{margin:0 0 14px}.error{color:#b12626}[hidden]{display:none!important}
 </style></head><body><main>
 <header><h1>WOYZ Stroke · Master admin</h1><a class="btn" href="./index.html">Case workspace</a></header>
-<div id="loginScreen"><form class="login-card" id="masterLogin"><h2>Administrator sign in</h2><p>Use your existing administrator account.</p><label>Email<input id="masterEmail" type="email" autocomplete="username" required></label><label>Password<input id="masterPassword" type="password" autocomplete="current-password" required></label><button class="btn" type="submit">Sign in</button><p role="status" class="error" id="masterLoginStatus"></p></form></div>
+<div id="loginScreen"><form class="login-card" id="masterLogin"><h2>Administrator sign in</h2><p>Only drgigy@gmail.com can manage access and the shared key.</p><label>Email<input id="masterEmail" type="email" autocomplete="username" required></label><label>Password<input id="masterPassword" type="password" autocomplete="current-password" required></label><button class="btn" type="submit">Sign in</button><p role="status" class="error" id="masterLoginStatus"></p></form></div>
 <div id="masterWorkspace" hidden>
-<section><header><h2>Access management</h2><button class="btn" type="button" id="masterLogout">Logout</button></header><p>Approve devices and dashboard users before they can open shared cases or receive the dictation key.</p><div class="management-controls" id="masterAccessControls"></div></section>
+<section><header><h2>Access management</h2><button class="btn" type="button" id="masterLogout">Logout</button></header><p>Approve device requests, create ready-to-use accounts, or block user access to shared cases and dictation.</p><div class="management-controls" id="masterAccessControls"></div></section>
+<section><h2>Create user</h2><p>New accounts created here can sign in immediately on all case pages. No separate approval is needed.</p><div id="accountProvisioning"></div></section>
 <section><h2>Shared Gemini key</h2><div id="adminSettingsMenu" data-key-management></div></section>
 </div>
 </main><script type="module">
@@ -16,6 +17,8 @@ import { firebaseConfig } from './firebase-config.js';
 import { mountDeviceManager } from './access.js';
 import { mountDashboardManager } from './dashboard-access.js';
 import { configureSharedKey } from './shared-key.js';
+import { isMasterAdmin } from './roles.js';
+import { mountAccountProvisioning } from './account-provisioning.js';
 const app=initializeApp(firebaseConfig),auth=getAuth(app),db=getFirestore(app);
 const ready=setPersistence(auth,browserLocalPersistence).catch(()=>{});
 configureSharedKey({auth,db});
@@ -26,8 +29,8 @@ onAuthStateChanged(auth,async user=>{
  if(!user)return;
  try{
   const token=await user.getIdTokenResult(true);if(epoch!==generation)return;
-  if(token.claims.admin!==true){status.textContent='Administrator access required.';return;}
-  if(!mounted){mounted=true;const host=document.getElementById('masterAccessControls');mountDeviceManager({auth,db,host});mountDashboardManager({auth,db,host});}
+  if(!isMasterAdmin(user,token)){status.textContent='Master admin access is restricted to drgigy@gmail.com.';return;}
+  if(!mounted){mounted=true;const host=document.getElementById('masterAccessControls');mountDeviceManager({auth,db,host});mountDashboardManager({auth,db,host});mountAccountProvisioning({auth,db,host:document.getElementById('accountProvisioning')});}
   login.hidden=true;workspace.hidden=false;
  }catch{if(epoch===generation)status.textContent='Unable to verify administrator access. Reconnect and try again.';}
 });

@@ -1,17 +1,23 @@
-import { onAuthStateChanged, signInAnonymously, signOut } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js';
+import { isMasterAdmin } from './roles.js';
+import { onAuthStateChanged, signInAnonymously, signInWithEmailAndPassword, signOut } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js';
 import { collection, doc, getDocFromServer, onSnapshot, serverTimestamp, setDoc, updateDoc } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-firestore.js';
 
 export function mountDeviceAccess({ auth, db, onAccess }) {
   const screen = document.getElementById('loginScreen');
-  screen.innerHTML = `<form class="login-card" id="deviceForm">
-    <div class="login-brand">WOYZ Notes</div><h1 class="login-title">Device access</h1>
+  screen.innerHTML = `<div class="login-card">
+    <div class="login-brand">WOYZ Stroke</div>
+    <form id="deviceForm"><h1 class="login-title">Device access</h1>
     <label class="login-label" for="deviceName">Name</label><input class="login-input" id="deviceName" required maxlength="100" autocomplete="name">
     <label class="login-label" for="deviceDepartment">Department</label><input class="login-input" id="deviceDepartment" required maxlength="100">
     <label class="login-label" for="deviceLabel">Device label (optional)</label><input class="login-input" id="deviceLabel" maxlength="100">
-    <button class="btn login-submit" type="submit">Request access</button>
+    <button class="btn login-submit" type="submit">Request access</button></form>
     <p id="deviceCode" class="device-code"></p><p id="deviceStatus" role="status">Connecting...</p>
-    <a href="./index.html">Administrator sign in</a>
-  </form>`;
+    <details class="account-login" id="accountLogin"><summary>User sign in</summary>
+      <form id="accountForm"><label class="login-label" for="accountEmail">Email</label><input class="login-input" id="accountEmail" type="email" autocomplete="username" required>
+      <label class="login-label" for="accountPassword">Password</label><input class="login-input" id="accountPassword" type="password" autocomplete="current-password" required>
+      <button class="btn login-submit" type="submit">Sign in</button><button class="btn" type="button" id="useDeviceAccess">Use device access</button></form>
+    </details><p><a href="./index.html">Admin case page</a></p>
+  </div>`;
   const form = document.getElementById('deviceForm');
   const fields = ['deviceName', 'deviceDepartment', 'deviceLabel'].map(id => document.getElementById(id));
   const status = document.getElementById('deviceStatus');
@@ -35,6 +41,17 @@ export function mountDeviceAccess({ auth, db, onAccess }) {
     submit.textContent = record ? 'Update request details' : 'Request access';
     status.textContent = state === 'blocked' ? 'Access blocked. Contact your administrator.' : state === 'pending' ? 'Awaiting approval. Share this device code with your administrator.' : 'Enter your details to request access.';
   };
+  const accountPanel = document.getElementById('accountLogin');
+  const accountForm = document.getElementById('accountForm');
+  accountForm.addEventListener('submit', async event => {
+    event.preventDefault(); const button = accountForm.querySelector('button'); button.disabled = true;
+    try {
+      await signInWithEmailAndPassword(auth, document.getElementById('accountEmail').value.trim(), document.getElementById('accountPassword').value);
+      document.getElementById('accountPassword').value = '';
+    } catch { status.textContent = 'Unable to sign in. Check the email and password.'; }
+    finally { button.disabled = false; }
+  });
+  document.getElementById('useDeviceAccess').addEventListener('click', () => signOut(auth));
   form.addEventListener('submit', async event => {
     event.preventDefault();
     if (!user) return;
@@ -52,44 +69,60 @@ export function mountDeviceAccess({ auth, db, onAccess }) {
     } catch (error) { status.textContent = error.message || 'Unable to request access.'; }
     finally { submit.disabled = accessRecord?.status === 'blocked'; }
   });
-  onAuthStateChanged(auth, async nextUser => {
+  async function verifyUser(nextUser) {
     const current = ++generation;
-    unsubscribe?.();
-    user = nextUser;
-    accessRecord = null;
-    submit.disabled = true;
-    lock('Connecting...');
+    unsubscribe?.(); unsubscribe = null; user = nextUser; accessRecord = null;
+    submit.disabled = true; form.hidden = false; lock('Connecting...');
     if (!nextUser) {
       try { await signInAnonymously(auth); }
-      catch (error) { status.textContent = `Unable to connect: ${error.message}`; }
+      catch { status.textContent = 'Unable to connect. Reconnect and try again.'; }
       return;
     }
-    unsubscribe = onSnapshot(doc(db, 'deviceApprovals', nextUser.uid), { includeMetadataChanges: true }, snapshot => {
-      if (current !== generation) return;
-      if (snapshot.metadata.fromCache || snapshot.metadata.hasPendingWrites) { if (!approved) status.textContent = 'Waiting for server confirmation...'; return; }
-      display(snapshot.data());
-      if (accessRecord?.status === 'approved') {
-        if (!approved) {
-          approved = true;
-          screen.classList.add('hidden');
-          onAccess(nextUser, accessRecord);
-          updateDoc(snapshot.ref, { lastSeenAt: serverTimestamp() }).catch(() => {});
-        }
-      } else lock(status.textContent);
-    }, () => lock('Access could not be verified. Reconnect and try again.'));
-  });
-  window.addEventListener('offline', () => lock('Offline. Reconnect to verify device access.'));
-  window.addEventListener('online', async () => {
-    if (!user) return;
     try {
-      const snapshot = await getDocFromServer(doc(db, 'deviceApprovals', user.uid));
-      if (snapshot.data()?.status === 'approved' && !approved) {
-        approved = true;
-        screen.classList.add('hidden');
-        onAccess(user, snapshot.data());
+      const token = await nextUser.getIdTokenResult(true);
+      if (current !== generation) return;
+      const accountDetails = { name: nextUser.email || 'User', department: '', deviceLabel: 'Account sign in' };
+      if (isMasterAdmin(nextUser, token)) {
+        approved = true; screen.classList.add('hidden'); onAccess(nextUser, accountDetails); return;
       }
-    } catch { lock('Access could not be verified.'); }
-  });
+      if (token.claims.firebase?.sign_in_provider === 'password') {
+        form.hidden = true; accountPanel.open = true; code.textContent = '';
+        document.getElementById('accountEmail').value = nextUser.email || '';
+        const ref = doc(db, 'dashboardApprovals', nextUser.uid);
+        const initial = await getDocFromServer(ref);
+        if (current !== generation) return;
+        if (!initial.exists()) {
+          try { await setDoc(ref, { email: nextUser.email, status: 'pending', createdAt: serverTimestamp() }); }
+          catch (error) { if (!(await getDocFromServer(ref)).exists()) throw error; }
+        }
+        if (current !== generation) return;
+        status.textContent = 'Awaiting approval. Ask drgigy to approve your user in Master admin.';
+        unsubscribe = onSnapshot(ref, { includeMetadataChanges: true }, snapshot => {
+          if (current !== generation) return;
+          if (snapshot.metadata.fromCache || snapshot.metadata.hasPendingWrites) { if (!approved) status.textContent = 'Waiting for server confirmation...'; return; }
+          if (snapshot.data()?.status === 'approved') {
+            if (!approved) { approved = true; screen.classList.add('hidden'); onAccess(nextUser, accountDetails); }
+          } else lock(snapshot.data()?.status === 'blocked' ? 'User access revoked. Contact drgigy.' : 'Awaiting approval. Ask drgigy to approve your user in Master admin.');
+        }, () => lock('User access could not be verified. Reconnect and try again.'));
+        return;
+      }
+      unsubscribe = onSnapshot(doc(db, 'deviceApprovals', nextUser.uid), { includeMetadataChanges: true }, snapshot => {
+        if (current !== generation) return;
+        if (snapshot.metadata.fromCache || snapshot.metadata.hasPendingWrites) { if (!approved) status.textContent = 'Waiting for server confirmation...'; return; }
+        display(snapshot.data());
+        if (accessRecord?.status === 'approved') {
+          if (!approved) {
+            approved = true; screen.classList.add('hidden'); onAccess(nextUser, accessRecord);
+            updateDoc(snapshot.ref, { lastSeenAt: serverTimestamp() }).catch(() => {});
+          }
+        } else lock(status.textContent);
+      }, () => lock('Access could not be verified. Reconnect and try again.'));
+    } catch { if (current === generation) lock('Access could not be verified. Reconnect and try again.'); }
+  }
+  onAuthStateChanged(auth, verifyUser);
+  window.addEventListener('offline', () => { ++generation; unsubscribe?.(); unsubscribe = null; lock('Offline. Reconnect to verify access.'); });
+  window.addEventListener('online', () => verifyUser(auth.currentUser));
+
 }
 
 export function mountDeviceManager({ auth, db, host }) {

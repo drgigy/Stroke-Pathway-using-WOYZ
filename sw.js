@@ -1,5 +1,5 @@
-const CACHE = 'woyz-stroke-notes-20261122-shared-key-pwa';
-const ASSETS = ['./master-admin.html', './index.html', './dashboard.html', './user.html', './offline.html', './access.js', './dashboard-access.js', './shared-key.js', './pwa.js', './protocol-dictation.js', './protocol-reference.js', './sidebar-controls.js', './protocol-viewer.js', './protocol-pages.js', './protocol-fields.js', './protocol-field-output.js', './protocol-form-overlay.js', './shared.css', './firebase-config.js', './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png', './icons/maskable-512.png', './icons/apple-touch-icon.png'];
+const CACHE = 'woyz-stroke-notes-20261122-owner-roles';
+const ASSETS = ['./master-admin.html', './index.html', './dashboard.html', './user.html', './offline.html', './access.js', './roles.js', './account-provisioning.js', './dashboard-access.js', './shared-key.js', './pwa.js', './protocol-dictation.js', './protocol-reference.js', './sidebar-controls.js', './protocol-viewer.js', './protocol-pages.js', './protocol-fields.js', './protocol-field-output.js', './protocol-form-overlay.js', './shared.css', './firebase-config.js', './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png', './icons/maskable-512.png', './icons/apple-touch-icon.png'];
 const root = new URL('./', self.location.href);
 const paths = new Set(ASSETS.map(asset => new URL(asset, root).pathname));
 const pagePaths = new Set(['master-admin.html', 'index.html', 'dashboard.html', 'user.html', ''].map(page => new URL(page, root).pathname));

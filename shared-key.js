@@ -1,3 +1,4 @@
+import { isMasterAdmin } from './roles.js';
 import { onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js';
 import { doc, getDocFromServer, onSnapshot, serverTimestamp, setDoc } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-firestore.js';
 
@@ -76,7 +77,7 @@ async function verify(user) {
   try {
     const token = await user.getIdTokenResult();
     if (epoch !== generation) return;
-    admin = token.claims.admin === true;
+    admin = isMasterAdmin(user, token);
     if (admin) { approved = true; installAdminForm(); subscribeKey(epoch); return; }
     const password = token.claims.firebase?.sign_in_provider === 'password';
     const approval = doc(config.db, password ? 'dashboardApprovals' : 'deviceApprovals', user.uid);
