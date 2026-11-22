@@ -1,5 +1,7 @@
 import { protocolPages } from './protocol-pages.js';
-import { cancelProtocolDictation, mountProtocolDictationControls, onProtocolDictationChange, protocolDictationBusy, setProtocolDictationContext } from './protocol-dictation.js';
+import { renderFilledProtocolForm } from './protocol-form-overlay.js';
+import { orderedDictations } from './protocol-field-output.js';
+import { cancelProtocolDictation, fillSavedProtocolDictation, mountProtocolDictationControls, onProtocolDictationChange, protocolDictationBusy, setProtocolDictationContext } from './protocol-dictation.js';
 
 let toolbar;
 let container;
@@ -144,7 +146,8 @@ function renderPage() {
   const sheet = document.createElement('section');
   sheet.className = 'protocol-page-sheet';
   sheet.setAttribute('aria-label', `Protocol page ${page.number}`);
-  sheet.append(image);
+  const canvas = document.createElement('div'); canvas.className = 'protocol-form-canvas';
+  canvas.append(image); sheet.append(canvas);
   container.replaceChildren(sheet);
   container.scrollTop = 0;
   updateToolbar();
@@ -163,18 +166,25 @@ function renderPage() {
 
 function renderSavedDictations(sheet) {
   sheet.querySelector('.protocol-saved-dictations')?.remove();
+  renderFilledProtocolForm(sheet, currentPage + 1, caseDictations[`page${currentPage + 1}`]);
   if (!showDictations) return;
-  const entries = Object.entries(caseDictations[`page${currentPage + 1}`] || {});
+  const entries = orderedDictations(caseDictations[`page${currentPage + 1}`]);
   if (!entries.length) return;
   const section = document.createElement('section'); section.className = 'protocol-saved-dictations';
   const heading = document.createElement('h2'); heading.textContent = `Page ${currentPage + 1}: ${pageTitles[currentPage]} — saved dictations`;
   section.append(heading);
-  for (const [id, entry] of entries.sort((a, b) => (a[1].createdAt?.seconds || 0) - (b[1].createdAt?.seconds || 0))) {
+  for (const [id, entry] of entries) {
     if (typeof entry.text !== 'string') continue;
     const article = document.createElement('article'); article.dataset.dictationId = id;
     const label = document.createElement('p'); label.className = 'protocol-dictation-label'; label.textContent = 'Dictation · clinical review required';
     const text = document.createElement('div'); text.className = 'protocol-dictation-text'; text.textContent = entry.text;
-    article.append(label, text); section.append(article);
+    article.append(label, text);
+    if (!entry.fields) {
+      const fill = document.createElement('button'); fill.type = 'button'; fill.className = 'btn protocol-fill-earlier';
+      fill.textContent = 'Fill this dictation into form';
+      fill.addEventListener('click', () => fillSavedProtocolDictation(id, entry)); article.append(fill);
+    }
+    section.append(article);
   }
   sheet.append(section);
 }
@@ -187,7 +197,7 @@ export function showProtocolCase(target, caseId, options = {}) {
   }
   currentCase = caseId;
   caseDictations = options.dictations || {};
-  showDictations = options.showDictations === true;
+  showDictations = true;
   toolbar.dataset.caseId = caseId;
   container = target;
   container.classList.add('protocol-scroll');

@@ -105,3 +105,17 @@ body[data-page="admin"] .topbar-title { min-width: 130px; overflow-wrap: anywher
   .sidebar-controls #mobileHomeBtn { display: inline-flex; padding: 0 12px; border: 1px solid #c8d9d3; background: #fff; color: #205e50; }
   .sidebar-controls .settings-btn { border: 1px solid #c8d9d3; }
 }
+
+/* Transparent field layer follows the exact supplied PDF page at every viewport size. */
+.protocol-form-canvas { position: relative; container-type: inline-size; }
+.protocol-field-layer { position: absolute; inset: 0; pointer-events: none; }
+.protocol-filled-field { display: flex; align-items: flex-start; justify-content: flex-start; position: absolute; box-sizing: border-box; margin: 0; padding: 0 1px; min-width: 0; min-height: 0; border: 0; border-radius: 1px; background: rgba(255,250,212,.94); color: #123f77; font-family: Arial,sans-serif; font-weight: 600; line-height: 1.1; text-align: left; white-space: pre-wrap; overflow: hidden; overflow-wrap: anywhere; cursor: pointer; pointer-events: auto; }
+.protocol-filled-field:focus-visible { outline: 2px solid #165da0; z-index: 2; }
+.protocol-field-check { justify-content: center; background: transparent; text-align: center; line-height: 1; }
+.protocol-field-review { padding: 12px 16px; background: #f6faf8; color: #193d33; font: 14px/1.5 Arial,sans-serif; border-top: 1px solid #c8d9d3; }
+.protocol-field-review summary { cursor: pointer; font-weight: 700; }
+.protocol-field-review dl { margin: 0; }
+.protocol-field-review dl > div { border-top: 1px solid #d8e3df; padding: 8px 0; overflow-wrap: anywhere; }
+.protocol-field-review dt { font-weight: 700; }
+.protocol-field-review dd { margin: 4px 0 0; white-space: pre-wrap; }
+@media print { .protocol-filled-field { background: transparent; } .protocol-field-review { display: none; } }
