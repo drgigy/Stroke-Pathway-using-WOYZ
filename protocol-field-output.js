@@ -4,7 +4,7 @@ export { protocolFieldSource, protocolFieldVersion };
 export function fieldContract(pageNumber) {
   const fields = protocolFields[pageNumber - 1];
   if (!fields) throw new Error('page-fields-unavailable');
-  return fields.map(({ id, label, kind, options }) => ({ id, label, ...(options ? { choices: options.map(option => option.value) } : {}), ...(kind === 'yesno' || kind === 'check' ? { rule: 'Use Yes or No only if explicitly dictated. Preserve uncertainty or additional details as text; do not infer from a number or printed threshold.' } : {}) }));
+  return fields.map(({ id, label, kind, options }) => ({ id, label, ...(options ? { choices: options.map(option => option.value) } : {}), ...(kind === 'binary' ? { rule: 'Yes/No only: Yes if the condition or history is explicitly stated present, No if explicitly denied. Omit unknown/unstated values. Never derive a condition from measurements or treatment. Preserve qualifications in other_details and full text.' } : {}), ...(kind === 'yesno' || kind === 'check' ? { rule: 'Use Yes or No only if explicitly dictated. Preserve uncertainty or additional details as text; do not infer from a number or printed threshold.' } : {}) }));
 }
 export function fieldResponseSchema(pageNumber) {
   return { type: 'OBJECT', properties: {
@@ -18,11 +18,13 @@ export function fieldResponseSchema(pageNumber) {
 export function validateFieldOutput(parsed, pageNumber) {
   if (!parsed || typeof parsed.text !== 'string' || !parsed.text.trim() || parsed.text.length > 60000 || !Array.isArray(parsed.fields)) throw new Error('invalid-output');
   const allowed = new Set(fieldContract(pageNumber).map(field => field.id));
+  const definitions = protocolFields[pageNumber - 1];
   if (parsed.fields.length > allowed.size) throw new Error('invalid-fields');
   const fields = {};
   for (const field of parsed.fields) {
     if (!field || !allowed.has(field.id) || Object.hasOwn(fields, field.id) || typeof field.value !== 'string' || !field.value.trim() || field.value.length > 12000) throw new Error('invalid-fields');
-    fields[field.id] = field.value.trim();
+    if (definitions.find(def => def.id === field.id).kind === 'binary' && !/^(yes|no)$/i.test(field.value.trim())) throw new Error('invalid-binary-value');
+    fields[field.id] = definitions.find(def => def.id === field.id).kind === 'binary' ? (/^yes$/i.test(field.value.trim()) ? 'Yes' : 'No') : field.value.trim();
   }
   return { text: parsed.text.trim(), fields };
 }
@@ -40,7 +42,7 @@ export function currentFieldValues(dictations, pageNumber) {
   for (const [takeId, entry] of orderedDictations(dictations)) {
     if (entry.fieldSource !== protocolFieldSource || entry.fieldVersion !== protocolFieldVersion || entry.pageNumber !== pageNumber) continue;
     for (const [id, value] of Object.entries(entry.fields || {})) {
-      if (allowed.has(id) && typeof value === 'string' && value.trim()) values[id] = { value, takeId };
+      if (allowed.has(id) && typeof value === 'string' && (value.trim() || entry.kind === 'manual-edit')) values[id] = { value, takeId };
     }
   }
   return values;

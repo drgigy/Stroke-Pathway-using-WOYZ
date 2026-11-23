@@ -24,3 +24,16 @@ const original={old:make('Earlier',1),new:make('Later',2),legacy:{text:'Legacy t
 assert.equal(currentFieldValues(original,1).name.value,'Later');
 assert.equal(original.old.fields.name,'Earlier');
 console.log('All nine PDF field maps, strict output validation, page/source isolation and chronological merge checks passed.');
+
+const risks=protocolFields[0].filter(f=>f.kind==='binary');
+assert.equal(risks.length,11);
+for(const f of risks){
+ assert.equal(validateFieldOutput({text:'Explicit denial',fields:[{id:f.id,value:'no'}]},1).fields[f.id],'No');
+ assert.throws(()=>validateFieldOutput({text:'Unknown',fields:[{id:f.id,value:'unknown'}]},1));
+}
+assert.equal(currentFieldValues({...original,clear:make('',6,{kind:'manual-edit'})},1).name.value,'');
+const {protocolPatientData,protocolPatientMeta}=await import('../protocol-patient.js');
+const patient={noteType:'code7',protocolDictations:{page1:{a:make('Test Patient',10,{fields:{name:'Test Patient',age:'56',uhid:'00123'}})}}};
+assert.deepEqual(protocolPatientData(patient),{name:'Test Patient',age:'56',uhid:'00123'});
+assert.equal(protocolPatientMeta(patient),'56 years · UHID 00123');
+console.log('Risk factors, explicit clearing and patient sidebar identity passed.');

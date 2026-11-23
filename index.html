@@ -287,6 +287,8 @@ import { firebaseConfig } from './firebase-config.js';
 import { mountSidebarControls } from './sidebar-controls.js';
 import { showProtocolCase, hideProtocolViewer } from './protocol-viewer.js';
 import { isReviewPage } from './page-mode.js';
+import { configureProtocolFormEditing } from './protocol-form-editor.js';
+import { protocolPatientData, protocolPatientMeta } from './protocol-patient.js';
 import { mountDashboardAccess } from './dashboard-access.js';
 
 
@@ -296,6 +298,7 @@ const authPersistenceReady = setPersistence(auth, browserLocalPersistence).catch
   console.warn('Unable to enable persistent login:', error);
 });
 const db = getFirestore(app);
+configureProtocolFormEditing({auth,db});
 
 const loginScreen = document.getElementById('loginScreen');
 const loginForm = document.getElementById('loginForm');
@@ -864,6 +867,7 @@ function updateVisitToggle(){
 }
 
 function noteMeta(note){
+  if(note.data.noteType==='code7')return [protocolPatientMeta(note.data),note.data.visitDate].filter(Boolean).join(' · ');
   const patient = note.data.patientData || {};
   const pieces = [userLabel(note.userId, 0)];
   if (patient.uhid) pieces.push(`UHID ${patient.uhid}`);
@@ -1191,7 +1195,7 @@ function subscribeToAllNotes(){
         path:doc.ref.path,
         userId,
         userLabel:'',
-        data:doc.data()
+        data:{...doc.data(),patientData:protocolPatientData(doc.data())}
       };
     });
     render();

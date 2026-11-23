@@ -1,8 +1,8 @@
 import { isReviewPage } from './page-mode.js';
 import { protocolPages } from './protocol-pages.js';
 import { renderFilledProtocolForm } from './protocol-form-overlay.js';
-import { orderedDictations } from './protocol-field-output.js';
-import { cancelProtocolDictation, fillSavedProtocolDictation, mountProtocolDictationControls, onProtocolDictationChange, protocolDictationBusy, setProtocolDictationContext } from './protocol-dictation.js';
+import { cancelProtocolFormEditing, mountProtocolFormEditStatus, onProtocolFormEditChange, protocolFormEditingBusy, setProtocolFormEditContext } from './protocol-form-editor.js';
+import { cancelProtocolDictation, mountProtocolDictationControls, onProtocolDictationChange, protocolDictationBusy, setProtocolDictationContext } from './protocol-dictation.js';
 
 let toolbar;
 let container;
@@ -10,7 +10,6 @@ let currentCase = null;
 let currentPage = 0;
 let expanded = false;
 let caseDictations = {};
-let showDictations = false;
 const pageTitles = protocolPages.map(page => page.title);
 const titleElements = [];
 const headingRows = [];
@@ -27,7 +26,7 @@ function stepButton(direction, suffix) {
   button.setAttribute('aria-label', label);
   button.addEventListener('click', () => {
     const next = Math.max(0, Math.min(protocolPages.length - 1, currentPage + direction));
-    if (!protocolDictationBusy() && next !== currentPage) { currentPage = next; renderPage(); }
+    if (!(protocolDictationBusy() || protocolFormEditingBusy()) && next !== currentPage) { currentPage = next; renderPage(); }
   });
   stepButtons.push({ button, direction });
   return button;
@@ -55,7 +54,7 @@ function ensureToolbar() {
     button.dataset.protocolPage = String(page.number);
     button.setAttribute('aria-label', `Protocol page ${page.number}`);
     button.addEventListener('click', () => {
-      if (protocolDictationBusy()) return;
+      if ((protocolDictationBusy() || protocolFormEditingBusy())) return;
       currentPage = index;
       expanded = false;
       renderPage();
@@ -101,6 +100,7 @@ function ensureToolbar() {
     navigation.append(stepButton(-1, suffix), title, stepButton(1, suffix));
     row.append(navigation);
     if (!isReviewPage) mountProtocolDictationControls(row);
+    else mountProtocolFormEditStatus(row);
     target.append(row);
     headingRows.push(row);
     titleElements.push(title);
@@ -111,6 +111,7 @@ function ensureToolbar() {
   new ResizeObserver(positionPicker).observe(topbar);
   positionPicker();
   onProtocolDictationChange(() => { if (!toolbar.hidden) updateToolbar(); });
+  onProtocolFormEditChange(() => { if (!toolbar.hidden) updateToolbar(); });
 }
 
 function updateToolbar() {
@@ -119,7 +120,7 @@ function updateToolbar() {
     title.hidden = false;
   }
   for (const row of headingRows) row.hidden = false;
-  for (const { button, direction } of stepButtons) button.disabled = protocolDictationBusy() || (direction === -1 ? currentPage === 0 : currentPage === protocolPages.length - 1);
+  for (const { button, direction } of stepButtons) button.disabled = (protocolDictationBusy() || protocolFormEditingBusy()) || (direction === -1 ? currentPage === 0 : currentPage === protocolPages.length - 1);
   for (const row of headingRows) row.classList.toggle('protocol-dictation-active', protocolDictationBusy());
   toolbar.querySelector('#protocolPageButtons').hidden = !expanded;
   const toggle = toolbar.querySelector('#protocolExpandBtn');
@@ -128,7 +129,7 @@ function updateToolbar() {
   toggle.setAttribute('aria-label', toggle.title);
   toggle.setAttribute('aria-expanded', String(expanded));
   for (const [index, button] of [...toolbar.querySelectorAll('[data-protocol-page]')].entries()) {
-    button.disabled = protocolDictationBusy();
+    button.disabled = (protocolDictationBusy() || protocolFormEditingBusy());
     if (index === currentPage) button.setAttribute('aria-current', 'page');
     else button.removeAttribute('aria-current');
   }
@@ -153,9 +154,9 @@ function renderPage() {
   container.scrollTop = 0;
   updateToolbar();
   renderSavedDictations(sheet);
-  if (isReviewPage) return;
   const caseId = currentCase, pageNumber = currentPage + 1;
-  setProtocolDictationContext({ caseId, pageNumber, title: pageTitles[currentPage], imageSrc: page.src,
+  const setContext = isReviewPage ? setProtocolFormEditContext : setProtocolDictationContext;
+  setContext({ caseId, pageNumber, title: pageTitles[currentPage], imageSrc: page.src,
     onSaved(id, entry) {
       if (currentCase !== caseId) return;
       const key = `page${pageNumber}`;
@@ -169,37 +170,25 @@ function renderPage() {
 function renderSavedDictations(sheet) {
   sheet.querySelector('.protocol-saved-dictations')?.remove();
   renderFilledProtocolForm(sheet, currentPage + 1, caseDictations[`page${currentPage + 1}`]);
-  if (!showDictations) return;
-  const entries = orderedDictations(caseDictations[`page${currentPage + 1}`]);
-  if (!entries.length) return;
-  const section = document.createElement('section'); section.className = 'protocol-saved-dictations';
-  const heading = document.createElement('h2'); heading.textContent = `Page ${currentPage + 1}: ${pageTitles[currentPage]} — saved dictations`;
-  section.append(heading);
-  for (const [id, entry] of entries) {
-    if (typeof entry.text !== 'string') continue;
-    const article = document.createElement('article'); article.dataset.dictationId = id;
-    const label = document.createElement('p'); label.className = 'protocol-dictation-label'; label.textContent = 'Dictation · clinical review required';
-    const text = document.createElement('div'); text.className = 'protocol-dictation-text'; text.textContent = entry.text;
-    article.append(label, text);
-    if (!isReviewPage && !entry.fields) {
-      const fill = document.createElement('button'); fill.type = 'button'; fill.className = 'btn protocol-fill-earlier';
-      fill.textContent = 'Fill this dictation into form';
-      fill.addEventListener('click', () => fillSavedProtocolDictation(id, entry)); article.append(fill);
-    }
-    section.append(article);
-  }
-  sheet.append(section);
+
 }
 
 export function showProtocolCase(target, caseId, options = {}) {
   ensureToolbar();
+  if (currentCase === caseId && container === target && target.querySelector('.protocol-page-sheet')) {
+    toolbar.hidden = false;
+    container.classList.add('protocol-scroll');
+    updateToolbar();
+    caseDictations = options.dictations || {};
+    renderSavedDictations(target.querySelector('.protocol-page-sheet'));
+    return;
+  }
   if (currentCase !== caseId) {
-    if (protocolDictationBusy()) { toolbar.hidden = false; renderPage(); return; }
+    if ((protocolDictationBusy() || protocolFormEditingBusy())) { toolbar.hidden = false; return; }
     currentPage = 0; expanded = false;
   }
   currentCase = caseId;
   caseDictations = options.dictations || {};
-  showDictations = true;
   toolbar.dataset.caseId = caseId;
   container = target;
   container.classList.add('protocol-scroll');
@@ -208,7 +197,7 @@ export function showProtocolCase(target, caseId, options = {}) {
 }
 
 export function hideProtocolViewer({ reset = false } = {}) {
-  if (reset) { cancelProtocolDictation(); caseDictations = {}; }
+  if (reset) { cancelProtocolFormEditing(); cancelProtocolDictation(); caseDictations = {}; }
   if (toolbar) toolbar.hidden = true;
   expanded = false;
   for (const title of titleElements) title.hidden = true;

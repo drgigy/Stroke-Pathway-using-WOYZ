@@ -116,7 +116,11 @@ export const protocolFields = [
     {
       "id": "dm",
       "label": "DM",
-      "kind": "text",
+      "kind": "binary",
+      "choices": [
+        "Yes",
+        "No"
+      ],
       "box": [
         42,
         178,
@@ -127,7 +131,11 @@ export const protocolFields = [
     {
       "id": "dyslipidemia",
       "label": "Dyslipidemia",
-      "kind": "text",
+      "kind": "binary",
+      "choices": [
+        "Yes",
+        "No"
+      ],
       "box": [
         86,
         178,
@@ -138,7 +146,11 @@ export const protocolFields = [
     {
       "id": "smoking",
       "label": "Smoking",
-      "kind": "text",
+      "kind": "binary",
+      "choices": [
+        "Yes",
+        "No"
+      ],
       "box": [
         195,
         178,
@@ -149,7 +161,11 @@ export const protocolFields = [
     {
       "id": "alcoholism",
       "label": "Alcoholism",
-      "kind": "text",
+      "kind": "binary",
+      "choices": [
+        "Yes",
+        "No"
+      ],
       "box": [
         275,
         178,
@@ -160,7 +176,11 @@ export const protocolFields = [
     {
       "id": "obesity",
       "label": "Obesity",
-      "kind": "text",
+      "kind": "binary",
+      "choices": [
+        "Yes",
+        "No"
+      ],
       "box": [
         395,
         178,
@@ -171,7 +191,11 @@ export const protocolFields = [
     {
       "id": "osa",
       "label": "OSA",
-      "kind": "text",
+      "kind": "binary",
+      "choices": [
+        "Yes",
+        "No"
+      ],
       "box": [
         490,
         178,
@@ -182,7 +206,11 @@ export const protocolFields = [
     {
       "id": "ihd",
       "label": "IHD",
-      "kind": "text",
+      "kind": "binary",
+      "choices": [
+        "Yes",
+        "No"
+      ],
       "box": [
         42,
         216,
@@ -193,7 +221,11 @@ export const protocolFields = [
     {
       "id": "af",
       "label": "AF",
-      "kind": "text",
+      "kind": "binary",
+      "choices": [
+        "Yes",
+        "No"
+      ],
       "box": [
         86,
         216,
@@ -204,7 +236,11 @@ export const protocolFields = [
     {
       "id": "htn",
       "label": "HTN",
-      "kind": "text",
+      "kind": "binary",
+      "choices": [
+        "Yes",
+        "No"
+      ],
       "box": [
         195,
         216,
@@ -215,7 +251,11 @@ export const protocolFields = [
     {
       "id": "family_history",
       "label": "Family History",
-      "kind": "text",
+      "kind": "binary",
+      "choices": [
+        "Yes",
+        "No"
+      ],
       "box": [
         275,
         216,
@@ -226,7 +266,11 @@ export const protocolFields = [
     {
       "id": "previous_stroke",
       "label": "Previous Stroke/TIA",
-      "kind": "text",
+      "kind": "binary",
+      "choices": [
+        "Yes",
+        "No"
+      ],
       "box": [
         395,
         216,

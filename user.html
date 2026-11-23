@@ -2534,6 +2534,7 @@ import { mountDeviceAccess } from './access.js';
 import { mountSidebarControls } from './sidebar-controls.js';
 import { showProtocolCase, hideProtocolViewer } from './protocol-viewer.js';
 import { configureProtocolDictation } from './protocol-dictation.js';
+import { protocolPatientData, protocolPatientMeta } from './protocol-patient.js';
 
 const firebaseApp = initializeApp(firebaseConfig);
 const auth = getAuth(firebaseApp);
@@ -2909,10 +2910,10 @@ function renderTodayEntries(){
     const manualNote = r.noteType === 'manual' || r.selectedMode === 'Manual note';
     const modeSuffix = r.everSaved && ['Reply letter','Medical certificate'].includes(r.selectedMode) ? ` (${r.selectedMode})` : '';
     const draftEntryName = namedDraft ? `${r.patientData.name}${modeSuffix}` : r.noteType === 'code7' ? (r.isDraft ? 'Code 7 draft' : 'Code 7') : `${manualNote ? 'Manual note' : 'Visit Note'} draft${modeSuffix}`;
-    const entryName = anonymizeEnabled && (namedDraft || !(r.isDraft || generatedEntry))
+    const entryName = r.noteType === 'code7' ? (r.patientData?.name || 'Code 7 draft') : anonymizeEnabled && (namedDraft || !(r.isDraft || generatedEntry))
       ? `${displayPatientName(r)}${modeSuffix}`
       : (r.isDraft || generatedEntry) ? draftEntryName : r.name;
-    const entryMeta = compactPatientMetaText([(r.isDraft || generatedEntry) && !namedDraft ? '' : patientMetaLine(r), r.createdAt || r.visitDate].filter(Boolean).join(' · '));
+    const entryMeta = r.noteType==='code7' ? [protocolPatientMeta(r),r.createdAt||r.visitDate].filter(Boolean).join(' · ') : compactPatientMetaText([(r.isDraft || generatedEntry) && !namedDraft ? '' : patientMetaLine(r), r.createdAt || r.visitDate].filter(Boolean).join(' · '));
     const ownerCode = ownerInitials(noteOwnerUid(r)) || ((r.isDraft || generatedEntry) ? (namedDraft ? initials(r.patientData.name) : 'D') : initials(r.name));
     btn.innerHTML = `
       <span class="entry-avatar">${escapeHtml(serialNumber)}</span>
@@ -4052,7 +4053,8 @@ function normalizeCarryForwardContinuation(record){
 }
 
 function noteFromSnapshot(snapshot, ownerUid = 'shared'){
-  const data = snapshot.data();
+  const raw = snapshot.data();
+  const data = {...raw,patientData:protocolPatientData(raw)};
   return normalizeCarryForwardContinuation({
     ...data,
     firestoreId:snapshot.id,
