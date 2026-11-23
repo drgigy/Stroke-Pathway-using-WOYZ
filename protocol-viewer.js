@@ -1,5 +1,6 @@
 import { isReviewPage } from './page-mode.js';
 import { protocolPages } from './protocol-pages.js';
+import { mountProtocolZoom } from './protocol-zoom.js';
 import { renderFilledProtocolForm } from './protocol-form-overlay.js';
 import { cancelProtocolFormEditing, mountProtocolFormEditStatus, onProtocolFormEditChange, protocolFormEditingBusy, setProtocolFormEditContext } from './protocol-form-editor.js';
 import { cancelProtocolDictation, mountProtocolDictationControls, onProtocolDictationChange, protocolDictationBusy, setProtocolDictationContext } from './protocol-dictation.js';
@@ -10,6 +11,7 @@ let currentCase = null;
 let currentPage = 0;
 let expanded = false;
 let caseDictations = {};
+let disposeZoom;
 const pageTitles = protocolPages.map(page => page.title);
 const titleElements = [];
 const headingRows = [];
@@ -136,6 +138,7 @@ function updateToolbar() {
 }
 
 function renderPage() {
+  disposeZoom?.();
   const page = protocolPages[currentPage];
   const image = document.createElement('img');
   image.id = 'protocolPageImage';
@@ -152,6 +155,8 @@ function renderPage() {
   canvas.append(image); sheet.append(canvas);
   container.replaceChildren(sheet);
   container.scrollTop = 0;
+  container.scrollLeft = 0;
+  disposeZoom = mountProtocolZoom(container, sheet);
   updateToolbar();
   renderSavedDictations(sheet);
   const caseId = currentCase, pageNumber = currentPage + 1;
@@ -197,7 +202,7 @@ export function showProtocolCase(target, caseId, options = {}) {
 }
 
 export function hideProtocolViewer({ reset = false } = {}) {
-  if (reset) { cancelProtocolFormEditing(); cancelProtocolDictation(); caseDictations = {}; }
+  if (reset) { disposeZoom?.(); disposeZoom = null; cancelProtocolFormEditing(); cancelProtocolDictation(); caseDictations = {}; }
   if (toolbar) toolbar.hidden = true;
   expanded = false;
   for (const title of titleElements) title.hidden = true;
