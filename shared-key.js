@@ -14,8 +14,12 @@ function clearManaged() {
   managedKey = '';
   if (read(MANAGED)) { remove(KEY); remove(MANAGED); }
 }
-function notify(message) {
-  if (statusElement) statusElement.textContent = message;
+function notify(message, state = '') {
+  if (statusElement) {
+    statusElement.dataset.state = state;
+    const management = statusElement.parentElement?.hasAttribute('data-key-management');
+    statusElement.textContent = management && state === 'unconfigured' ? 'No shared key configured' : management && state === 'ready' ? 'Shared key is active' : message;
+  }
   window.dispatchEvent(new Event('woyz-key-status'));
 }
 function resolveReady() { settled = true; for (const resolve of waiting) resolve(); waiting.clear(); }
@@ -28,20 +32,22 @@ function installAdminForm() {
   const menu = document.getElementById('adminSettingsMenu');
   if (!menu?.hasAttribute('data-key-management') || adminForm) return;
   adminForm = document.createElement('form'); adminForm.className = 'protocol-key-form shared-key-form';
-  adminForm.innerHTML = '<label>Shared Gemini key<input type="password" autocomplete="new-password" aria-label="Shared Gemini key" maxlength="256" placeholder="Enter once for approved devices"></label><button type="submit" class="btn">Save for approved devices</button><button type="button" class="btn" data-use-local>Share this browser’s saved key</button><button type="button" class="btn" data-disable>Disable shared key</button><p>Approved devices receive this key and store it locally. Only an administrator can change it.</p><span role="status"></span>';
+  adminForm.innerHTML = '<label>Gemini API key<input type="password" autocomplete="new-password" aria-label="Shared Gemini key" maxlength="256" placeholder="Paste your Gemini API key"></label><button type="submit" class="btn">Save shared key</button><div class="shared-key-actions"><button type="button" class="btn" data-use-local title="Use the key already saved in this browser">Use saved key</button><button type="button" class="btn" data-disable>Disable key</button></div><p>Enabled users and approved devices receive key updates automatically. The key is stored locally on their devices.</p><span role="status"></span>';
   adminForm.addEventListener('click', event => event.stopPropagation());
   async function save(value, enabled) {
     if (!admin || !config.auth.currentUser || config.auth.currentUser.uid !== currentUid) return;
     const status = adminForm.querySelector('[role="status"]');
-    if (enabled && (!value || value.length < 20 || value.length > 256 || /\s/.test(value))) { status.textContent = 'Enter a valid Gemini API key.'; return; }
+    status.dataset.state = ''; status.textContent = '';
+    if (enabled && (!value || value.length < 20 || value.length > 256 || /\s/.test(value))) { status.dataset.state = 'error'; status.textContent = 'Enter a valid Gemini API key.'; return; }
     adminForm.querySelectorAll('button').forEach(button => { button.disabled = true; });
     const uid = currentUid;
     try {
       await setDoc(doc(config.db, 'runtimeSecrets', 'gemini'), { key: enabled ? value : '', enabled, version: crypto.randomUUID(), updatedBy: uid, updatedAt: serverTimestamp() });
       if (!admin || currentUid !== uid) return;
       adminForm.querySelector('input').value = '';
+      status.dataset.state = 'success';
       status.textContent = enabled ? 'Shared key saved. Approved devices receive it automatically.' : 'Shared key disabled. Managed copies are cleared when devices reconnect.';
-    } catch { status.textContent = 'Unable to save the shared key. Check administrator access and connection.'; }
+    } catch { status.dataset.state = 'error'; status.textContent = 'Unable to save the shared key. Check administrator access and connection.'; }
     finally { adminForm.querySelectorAll('button').forEach(button => { button.disabled = false; }); }
   }
   adminForm.addEventListener('submit', event => { event.preventDefault(); event.stopPropagation(); save(adminForm.querySelector('input').value.trim(), true); });
@@ -54,12 +60,12 @@ function receiveKey(snapshot, epoch) {
   if (snapshot.metadata?.fromCache || snapshot.metadata?.hasPendingWrites) return;
   const record = snapshot.data();
   if (!record?.enabled || typeof record.key !== 'string' || !record.key) {
-    clearManaged(); notify('Shared key not configured. An administrator can set it in Master admin.'); resolveReady(); return;
+    clearManaged(); notify('Shared key not configured. An administrator can set it in Master admin.', 'unconfigured'); resolveReady(); return;
   }
   managedKey = record.key;
   try { localStorage.setItem(MANAGED, JSON.stringify({ uid: currentUid, version: record.version })); localStorage.setItem(KEY, record.key); }
   catch { notify('Shared key ready for this session. Browser storage is unavailable.'); resolveReady(); return; }
-  notify('Dictation key supplied by administrator.'); resolveReady();
+  notify('Dictation key supplied by administrator.', 'ready'); resolveReady();
 }
 function subscribeKey(epoch) {
   stopKey?.(); const keyEpoch = ++keyGeneration;
@@ -73,7 +79,7 @@ async function verify(user) {
   stop(); approved = admin = false; currentUid = user?.uid || ''; settled = false; clearManaged();
   if (adminForm) { adminForm.remove(); adminForm = null; }
   if (!user || !navigator.onLine) { lock(user ? 'Reconnect to verify device access.' : 'Sign in to receive the dictation key.'); return; }
-  notify('Verifying dictation access…');
+  notify('Verifying dictation access…', 'loading');
   try {
     const token = await user.getIdTokenResult();
     if (epoch !== generation) return;

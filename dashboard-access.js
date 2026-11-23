@@ -76,7 +76,7 @@ export function mountDashboardManager({ auth, db, host }) {
       const choices = record.status === 'pending' ? [['Approve', 'approved'], ['Block', 'blocked']]
         : record.status === 'approved' ? [['Revoke', 'blocked']] : [['Return to pending', 'pending']];
       for (const [label, value] of choices) {
-        const control = document.createElement('button'); control.className = 'btn'; control.textContent = label;
+        const control = document.createElement('button'); control.className = 'btn'; control.textContent = label; control.dataset.action = value;
         control.addEventListener('click', async () => {
           actions.querySelectorAll('button').forEach(button => { button.disabled = true; });
           try {

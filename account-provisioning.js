@@ -6,12 +6,12 @@ import { isMasterAdmin } from './roles.js';
 
 export function mountAccountProvisioning({ auth, db, host }) {
   const form = document.createElement('form'); form.className = 'account-create-form';
-  form.innerHTML = '<label>Email<input type="email" autocomplete="off" required maxlength="254" aria-label="New user email"></label><label>Initial password<input type="password" autocomplete="new-password" required minlength="8" aria-label="New user password"></label><button class="btn" type="submit">Create user</button><p role="status"></p>';
+  form.innerHTML = '<label>Email<input type="email" autocomplete="off" required maxlength="254" aria-label="New user email"></label><label>Initial password<input type="password" autocomplete="new-password" required minlength="8" aria-label="New user password"></label><button class="btn" type="submit" aria-label="Create user">Create user</button><p role="status"></p>';
   host.append(form);
   const [email, password] = form.querySelectorAll('input'), button = form.querySelector('button'), status = form.querySelector('[role="status"]');
-  onAuthStateChanged(auth, () => { password.value = ''; status.textContent = ''; });
+  onAuthStateChanged(auth, () => { password.value = ''; status.textContent = ''; status.dataset.state = ''; });
   form.addEventListener('submit', async event => {
-    event.preventDefault(); button.disabled = true; status.textContent = '';
+    event.preventDefault(); button.disabled = true; status.textContent = ''; status.dataset.state = '';
     const owner = auth.currentUser; let secondaryApp, secondaryAuth, created = false;
     try {
       const token = await owner?.getIdTokenResult(true);
@@ -27,9 +27,11 @@ export function mountAccountProvisioning({ auth, db, host }) {
         email: result.user.email, status: 'approved', createdBy: owner.uid,
         createdAt: serverTimestamp(), reviewedBy: owner.uid, reviewedAt: serverTimestamp()
       });
+      status.dataset.state = 'success';
       status.textContent = 'User created. They can sign in immediately on the user, admin and dashboard pages.';
       email.value = '';
     } catch (error) {
+      status.dataset.state = 'error';
       status.textContent = created ? 'Account created, but access setup did not finish. Ask the user to sign in, then enable them under Users.'
         : error.code === 'auth/email-already-in-use' ? 'This email already has an account. Enable it under Users if needed.'
         : error.code === 'auth/weak-password' ? 'Use a stronger initial password.'

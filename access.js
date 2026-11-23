@@ -152,7 +152,7 @@ export function mountDeviceManager({ auth, db, host }) {
       const detail = document.createElement('p'); detail.textContent = `${device.department} · ${device.deviceLabel || 'Unlabelled device'} · ${device.deviceCode}`;
       const actions = document.createElement('div'); actions.className = 'device-actions';
       for (const [label, value] of device.status === 'blocked' ? [['Unblock', 'pending']] : device.status === 'pending' ? [['Approve', 'approved'], ['Block', 'blocked']] : [['Revoke', 'blocked']]) {
-        const control = document.createElement('button'); control.className = 'btn'; control.textContent = label;
+        const control = document.createElement('button'); control.className = 'btn'; control.textContent = label; control.dataset.action = value;
         control.addEventListener('click', async () => {
           control.disabled = true;
           try { await updateDoc(doc(db, 'deviceApprovals', device.id), { status: value, reviewedBy: auth.currentUser.uid, reviewedAt: serverTimestamp() }); }
