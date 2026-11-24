@@ -8,6 +8,7 @@ import { mountProtocolDictationControls, setProtocolDictationContext, protocolDi
 import { protocolFormEditingBusy, configureProtocolFormEditing, onProtocolFormEditChange, parkProtocolFormEditing, restoreProtocolFormEditing } from './protocol-form-editor.js';
 import { showProtocolCase as showArchive, hideProtocolViewer as hideArchive } from './protocol-viewer.js';
 
+const caseSections=kpiSections.filter(section=>section.id!=='kpiResults');
 let standalone=false, parameterHome=false, caseTabs;
 export const kpiWorkspaceBusy=()=>busy();
 let configured=false, target=null, caseId=null, caseData={}, section=0, allData=new Map(), archive=false, active=false;
@@ -18,7 +19,7 @@ const busy=()=>saveBusy||!!failed||jobs.length>0||dirty.size>0||protocolDictatio
 const el=(tag,className,text)=>{const node=document.createElement(tag);if(className)node.className=className;if(text!==undefined)node.textContent=text;return node;};
 const validMonth=value=>/^\d{4}-(0[1-9]|1[0-2])$/.test(value);
 const indianMonth=value=>{if(!value)return '';const date=new Date(value);if(!Number.isFinite(date.getTime()))return '';const p=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Kolkata',year:'numeric',month:'2-digit'}).formatToParts(date);return p.find(x=>x.type==='year').value+'-'+p.find(x=>x.type==='month').value;};
-function updateStatus(){for(const node of statusNodes){node.firstChild.textContent=failed?'Save failed':saveBusy||jobs.length?'Saving…':dirty.size?'Unsaved changes':localSaved?'Saved':'';node.lastChild.hidden=!failed;}if(root?.isConnected)for(const button of root.querySelectorAll('.kpi-section-foot button'))button.disabled=busy()||(button.textContent==='Previous section'?section===0:section===5);updateNavigation();window.dispatchEvent(new Event('case-workspace-state'));}
+function updateStatus(){for(const node of statusNodes){node.firstChild.textContent=failed?'Save failed':saveBusy||jobs.length?'Saving…':dirty.size?'Unsaved changes':localSaved?'Saved':'';node.lastChild.hidden=!failed;}if(root?.isConnected)for(const button of root.querySelectorAll('.kpi-section-foot button'))button.disabled=busy()||(button.textContent==='Previous section'?section===0:section>=caseSections.length-1);updateNavigation();window.dispatchEvent(new Event('case-workspace-state'));}
 export function configureKpiWorkspace(config){
  if(configured)return;configured=true;storeConfig=config;configureKpiStore(config);configureProtocolFormEditing(config);
  window.addEventListener('offline',parkOfflineInput);
@@ -73,7 +74,7 @@ function ensureToolbar(){
   parent.append(row);rows.push({row,prev,title,next});
  }
  picker=el('nav','kpi-section-picker');picker.setAttribute('aria-label','KPI sections');picker.hidden=true;
- kpiSections.forEach((s,i)=>{const button=el('button','',`${i+1}. ${s.title}`);button.type='button';button.dataset.section=s.id;button.addEventListener('click',()=>changeSection(i));picker.append(button);});
+ caseSections.forEach((s,i)=>{const button=el('button','',`${i+1}. ${s.title}`);button.type='button';button.dataset.section=s.id;button.addEventListener('click',()=>changeSection(i));picker.append(button);});
  topbar.parentElement.classList.add('protocol-viewer-host');topbar.parentElement.append(picker);
  const position=()=>topbar.parentElement.style.setProperty('--protocol-top',(topbar.getBoundingClientRect().bottom-topbar.parentElement.getBoundingClientRect().top)+'px');new ResizeObserver(position).observe(topbar);new ResizeObserver(position).observe(caseTabs);position();
  document.addEventListener('pointerdown',e=>{if(!picker.hidden&&!picker.contains(e.target)&&!e.target.closest('.kpi-title'))picker.hidden=true;});
@@ -82,10 +83,10 @@ function ensureToolbar(){
 function updateNavigation(){
  const topbar=document.querySelector('.main-topbar');if(topbar)topbar.hidden=active&&!standalone&&!archive&&parameterHome;
  if(caseTabs){caseTabs.hidden=!active||standalone;for(const button of caseTabs.children){const selected=(button.dataset.caseMode==='form')===archive;button.setAttribute('aria-selected',String(selected));button.disabled=busy();}}
- for(const {row,prev,title,next}of rows){row.hidden=!active||archive||parameterHome;const mic=row.querySelector('.protocol-dictation');if(mic)mic.hidden=standalone;title.textContent=parameterHome?'Other Parameters':['Patient','Assessment','IVT / EVT','Complications','Follow-up','KPIs'][section];title.title=kpiSections[section].title;title.setAttribute('aria-label','Choose section: '+kpiSections[section].title);title.disabled=busy()||standalone||parameterHome;prev.hidden=parameterHome;next.hidden=parameterHome;prev.disabled=busy()||standalone||section===0;next.disabled=busy()||standalone||section===kpiSections.length-1;row.classList.toggle('protocol-dictation-active',protocolDictationBusy()&&!document.getElementById('dictationTopbar'));}
+ for(const {row,prev,title,next}of rows){row.hidden=!active||archive||parameterHome;const mic=row.querySelector('.protocol-dictation');if(mic)mic.hidden=standalone;title.textContent=parameterHome?'Other Parameters':['Patient','Assessment','IVT / EVT','Complications','Follow-up','KPIs'][section];title.title=kpiSections[section].title;title.setAttribute('aria-label','Choose section: '+kpiSections[section].title);title.disabled=busy()||standalone||parameterHome;prev.hidden=parameterHome;next.hidden=parameterHome;prev.disabled=busy()||standalone||section===0;next.disabled=busy()||standalone||section>=caseSections.length-1;row.classList.toggle('protocol-dictation-active',protocolDictationBusy()&&!document.getElementById('dictationTopbar'));}
  if(picker)for(const b of picker.children){b.disabled=busy();b.setAttribute('aria-current',b.dataset.section===kpiSections[section].id?'step':'false');}
 }
-function changeSection(index){if(standalone||busy()||index<0||index>=kpiSections.length)return;parameterHome=false;section=index;picker.hidden=true;build();}
+function changeSection(index){if(standalone||busy()||index<0||index>=caseSections.length)return;parameterHome=false;section=index;picker.hidden=true;build();}
 function humanDate(value){if(!value)return 'Not recorded';const date=new Date(value);return Number.isFinite(date.getTime())?new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Kolkata',day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:true}).format(date):value;}
 function localDateTime(value){if(!value)return '';const d=new Date(value);if(!Number.isFinite(d.getTime()))return '';const p=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Kolkata',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23'}).formatToParts(d),v=key=>p.find(x=>x.type===key)?.value;return `${v('year')}-${v('month')}-${v('day')}T${v('hour')}:${v('minute')}:${v('second')}`;}
 function visible(field,values){const conditions=field.showIf?Array.isArray(field.showIf)?field.showIf:[field.showIf]:[];return conditions.every(test=>test.values.includes(values[test.field]))&&(!field.showIfAny||field.showIfAny.some(test=>test.values.includes(values[test.field])));}
@@ -138,7 +139,7 @@ function switchCaseMode(form){
 }
 function buildParameterMenu(){
  const list=el('div','case-parameter-list');
- kpiSections.forEach((item,index)=>{const button=el('button','case-parameter-card');button.type='button';button.append(el('span','case-parameter-number',String(index+1)),el('strong','',item.title),el('span','','›'));button.addEventListener('click',()=>changeSection(index));list.append(button);});
+ caseSections.forEach((item,index)=>{const button=el('button','case-parameter-card');button.type='button';button.append(el('span','case-parameter-number',String(index+1)),el('strong','',item.title),el('span','','›'));button.addEventListener('click',()=>changeSection(index));list.append(button);});
  root.append(list);target.replaceChildren(root);updateNavigation();setVoiceContext();
 }
 function setVoiceContext(){if(isReviewPage||standalone)return;const currentId=caseId;setProtocolDictationContext({kind:'kpi',caseId,pageNumber:section+1,sectionId:parameterHome?'kpiResults':kpiSections[section].id,title:parameterHome?'Other Parameters':kpiSections[section].title,fieldDefinitions:parameterHome||section===5?kpiFields:kpiSections[section].fields,onSaved(id,entry){if(caseId!==currentId)return;caseData={...caseData,kpiEntries:{...caseData.kpiEntries,[id]:entry}};allData.set(caseId,caseData);refresh();}});}
@@ -153,13 +154,13 @@ function build(){
  target.classList.remove('protocol-scroll');target.classList.add('kpi-scroll');target.scrollTop=0;target.scrollLeft=0;
  root=el('section','kpi-workspace');root.dataset.kpiSection=parameterHome?'parameters':kpiSections[section].id;
  if(parameterHome&&!standalone){buildParameterMenu();return;}
- const head=el('header','kpi-section-head'),kicker=el('span','kpi-kicker',standalone?'SHARED REPORTING':`SECTION ${section+1} OF 6`),name=el('h1','',kpiSections[section].title),identity=el('p','kpi-case-identity');if(standalone)head.append(kicker,name,identity);else{head.classList.add('kpi-case-head');head.hidden=!isReviewPage;}if(isReviewPage&&!standalone){const review=el('button','kpi-source-button','Review dictation');review.type='button';review.addEventListener('click',reviewSources);head.append(review);}root.append(head);
+ const head=el('header','kpi-section-head'),kicker=el('span','kpi-kicker',standalone?'SHARED REPORTING':`SECTION ${section+1} OF ${caseSections.length}`),name=el('h1','',kpiSections[section].title),identity=el('p','kpi-case-identity');if(standalone)head.append(kicker,name,identity);else{head.classList.add('kpi-case-head');head.hidden=!isReviewPage;}if(isReviewPage&&!standalone){const review=el('button','kpi-source-button','Review dictation');review.type='button';review.addEventListener('click',reviewSources);head.append(review);}root.append(head);
  if(section!==5){
   const grid=el('div','kpi-fields');for(const field of kpiSections[section].fields)grid.append(fieldRow(field));root.append(grid);
   const empty=el('p','kpi-empty-section','Complete the relevant choices in earlier sections to show applicable fields.');root.append(empty);
  }else buildReport(root);
 
- const foot=el('footer','kpi-section-foot');for(const [label,index]of [['Previous section',section-1],['Next section',section+1]]){const b=el('button','',label);b.type='button';b.disabled=index<0||index>=6;b.addEventListener('click',()=>changeSection(index));foot.append(b);}foot.hidden=standalone;root.append(foot);
+ const foot=el('footer','kpi-section-foot');for(const [label,index]of [['Previous section',section-1],['Next section',section+1]]){const b=el('button','',label);b.type='button';b.disabled=index<0||index>=caseSections.length;b.addEventListener('click',()=>changeSection(index));foot.append(b);}foot.hidden=standalone;root.append(foot);
  target.replaceChildren(root);updateNavigation();setVoiceContext();refresh();
 }
 function refresh(){
@@ -179,7 +180,7 @@ function refresh(){
  let warnings=root.querySelector('.kpi-warnings');const uncertain=Object.values(caseData.kpiEntries||{}).filter(entry=>entry.sectionId===kpiSections[section].id&&entry.warnings?.length).flatMap(entry=>entry.warnings);if(uncertain.length){if(!warnings){warnings=el('details','kpi-warnings');root.querySelector('.kpi-section-head').after(warnings);}warnings.replaceChildren(el('summary','','Dictated details needing clarification'));const list=el('ul');for(const message of uncertain)list.append(el('li','',message));warnings.append(list);}else warnings?.remove();
  const empty=root.querySelector('.kpi-empty-section');if(empty)empty.hidden=shown>0;
  if(section===5)refreshReport();
- for(const b of root.querySelectorAll('.kpi-section-foot button'))b.disabled=busy()||(b.textContent==='Previous section'?section===0:section===5);
+ for(const b of root.querySelectorAll('.kpi-section-foot button'))b.disabled=busy()||(b.textContent==='Previous section'?section===0:section>=caseSections.length-1);
  updateNavigation();
 }
 function buildReport(parent){
