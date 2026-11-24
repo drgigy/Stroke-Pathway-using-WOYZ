@@ -6,6 +6,7 @@ import { isReviewPage } from './page-mode.js';
 import { mountDeviceAccess } from './access.js';
 import { configureProtocolDictation, mountProtocolDictationControls, onProtocolDictationChange } from './protocol-dictation.js';
 import { mountDashboardAccess } from './dashboard-access.js';
+import { printFilledProtocol, cancelProtocolPrint } from './protocol-print.js';
 import { mountDictationPanel } from './dictation-panel.js';
 import { mountPwa, setProtocolCacheAccess } from './pwa.js';
 import { configureKpiWorkspace, ingestKpiSnapshot, showProtocolCase, showKpiReport, hideProtocolViewer, kpiWorkspaceBusy } from './kpi-workspace.js';
@@ -18,7 +19,7 @@ configureKpiWorkspace({auth,db});
 if(!isReviewPage)configureProtocolDictation({auth,db});
 const $=id=>document.getElementById(id),shell=$('appShell'),screen=$('screen'),panel=$('reviewPanel'),scroller=$('mainScroll');
 if(!isReviewPage&&$('dictationTopbar')){mountProtocolDictationControls($('dictationTopbar'));mountDictationPanel($('dictationTopbar'));}
-let pendingDraft=null,creating=false,accessDetails=null;
+let pendingDraft=null,creating=false,printing=false,accessDetails=null;
 let documents=[],stopNotes,uid=null,generation=0,view='home',selectedId=null,query='',rangeMode='all',from='',to='',ivtOnly=false,evtOnly=false,analysisMode='',indicator=1;
 const india=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Kolkata',year:'numeric',month:'2-digit',day:'2-digit'});
 const dateKey=value=>{const d=new Date(value);if(!value||!Number.isFinite(d.getTime()))return '';const parts=india.formatToParts(d),part=type=>parts.find(x=>x.type===type).value;return `${part('year')}-${part('month')}-${part('day')}`;};
@@ -38,9 +39,9 @@ const minutes=value=>value===null?'Pending':`${Number(value.toFixed(1))} min`;
 const monthly=m=>currentMonthlyValues(documents.find(d=>d.id==='kpi-month-'+m)||{});
 const report=m=>calculateKpis(records().filter(r=>isKpiReportingCase(r._data)&&episodeDate(r).slice(0,7)===m),monthly(m));
 function message(text,kind='info'){let el=$('navigationMessage');if(!el){el=node('p','review-top-message');el.id='navigationMessage';el.setAttribute('role','status');shell.querySelector('.topbar').after(el);}el.dataset.kind=kind;el.textContent=text;}
-function canNavigate(){if(kpiWorkspaceBusy()||creating){message('Finish saving or retry the pending change before leaving this view.','busy');return false;}$('navigationMessage')?.remove();return true;}
-function navigate(next){if(!canNavigate())return;view=next;selectedId=null;analysisMode='';query='';if(next==='dashboard')rangeMode='month';hideProtocolViewer();window.scrollTo(0,0);render();}
-function openCase(id){if(!canNavigate())return;const r=records().find(r=>r.id===id);if(!r)return;selectedId=id;hideProtocolViewer();window.scrollTo(0,0);render();}
+function canNavigate(){if(kpiWorkspaceBusy()||creating||printing){message('Finish saving or retry the pending change before leaving this view.','busy');return false;}$('navigationMessage')?.remove();return true;}
+function navigate(next){if(!canNavigate())return;cancelProtocolPrint();view=next;selectedId=null;analysisMode='';query='';if(next==='dashboard')rangeMode='month';hideProtocolViewer();window.scrollTo(0,0);render();}
+function openCase(id){if(!canNavigate())return;cancelProtocolPrint();const r=records().find(r=>r.id===id);if(!r)return;selectedId=id;hideProtocolViewer();window.scrollTo(0,0);render();}
 function title(text,sub=''){const head=node('div');head.append(node('h2','review-title',text));if(sub)head.append(node('p','review-intro',sub));return head;}
 function empty(text){return node('div','review-empty',text);}
 function filters(){
@@ -102,7 +103,17 @@ function settings(){const dialog=node('dialog','review-settings'),head=node('hea
 function fitReviewPanel(){if(!panel.hidden){const bottom=shell.querySelector('.bottom-nav').getBoundingClientRect().height;panel.style.height=Math.max(220,window.innerHeight-panel.getBoundingClientRect().top-bottom-12)+'px';}}
 window.addEventListener('resize',fitReviewPanel);
 new ResizeObserver(fitReviewPanel).observe(shell.querySelector('.topbar'));
-function clearBusyMessage(){const notice=$('navigationMessage');if(notice?.dataset.kind==='busy'&&!creating&&!kpiWorkspaceBusy()){notice.remove();fitReviewPanel();}}
+function refreshPrintAction(){const button=$('printProtocolBtn');if(button){button.disabled=printing||kpiWorkspaceBusy();button.textContent=printing?'Preparing print…':'Print filled form';}}
+async function printCase(){
+ if(!isReviewPage||!selectedId||!uid||!canNavigate())return;
+ const author=uid,id=selectedId,data=documents.find(d=>d.id===id);if(!data)return;
+ const revision=JSON.stringify(data.protocolDictations||{}),dictations=structuredClone(data.protocolDictations||{});printing=true;refreshPrintAction();
+ try{await printFilledProtocol({dictations,isCurrent:()=>navigator.onLine&&uid===author&&selectedId===id&&shell.classList.contains('authenticated')&&!kpiWorkspaceBusy()&&JSON.stringify(documents.find(d=>d.id===id)?.protocolDictations||{})===revision});}
+ catch(error){message(error.message==='print-case-changed'?'The case changed while preparing print. Please try again.':'Could not prepare the filled form for printing. Check your connection and try again.');}
+ finally{printing=false;refreshPrintAction();clearBusyMessage();}
+}
+$('printProtocolBtn')?.addEventListener('click',printCase);
+function clearBusyMessage(){refreshPrintAction();const notice=$('navigationMessage');if(notice?.dataset.kind==='busy'&&!creating&&!kpiWorkspaceBusy()){notice.remove();fitReviewPanel();}}
 onProtocolDictationChange(clearBusyMessage);window.addEventListener('case-workspace-state',clearBusyMessage);
 function recoveryNotice(){
  const pending=document.querySelector('.kpi-recovery');let notice=$('recoveryNotice');
@@ -110,7 +121,7 @@ function recoveryNotice(){
  if(!notice){notice=node('div','review-top-message');notice.id='recoveryNotice';notice.append(node('span','','Pending input is available after reconnecting. '),button('Recover pending input',()=>pending.click()));shell.querySelector('.topbar').after(notice);}
 }
 function render(){
- if(!uid)return;if($('dictationTopbar'))$('dictationTopbar').hidden=!selectedId;const reviewing=!!selectedId||view==='kpi';shell.classList.toggle('dashboard-wide',view==='dashboard');const installs=$('installControls');if(installs)installs.hidden=view!=='more'||!!selectedId;panel.classList.toggle('standalone-report',view==='kpi'&&!selectedId);screen.hidden=reviewing;panel.hidden=!reviewing;recoveryNotice();
+ if(!uid)return;if($('adminCaseActions'))$('adminCaseActions').hidden=!selectedId;refreshPrintAction();if($('dictationTopbar'))$('dictationTopbar').hidden=!selectedId;const reviewing=!!selectedId||view==='kpi';shell.classList.toggle('dashboard-wide',view==='dashboard');const installs=$('installControls');if(installs)installs.hidden=view!=='more'||!!selectedId;panel.classList.toggle('standalone-report',view==='kpi'&&!selectedId);screen.hidden=reviewing;panel.hidden=!reviewing;recoveryNotice();
  for(const b of shell.querySelectorAll('[data-view]')){b.classList.toggle('active',b.dataset.view===view);b.setAttribute('aria-current',b.dataset.view===view?'page':'false');}
  $('viewTitle').textContent=selectedId?(isReviewPage?'Case review':'Case dictation'):({home:'Home',cases:'Cases',dashboard:'Dashboard',kpi:'NABH KPI Analysis',analysis:'Analysis',more:'More'})[view];$('viewSubtitle').textContent=selectedId?'Shared patient record':isReviewPage?'Shared case review':'Shared case workspace';
  if(reviewing){if(selectedId){const r=records().find(r=>r.id===selectedId);if(!r){selectedId=null;hideProtocolViewer({reset:true});render();return;}showProtocolCase(scroller,r.id,{data:r._data});}else{showKpiReport(scroller,{month});}fitReviewPanel();return;}
@@ -121,6 +132,7 @@ window.addEventListener('kpi-report-month-changed',event=>{month=event.detail.mo
 window.addEventListener('kpi-case-recovered',event=>{selectedId=event.detail.caseId;view='cases';render();queueMicrotask(recoveryNotice);});
 if(isReviewPage)$('loginForm').addEventListener('submit',async event=>{event.preventDefault();$('loginSubmit').disabled=true;$('loginError').textContent='';try{await signInWithEmailAndPassword(auth,$('loginEmail').value.trim(),$('loginPassword').value);$('loginPassword').value='';}catch{$('loginError').textContent='Unable to sign in. Check your email and password.';}finally{$('loginSubmit').disabled=false;}});
 function locked(message=''){
+ cancelProtocolPrint();
  setProtocolCacheAccess(false);
  generation++;stopNotes?.();stopNotes=null;uid=null;documents=[];selectedId=null;creating=false;
  if(!auth.currentUser||/blocked|revoked/i.test(message))pendingDraft=null;
