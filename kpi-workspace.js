@@ -127,10 +127,8 @@ function reviewSources(){
 function build(){
  target.classList.remove('protocol-scroll');target.classList.add('kpi-scroll');target.scrollTop=0;target.scrollLeft=0;
  root=el('section','kpi-workspace');root.dataset.kpiSection=kpiSections[section].id;
- const head=el('header','kpi-section-head'),kicker=el('span','kpi-kicker',standalone?'SHARED REPORTING':`SECTION ${section+1} OF 6`),name=el('h1','',kpiSections[section].title),identity=el('p','kpi-case-identity');head.append(kicker,name,identity);if(isReviewPage&&!standalone){const review=el('button','kpi-source-button','Review dictation');review.type='button';review.addEventListener('click',reviewSources);head.append(review);}root.append(head);
- if(caseData.importProvenance&&!standalone){const notice=el('p','kpi-section-help','Imported historical case. Source suspicion is not a confirmed diagnosis. Confirm diagnosis, admission and follow-up details; unavailable evidence remains pending. KPI inclusion can be reviewed in Patient and admission.');root.append(notice);}
+ const head=el('header','kpi-section-head'),kicker=el('span','kpi-kicker',standalone?'SHARED REPORTING':`SECTION ${section+1} OF 6`),name=el('h1','',kpiSections[section].title),identity=el('p','kpi-case-identity');if(standalone)head.append(kicker,name);else head.classList.add('kpi-case-head');head.append(identity);if(isReviewPage&&!standalone){const review=el('button','kpi-source-button','Review dictation');review.type='button';review.addEventListener('click',reviewSources);head.append(review);}root.append(head);
  if(section!==5){
-  const help=el('p','kpi-section-help',isReviewPage?'Correct a field here. Changes save to the shared case.':'Dictate the details you know. Unstated information stays pending.');root.append(help);
   const grid=el('div','kpi-fields');for(const field of kpiSections[section].fields)grid.append(fieldRow(field));root.append(grid);
   const empty=el('p','kpi-empty-section','Complete the relevant choices in earlier sections to show applicable fields.');root.append(empty);
  }else buildReport(root);

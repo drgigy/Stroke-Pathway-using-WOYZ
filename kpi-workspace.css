@@ -57,3 +57,5 @@
 .kpi-recovery{position:absolute;z-index:32;right:12px;top:calc(var(--protocol-top,64px) + 8px);border:1px solid #b57522;background:#fff3d8;color:#704214;padding:10px 12px;border-radius:8px;font:700 14px Inter,system-ui,sans-serif;box-shadow:0 4px 15px #4332181f;cursor:pointer}
 
 .protocol-dictation[hidden],.protocol-edit-status[hidden]{display:none!important;}
+
+.kpi-case-head { border:0; padding:0; margin-bottom:14px; }
