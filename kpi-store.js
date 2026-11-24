@@ -1,5 +1,7 @@
 import { doc, runTransaction, serverTimestamp } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-firestore.js';
 import { kpiFields, kpiSections, hospitalFields, kpiSource, kpiSchemaVersion } from './kpi-schema.js';
+import { identityFields } from './dictation-output.js';
+import { protocolFieldSource, protocolFieldVersion } from './protocol-fields.js';
 import { normalizeKpiFields } from './kpi-data.js';
 
 let config;
@@ -96,7 +98,8 @@ export async function saveKpiEdit(caseId, fields, sectionId, previous) {
           || existing.recordedAt !== pending.entry.recordedAt || !sameFields(existing.fields, values)) throw new Error('kpi-entry-conflict');
         return existing;
       }
-      transaction.update(ref, { [`kpiEntries.${pending.id}`]: pending.entry,
+      const identity=identityFields(values),identityUpdate=Object.keys(identity).length?{['protocolDictations.page1.'+pending.id]:{kind:'manual-edit',text:pending.entry.text,fields:identity,pageNumber:1,pageTitle:'Stroke Protocol Form',fieldSource:protocolFieldSource,fieldVersion:protocolFieldVersion,recordedAt:pending.entry.recordedAt,createdBy:context.uid,createdAt:pending.entry.createdAt}}:{};
+      transaction.update(ref, { ...identityUpdate,[`kpiEntries.${pending.id}`]: pending.entry,
         updatedBy: context.uid, updatedAt: serverTimestamp() });
       return pending.entry;
     });

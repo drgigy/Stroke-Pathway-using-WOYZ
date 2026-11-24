@@ -13,7 +13,7 @@ let expanded = false;
 let caseDictations = {};
 let disposeZoom;
 let archiveOnly=false;
-let referenceDictationContext=null;
+let referenceDictationContext=null, savedCallback=null;
 const pageTitles = protocolPages.map(page => page.title);
 const titleElements = [];
 const headingRows = [];
@@ -162,17 +162,14 @@ function renderPage() {
   updateToolbar();
   renderSavedDictations(sheet);
   const caseId = currentCase, pageNumber = currentPage + 1;
-  const setContext = isReviewPage ? setProtocolFormEditContext : setProtocolDictationContext;
-  if(archiveOnly&&referenceDictationContext&&!isReviewPage)setProtocolDictationContext(referenceDictationContext({caseId,pageNumber,title:pageTitles[currentPage]}));
-  if(!archiveOnly)setContext({ caseId, pageNumber, title: pageTitles[currentPage], imageSrc: page.src,
-    onSaved(id, entry) {
-      if (currentCase !== caseId) return;
-      const key = `page${pageNumber}`;
-      caseDictations = { ...caseDictations, [key]: { ...caseDictations[key], [id]: entry } };
-      const activeSheet = container.querySelector('.protocol-page-sheet');
-      if (activeSheet) renderSavedDictations(activeSheet);
-    }
-  });
+  const onSaved=(id,entry)=>{
+    if(currentCase!==caseId)return;
+    const key=`page${pageNumber}`;caseDictations={...caseDictations,[key]:{...caseDictations[key],[id]:entry}};
+    const activeSheet=container.querySelector('.protocol-page-sheet');if(activeSheet)renderSavedDictations(activeSheet);
+    savedCallback?.(id,entry);
+  };
+  if(referenceDictationContext&&!isReviewPage)setProtocolDictationContext({...referenceDictationContext({caseId,pageNumber,title:pageTitles[currentPage]}),onSaved});
+  else if(!archiveOnly)(isReviewPage?setProtocolFormEditContext:setProtocolDictationContext)({caseId,pageNumber,title:pageTitles[currentPage],imageSrc:page.src,onSaved});
 }
 
 function renderSavedDictations(sheet) {
@@ -182,7 +179,7 @@ function renderSavedDictations(sheet) {
 }
 
 export function showProtocolCase(target, caseId, options = {}) {
-  archiveOnly=options.readOnly===true;
+  archiveOnly=options.readOnly===true;savedCallback=options.onSaved||null;
   referenceDictationContext=typeof options.dictationContext==='function'?options.dictationContext:null;
   ensureToolbar();
   if (currentCase === caseId && container === target && target.querySelector('.protocol-page-sheet')) {
@@ -197,6 +194,7 @@ export function showProtocolCase(target, caseId, options = {}) {
     if ((protocolDictationBusy() || protocolFormEditingBusy())) { toolbar.hidden = false; return; }
     currentPage = 0; expanded = false;
   }
+  if(Number.isInteger(options.pageNumber)&&options.pageNumber>=1&&options.pageNumber<=protocolPages.length)currentPage=options.pageNumber-1;
   currentCase = caseId;
   caseDictations = options.dictations || {};
   toolbar.dataset.caseId = caseId;

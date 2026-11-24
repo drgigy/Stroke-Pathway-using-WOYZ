@@ -1,0 +1,10 @@
+import assert from 'node:assert/strict';
+import { combinedResponseSchema,validateCombinedOutput,identityFields,sameFields } from '../dictation-output.js';
+const valid={text:'Explicit synthetic facts',fields:[{id:'name',value:'Test Patient'},{id:'dm',value:'Yes'}],kpiFields:[{id:'name',value:'Test Patient'},{id:'age',value:'56'}],warnings:['Uncertain arrival time omitted']};
+const result=validateCombinedOutput(valid,1);assert.equal(result.fields.dm,'Yes');assert.equal(result.kpiFields.age,'56');assert.equal(result.kpiFields.ivtGiven,undefined);assert(result.warnings.length);
+for(const bad of [{...valid,kpiFields:undefined},{...valid,kpiFields:[{id:'not_a_field',value:'x'}]},{...valid,kpiFields:[{id:'arrivalTime',value:'8 am'}]},{...valid,kpiFields:[{id:'age',value:'56 years'}]},{...valid,fields:[{id:'not_a_pdf_field',value:'x'}]},{...valid,fields:[{id:'dm',value:'Probably'}]}])assert.throws(()=>validateCombinedOutput(bad,1));
+assert.throws(()=>validateCombinedOutput(valid,2),'PDF mappings remain bound to the selected page');
+const schema=combinedResponseSchema(1);assert(schema.required.includes('kpiFields'));assert(schema.properties.fields);assert(schema.properties.kpiFields);
+assert.deepEqual(identityFields({name:'Test',age:'56 years',uhid:'00042',diagnosis:'Ischemic Stroke'},{fromForm:true}),{name:'Test',age:'56',uhid:'00042'});
+assert.deepEqual(identityFields({age:'Unknown',uhid:''},{fromForm:true}),{uhid:''});assert(sameFields({a:'1',b:'2'},{b:'2',a:'1'}));assert(!sameFields({a:'1'},{}));
+console.log('PASS: Dual PDF/KPI contracts, source-page isolation, strict values, missing-fact omission and identity normalization.');

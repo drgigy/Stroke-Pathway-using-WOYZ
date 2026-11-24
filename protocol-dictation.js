@@ -3,6 +3,7 @@ import { configureSharedKey, getDictationKey } from './shared-key.js';
 import { doc, serverTimestamp, updateDoc, runTransaction } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-firestore.js';
 import { kpiSource, kpiSchemaVersion } from './kpi-schema.js';
 import { kpiContract, kpiResponseSchema, validateKpiFields } from './kpi-data.js';
+import { combinedResponseSchema, validateCombinedOutput, combinedInstruction, sameFields, identityFields } from './dictation-output.js';
 import { protocolReferences } from './protocol-reference.js';
 import { fieldContract, fieldResponseSchema, validateFieldOutput, protocolFieldSource, protocolFieldVersion } from './protocol-field-output.js';
 
@@ -32,6 +33,9 @@ export function configureProtocolDictation(options) {
 
 export function onProtocolDictationChange(callback) { observers.add(callback); }
 export function protocolDictationBusy() { return busy(); }
+export function protocolDictationState(){return {phase,busy:busy(),message,takeId:session?.id,stream:session?.stream};}
+export const pauseProtocolDictation=()=>pauseResume();
+export const finishProtocolDictation=()=>finish();
 export async function fillSavedProtocolDictation(id, entry) {
   if (busy() || !context || !config?.auth.currentUser || !/^[A-Za-z0-9_-]{1,128}$/.test(id) || typeof entry?.text !== 'string') return;
   const original = context, uid = config.auth.currentUser.uid;
@@ -198,10 +202,25 @@ async function finish() {
         if (existing.createdBy !== active.uid || existing.source !== kpiSource || existing.version !== kpiSchemaVersion || existing.recordedAt !== active.recordedAt || existing.text !== entry.text || (!existing.fields || Object.keys(existing.fields).length !== Object.keys(entry.fields).length || Object.entries(entry.fields).some(([id,value])=>existing.fields[id]!==value))) throw new Error('dictation-entry-conflict');
         return existing;
       }
-      transaction.update(referenceDoc,update);
+      const identity=identityFields(entry.fields),identityUpdate=Object.keys(identity).length?{['protocolDictations.page1.'+active.id]:{kind:'dictation',text:entry.text,fields:identity,pageNumber:1,pageTitle:'Stroke Protocol Form',fieldSource:protocolFieldSource,fieldVersion:protocolFieldVersion,recordedAt:entry.recordedAt,createdBy:entry.createdBy,createdAt:entry.createdAt}}:{};
+      transaction.update(referenceDoc,{...update,...identityUpdate});
       return savedEntry;
     });
-    else await updateDoc(referenceDoc,update);
+    else if(active.kind==='protocol-kpi'){
+      const kpiEntry={source:kpiSource,version:kpiSchemaVersion,kind:'dictation',sectionId:'protocolForm',sectionTitle:active.title,referencePageNumber:active.pageNumber,recordedAt:active.recordedAt,createdBy:active.uid,createdAt:entry.createdAt,text:entry.text,fields:active.output.kpiFields,warnings:active.output.warnings||[]};
+      entry.kpiFields=active.output.kpiFields;entry.warnings=active.output.warnings||[];
+      savedEntry=await runTransaction(config.db,async transaction=>{
+        const snapshot=await transaction.get(referenceDoc);
+        if(!snapshot.exists()||snapshot.data().deleted===true||snapshot.data().noteType!=='code7')throw new Error('case-unavailable');
+        if(session!==active||config.auth.currentUser?.uid!==active.uid)throw new Error('access-changed');
+        const existing=snapshot.data().protocolDictations?.['page'+active.pageNumber]?.[active.id],existingKpi=snapshot.data().kpiEntries?.[active.id];
+        if(existing||existingKpi){
+          if(!existing||!existingKpi||existing.createdBy!==active.uid||existing.recordedAt!==active.recordedAt||existing.text!==entry.text||existing.fieldSource!==protocolFieldSource||existing.fieldVersion!==protocolFieldVersion||existing.pageNumber!==active.pageNumber||!sameFields(existing.fields,entry.fields)||existingKpi.createdBy!==active.uid||existingKpi.source!==kpiSource||existingKpi.version!==kpiSchemaVersion||existingKpi.recordedAt!==active.recordedAt||existingKpi.text!==entry.text||!sameFields(existingKpi.fields,kpiEntry.fields))throw new Error('dictation-entry-conflict');
+          return existing;
+        }
+        transaction.update(referenceDoc,{[prefix]:entry,['kpiEntries.'+active.id]:kpiEntry,updatedBy:active.uid,updatedAt:serverTimestamp()});return entry;
+      });
+    }else await updateDoc(referenceDoc,update);
     if (session !== active) return;
     session = null; phase = 'saved'; message = active.output?.warnings?.length ? 'Some details need clarification: ' + active.output.warnings.join('; ') : '';
     active.onSaved?.(active.id, savedEntry);
@@ -241,6 +260,7 @@ async function transcribe(active, audio) {
     ] }],
     generationConfig: { temperature: 0, maxOutputTokens: 8192, responseMimeType: 'application/json', responseSchema: active.kind === 'kpi' ? kpiResponseSchema(active.fieldDefinitions) : fieldResponseSchema(active.pageNumber) }
   };
+  if(active.kind==='protocol-kpi'){payload.systemInstruction.parts.push({text:combinedInstruction(active.recordedAt)});payload.generationConfig.responseSchema=combinedResponseSchema(active.pageNumber);}
   for (const model of ['gemini-2.5-flash', 'gemini-flash-latest']) {
     active.abort.signal.throwIfAborted();
     const attempt = new AbortController();
@@ -264,7 +284,7 @@ async function transcribe(active, audio) {
         const warnings = Array.isArray(parsed.warnings) ? parsed.warnings.filter(v=>typeof v==='string').slice(0,20).map(v=>v.slice(0,1000)) : [];
         return {text:parsed.text.trim(),fields,warnings};
       }
-      return validateFieldOutput(parsed, active.pageNumber);
+      return active.kind==='protocol-kpi'?validateCombinedOutput(parsed,active.pageNumber):validateFieldOutput(parsed, active.pageNumber);
     } finally { clearTimeout(timeout); active.abort.signal.removeEventListener('abort', cancel); }
   }
   throw new Error('transcription-unavailable');

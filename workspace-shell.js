@@ -4,8 +4,9 @@ import { getFirestore, collection, onSnapshot, doc, runTransaction, serverTimest
 import { firebaseConfig } from './firebase-config.js';
 import { isReviewPage } from './page-mode.js';
 import { mountDeviceAccess } from './access.js';
-import { configureProtocolDictation, mountProtocolDictationControls } from './protocol-dictation.js';
+import { configureProtocolDictation, mountProtocolDictationControls, onProtocolDictationChange } from './protocol-dictation.js';
 import { mountDashboardAccess } from './dashboard-access.js';
+import { mountDictationPanel } from './dictation-panel.js';
 import { mountPwa, setProtocolCacheAccess } from './pwa.js';
 import { configureKpiWorkspace, ingestKpiSnapshot, showProtocolCase, showKpiReport, hideProtocolViewer, kpiWorkspaceBusy } from './kpi-workspace.js';
 import { currentKpiValues, currentMonthlyValues, isKpiReportingCase } from './kpi-data.js';
@@ -16,7 +17,7 @@ const app=initializeApp(firebaseConfig),auth=getAuth(app),db=getFirestore(app);
 configureKpiWorkspace({auth,db});
 if(!isReviewPage)configureProtocolDictation({auth,db});
 const $=id=>document.getElementById(id),shell=$('appShell'),screen=$('screen'),panel=$('reviewPanel'),scroller=$('mainScroll');
-if(!isReviewPage&&$('dictationTopbar'))mountProtocolDictationControls($('dictationTopbar'));
+if(!isReviewPage&&$('dictationTopbar')){mountProtocolDictationControls($('dictationTopbar'));mountDictationPanel($('dictationTopbar'));}
 let pendingDraft=null,creating=false,accessDetails=null;
 let documents=[],stopNotes,uid=null,generation=0,view='home',selectedId=null,query='',rangeMode='all',from='',to='',ivtOnly=false,evtOnly=false,analysisMode='',indicator=1;
 const india=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Kolkata',year:'numeric',month:'2-digit',day:'2-digit'});
@@ -36,8 +37,8 @@ const elapsed=(r,start,end)=>{if(!r[start]||!r[end])return null;const ms=new Dat
 const minutes=value=>value===null?'Pending':`${Number(value.toFixed(1))} min`;
 const monthly=m=>currentMonthlyValues(documents.find(d=>d.id==='kpi-month-'+m)||{});
 const report=m=>calculateKpis(records().filter(r=>isKpiReportingCase(r._data)&&episodeDate(r).slice(0,7)===m),monthly(m));
-function message(text){let el=$('navigationMessage');if(!el){el=node('p','review-top-message');el.id='navigationMessage';el.setAttribute('role','status');shell.querySelector('.topbar').after(el);}el.textContent=text;}
-function canNavigate(){if(kpiWorkspaceBusy()||creating){message('Finish saving or retry the pending change before leaving this view.');return false;}$('navigationMessage')?.remove();return true;}
+function message(text,kind='info'){let el=$('navigationMessage');if(!el){el=node('p','review-top-message');el.id='navigationMessage';el.setAttribute('role','status');shell.querySelector('.topbar').after(el);}el.dataset.kind=kind;el.textContent=text;}
+function canNavigate(){if(kpiWorkspaceBusy()||creating){message('Finish saving or retry the pending change before leaving this view.','busy');return false;}$('navigationMessage')?.remove();return true;}
 function navigate(next){if(!canNavigate())return;view=next;selectedId=null;analysisMode='';query='';if(next==='dashboard')rangeMode='month';hideProtocolViewer();window.scrollTo(0,0);render();}
 function openCase(id){if(!canNavigate())return;const r=records().find(r=>r.id===id);if(!r)return;selectedId=id;hideProtocolViewer();window.scrollTo(0,0);render();}
 function title(text,sub=''){const head=node('div');head.append(node('h2','review-title',text));if(sub)head.append(node('p','review-intro',sub));return head;}
@@ -72,9 +73,9 @@ async function createCase(){
  finally{creating=false;if(uid===author&&current===generation)render();}
 }
 function home(){
- if(!isReviewPage){const start=button(pendingDraft?'RETRY NEW CODE 7':'START NEW CODE 7',createCase,'primary-cta');start.dataset.startCode7='';start.disabled=creating;screen.append(start);}
+ if(!isReviewPage){const start=button(pendingDraft?'Retry new Code 7':'Start New Code 7',createCase,'primary-cta');start.dataset.startCode7='';start.disabled=creating;screen.append(start);}
  const all=records();
- if(all.length)screen.append(button(isReviewPage?'REVIEW LATEST CASE':'OPEN LATEST CASE',()=>openCase(all[0].id),'primary-cta'));
+ if(all.length&&isReviewPage)screen.append(button('REVIEW LATEST CASE',()=>openCase(all[0].id),'primary-cta'));
  screen.append(title('Recent cases'));for(const r of all.slice(0,8))screen.append(card(r));if(!all.length)screen.append(empty('No shared cases have been recorded yet.'));
 }
 function cases(){screen.append(title('Cases'),search(),filters());const list=filtered();for(const r of list)screen.append(card(r));if(!list.length)screen.append(empty('No cases match these filters.'));}
@@ -101,6 +102,8 @@ function settings(){const dialog=node('dialog','review-settings'),head=node('hea
 function fitReviewPanel(){if(!panel.hidden){const bottom=shell.querySelector('.bottom-nav').getBoundingClientRect().height;panel.style.height=Math.max(220,window.innerHeight-panel.getBoundingClientRect().top-bottom-12)+'px';}}
 window.addEventListener('resize',fitReviewPanel);
 new ResizeObserver(fitReviewPanel).observe(shell.querySelector('.topbar'));
+function clearBusyMessage(){const notice=$('navigationMessage');if(notice?.dataset.kind==='busy'&&!creating&&!kpiWorkspaceBusy()){notice.remove();fitReviewPanel();}}
+onProtocolDictationChange(clearBusyMessage);window.addEventListener('case-workspace-state',clearBusyMessage);
 function recoveryNotice(){
  const pending=document.querySelector('.kpi-recovery');let notice=$('recoveryNotice');
  if(!pending||!panel.hidden){notice?.remove();return;}
@@ -126,6 +129,7 @@ function locked(message=''){
  screen.replaceChildren();scroller.replaceChildren();$('recoveryNotice')?.remove();for(const d of document.querySelectorAll('dialog[open]'))d.close();
 }
 function granted(user,details){
+ if(uid&&uid!==user.uid)hideProtocolViewer({reset:true,clearRecords:true,discardPending:true});
  setProtocolCacheAccess(true);
  if(pendingDraft&&pendingDraft.uid!==user.uid)pendingDraft=null;
  accessDetails=details;uid=user.uid;const current=++generation;shell.hidden=false;shell.classList.add('authenticated');$('loginScreen').hidden=true;$('syncStatus').textContent='Connecting';view='home';selectedId=null;stopNotes?.();
