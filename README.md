@@ -11,6 +11,12 @@ Production: https://code7.codestroke.in/
 - `dashboard.html`: the same review workflow for approved email/password accounts.
 - `master-admin.html`: drgigy-only account/device approvals and shared Gemini key management.
 
+## Admin layout
+
+The review entry points use the uploaded Stroke handover's visual layout and original stylesheet, preserved as `admin-reference.css`. A full-width Rajagiri Stroke Code header and fixed bottom navigation replace the former notes sidebar. Home shows shared-case counts and recent cases; Cases provides search and date/treatment filters; Dashboard provides a horizontally scrollable timings table and print view; KPI opens all 24 indicators and shared monthly inputs without requiring a selected patient; Analysis provides KPI trends and individual recorded-event timelines; More contains Settings and Logout. Selecting a case opens the existing six-section editable review workspace. Neither review entry point offers recording, user-workspace links, installation controls, or device management. The user dictation page is unchanged by this layout update.
+
+Source styling is reused, not the handover's Firebase configuration, PIN, records or application initialization. The current project's shared data model, calculation code and approval boundaries are retained.
+
 ## Six sections
 
 1. Patient and admission: identity and the episode/diagnosis fields needed to determine KPI populations.
