@@ -1,9 +1,9 @@
-import { currentFieldValues } from './protocol-field-output.js';
+import { currentKpiValues } from './kpi-data.js';
 export function protocolPatientData(data) {
   const patient={...(data.patientData||{})};
   if(data.noteType!=='code7')return patient;
-  const fields=currentFieldValues(data.protocolDictations?.page1,1);
-  for(const key of ['name','age','uhid'])if(Object.hasOwn(fields,key))patient[key]=fields[key].value.trim();
+  const fields=currentKpiValues(data);
+  for(const key of ['name','age','uhid'])if(Object.hasOwn(fields,key))patient[key]=fields[key].trim();
   return patient;
 }
 export function protocolPatientMeta(data) {

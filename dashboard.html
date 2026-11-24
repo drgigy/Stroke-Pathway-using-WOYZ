@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#205e50">
 <link rel="manifest" href="./manifest.webmanifest">
 <link rel="apple-touch-icon" sizes="180x180" href="./icons/apple-touch-icon.png">
-<title>WOYZ Admin</title>
+<title>WOYZ Stroke · KPI review</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
 <style>
@@ -211,6 +211,7 @@
   }
 </style>
 <link rel="stylesheet" href="./shared.css">
+<link rel="stylesheet" href="./kpi-workspace.css">
 </head>
 <body data-page="admin">
 <section class="login-screen" id="loginScreen">
@@ -229,7 +230,7 @@
 
 <div class="app" id="appShell">
   <aside class="sidebar">
-    <div class="admin-brand"><span class="admin-brand-pill"><span class="admin-brand-dot"></span><span>WOYZ</span></span><span class="admin-brand-word">Notes</span></div>
+    <div class="admin-brand"><span class="admin-brand-pill"><span class="admin-brand-dot"></span><span>WOYZ</span></span><span class="admin-brand-word">Stroke</span></div>
     <div class="visit-toggle" id="adminVisitToggle" aria-label="Visit type">
       <button class="visit-toggle-btn active" data-admin-visit-type="OP">OP</button>
       <button class="visit-toggle-btn" data-admin-visit-type="IP">IP</button>
@@ -286,7 +287,7 @@ import { getFirestore, collection, collectionGroup, doc, getDoc, onSnapshot, ser
 import { firebaseConfig } from './firebase-config.js';
 import { mountDashboardAccess } from './dashboard-access.js';
 import { mountSidebarControls } from './sidebar-controls.js';
-import { showProtocolCase, hideProtocolViewer } from './protocol-viewer.js';
+import { showProtocolCase, hideProtocolViewer, configureKpiWorkspace, ingestKpiSnapshot } from './kpi-workspace.js';
 import { isReviewPage } from './page-mode.js';
 import { configureProtocolFormEditing } from './protocol-form-editor.js';
 import { protocolPatientData, protocolPatientMeta } from './protocol-patient.js';
@@ -299,6 +300,7 @@ const authPersistenceReady = setPersistence(auth, browserLocalPersistence).catch
 });
 const db = getFirestore(app);
 configureProtocolFormEditing({auth,db});
+configureKpiWorkspace({auth,db});
 
 const loginScreen = document.getElementById('loginScreen');
 const loginForm = document.getElementById('loginForm');
@@ -1070,6 +1072,11 @@ function renderAdminAllEntries(seedNote){
   `;
 }
 
+window.addEventListener('kpi-case-recovered',event=>{
+ const note=allNotes.find(note=>note.id===event.detail.caseId);if(!note)return;
+ selectedNoteId=note.id;selectedUserId=note.userId;selectedTimelineEntryId='all';renderEntries();
+});
+
 function renderSelectedNote(){
   hideProtocolViewer();
   const selectedUser = users.find(user => user.uid === selectedUserId);
@@ -1094,7 +1101,7 @@ function renderSelectedNote(){
     dischargeBtn.style.display = 'none';
     hideAdminPrintMenu();
     hideAdminTimelineMenu();
-    showProtocolCase(mainScroll, note.id, {dictations:note.data.protocolDictations,showDictations:true});
+    showProtocolCase(mainScroll, note.id, {data:note.data});
     return;
   }
   const timelineNotes = orderedPatientTimelineNotes(note);
@@ -1188,7 +1195,8 @@ function subscribeToAllNotes(){
   if (notesUnsubscribe) notesUnsubscribe();
   notesUnsubscribe = onSnapshot(collection(db,'workspaces','stroke','notes'), snapshot => {
     if (!currentAdminUid) return;
-    allNotes = snapshot.docs.map(doc => {
+    ingestKpiSnapshot(snapshot);
+    allNotes = snapshot.docs.filter(doc=>doc.data().noteType !== 'kpi-monthly').map(doc => {
       const userId = doc.data().createdBy || 'unknown';
       return {
         id:doc.id,
@@ -1239,7 +1247,7 @@ mountDashboardAccess({ auth, db,
     notesUnsubscribe?.(); profilesUnsubscribe?.(); clearScopedSubscriptions();
     notesUnsubscribe = null; profilesUnsubscribe = null;
     users = []; selectedUserId = null; selectedNoteId = null; selectedTimelineEntryId = 'all';
-    hideProtocolViewer({reset:true});
+    hideProtocolViewer({reset:true,clearRecords:true,allowRecovery:/offline|reconnect|waiting|confirm|verif/i.test(message),discardPending:/blocked|revoked/i.test(message)});
     appShell.classList.remove('authenticated');
     loginScreen.classList.remove('hidden');
     for (const element of [mainScroll, entryList, userRail, topbarTitle, topbarMeta, adminTimelineMenu]) element.replaceChildren();

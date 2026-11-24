@@ -1680,7 +1680,7 @@
     .privacy-row{ margin:8px 0 0; }
     .record-title{ font-size:0; }
     .record-title::after{
-      content:'WOYZ Notes';
+      content:'WOYZ Stroke';
       font-size:16px;
       font-weight:900;
       letter-spacing:.2px;
@@ -2118,12 +2118,13 @@
 </style>
 <link rel="stylesheet" href="./shared.css">
 <style>#emailWrap{display:none!important}</style>
+<link rel="stylesheet" href="./kpi-workspace.css">
 </head>
 <body>
 
 <section class="login-screen" id="loginScreen">
   <form class="login-card" id="loginForm">
-    <div class="login-brand"><span class="login-brand-pill"><span class="login-brand-dot"></span>WOYZ</span><span>Notes</span></div>
+    <div class="login-brand"><span class="login-brand-pill"><span class="login-brand-dot"></span>WOYZ</span><span>Stroke</span></div>
     <h1 class="login-title">Sign in</h1>
     <label class="login-label" for="loginEmail">Email address</label>
     <input class="login-input" id="loginEmail" type="email" autocomplete="username" required>
@@ -2532,7 +2533,7 @@ import { getFirestore, collection, query, where, onSnapshot, addDoc, deleteDoc, 
 import { firebaseConfig } from './firebase-config.js';
 import { mountDeviceAccess } from './access.js';
 import { mountSidebarControls } from './sidebar-controls.js';
-import { showProtocolCase, hideProtocolViewer } from './protocol-viewer.js';
+import { showProtocolCase, hideProtocolViewer, configureKpiWorkspace, ingestKpiSnapshot } from './kpi-workspace.js';
 import { configureProtocolDictation } from './protocol-dictation.js';
 import { protocolPatientData, protocolPatientMeta } from './protocol-patient.js';
 
@@ -2543,6 +2544,7 @@ const authPersistenceReady = setPersistence(auth, browserLocalPersistence).catch
 });
 const db = getFirestore(firebaseApp);
 configureProtocolDictation({auth,db});
+configureKpiWorkspace({auth,db});
 
 const sampleRecords = [];
 
@@ -4090,7 +4092,7 @@ function noteMatchesSelectedVisitType(note){
 }
 
 function noteMatchesSelectedScope(note, selectedDate = dateInputValue(selectedVisitDate)){
-  return !note?.isDeleted;
+  return !note?.isDeleted && note.noteType !== 'kpi-monthly';
 }
 
 function updateVisitToggle(){
@@ -4225,6 +4227,7 @@ function subscribeToSelectedDate(){
   owners.forEach(ownerUid => {
     const notesQuery = collection(db,'workspaces','stroke','notes');
     const unsubscribe = onSnapshot(notesQuery,async snapshot => {
+      ingestKpiSnapshot(snapshot);
       receivedOwners += ownerRecords.has(ownerUid) ? 0 : 1;
       ownerRecords.set(ownerUid, snapshot.docs.map(docSnap => noteFromSnapshot(docSnap, ownerUid)));
       await applyRecords();
@@ -4256,7 +4259,8 @@ function subscribeToAllRecords(){
   const owners = ['shared'];
   owners.forEach(ownerUid => {
     const unsubscribe = onSnapshot(collection(db,'workspaces','stroke','notes'), snapshot => {
-      allOwnerRecords.set(ownerUid, snapshot.docs.map(docSnap => applyLocalDirtyRecord(noteFromSnapshot(docSnap, ownerUid))));
+      ingestKpiSnapshot(snapshot);
+      allOwnerRecords.set(ownerUid, snapshot.docs.filter(docSnap=>docSnap.data().noteType !== 'kpi-monthly').map(docSnap => applyLocalDirtyRecord(noteFromSnapshot(docSnap, ownerUid))));
       allRecords = Array.from(allOwnerRecords.values()).flat();
       if (searchScope === 'all'){
         renderEntries();
@@ -4414,7 +4418,7 @@ function updateRecordSearchPlaceholder(){
 }
 
 function applyDeviceAccess(user, details){
-  hideProtocolViewer({reset:true});
+  hideProtocolViewer({reset:true,clearRecords:true,allowRecovery:/offline|reconnect|waiting|confirm|verif/i.test(details?.accessLockReason||''),discardPending:/blocked|revoked/i.test(details?.accessLockReason||'')});
   currentUser = user;
   deviceDetails = details || null;
   if (userProfileUnsubscribe) userProfileUnsubscribe();
@@ -5596,6 +5600,14 @@ function renderVoiceDraftTemplate(draft){
   recordSub.textContent = draft.recording ? 'Listening...' : 'Voice draft open';
 }
 
+window.addEventListener('kpi-case-recovered',event=>{
+ const index=records.findIndex(record=>record.firestoreId===event.detail.caseId);
+ if(index<0)return;
+ activeIndex=index;pendingSelectId=null;mobileHomeDefaultPending=false;mobileHomeDefaultActive=false;
+ selectedOpTimelineKey=null;selectedOpTimelineEntryId='all';selectedIpTimelineKey=null;
+ renderEntries();
+});
+
 function renderVoiceWorkspace(){
   const draft = records[activeIndex];
   setMobileBottomActionsVisible(true);
@@ -5613,7 +5625,7 @@ function renderGeneratedNote(draft){
     setMobileBottomActionsVisible(false);
     saveDraftBtn.classList.remove('visible');
     copyBtn.style.display = 'none';
-    showProtocolCase(mainScroll, draft.firestoreId, {dictations:draft.protocolDictations});
+    showProtocolCase(mainScroll, draft.firestoreId, {data:draft});
     return;
   }
   hideProtocolViewer();
@@ -7286,7 +7298,7 @@ async function createManualDraft(options = {}){
     stopMediaTracks();
     const now = new Date();
     const createdAt = now.toLocaleDateString('en-GB', {day:'2-digit', month:'short', year:'numeric'}) + ', ' + now.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
-    const selectedDateString = dateInputValue(code7 ? now : selectedVisitDate);
+    const selectedDateString = code7 ? new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Kolkata',year:'numeric',month:'2-digit',day:'2-digit'}).format(now) : dateInputValue(selectedVisitDate);
     const newDraftRef = doc(userNotesCollection());
     const draftData = {
       heading: code7 ? 'Code 7 draft' : 'Manual note draft',
@@ -7300,6 +7312,7 @@ async function createManualDraft(options = {}){
       saved:false,
       kind:'generated',
       noteType:code7 ? 'code7' : 'manual',
+      ...(code7 ? {kpiWorkflowVersion:1} : {}),
       selectedMode:code7 ? 'Code 7' : 'Manual note',
       status:code7 ? 'Draft' : 'Type your note',
       transcription:code7 ? '' : MANUAL_NOTE_TEMPLATE,

@@ -28,7 +28,7 @@ export function mountDeviceAccess({ auth, db, onAccess }) {
   let approved = false;
   const lock = message => {
     approved = false;
-    onAccess(null);
+    onAccess(null,{accessLockReason:message});
     screen.classList.remove('hidden');
     status.textContent = message;
   };

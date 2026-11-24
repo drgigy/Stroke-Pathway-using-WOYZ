@@ -12,6 +12,7 @@ let currentPage = 0;
 let expanded = false;
 let caseDictations = {};
 let disposeZoom;
+let archiveOnly=false;
 const pageTitles = protocolPages.map(page => page.title);
 const titleElements = [];
 const headingRows = [];
@@ -121,7 +122,7 @@ function updateToolbar() {
     title.textContent = pageTitles[currentPage] || `Page ${currentPage + 1}`;
     title.hidden = false;
   }
-  for (const row of headingRows) row.hidden = false;
+  for (const row of headingRows) { row.hidden = false; for(const control of row.querySelectorAll('.protocol-dictation,.protocol-edit-status'))control.hidden=archiveOnly; }
   for (const { button, direction } of stepButtons) button.disabled = (protocolDictationBusy() || protocolFormEditingBusy()) || (direction === -1 ? currentPage === 0 : currentPage === protocolPages.length - 1);
   for (const row of headingRows) row.classList.toggle('protocol-dictation-active', protocolDictationBusy());
   toolbar.querySelector('#protocolPageButtons').hidden = !expanded;
@@ -161,7 +162,7 @@ function renderPage() {
   renderSavedDictations(sheet);
   const caseId = currentCase, pageNumber = currentPage + 1;
   const setContext = isReviewPage ? setProtocolFormEditContext : setProtocolDictationContext;
-  setContext({ caseId, pageNumber, title: pageTitles[currentPage], imageSrc: page.src,
+  if(!archiveOnly)setContext({ caseId, pageNumber, title: pageTitles[currentPage], imageSrc: page.src,
     onSaved(id, entry) {
       if (currentCase !== caseId) return;
       const key = `page${pageNumber}`;
@@ -174,11 +175,12 @@ function renderPage() {
 
 function renderSavedDictations(sheet) {
   sheet.querySelector('.protocol-saved-dictations')?.remove();
-  renderFilledProtocolForm(sheet, currentPage + 1, caseDictations[`page${currentPage + 1}`]);
+  renderFilledProtocolForm(sheet, currentPage + 1, caseDictations[`page${currentPage + 1}`],{readOnly:archiveOnly});
 
 }
 
 export function showProtocolCase(target, caseId, options = {}) {
+  archiveOnly=options.readOnly===true;
   ensureToolbar();
   if (currentCase === caseId && container === target && target.querySelector('.protocol-page-sheet')) {
     toolbar.hidden = false;

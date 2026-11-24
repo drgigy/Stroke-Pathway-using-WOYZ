@@ -1,0 +1,16 @@
+import assert from 'node:assert/strict';
+import { kpiFields,kpiSections,kpiSource,kpiSchemaVersion,hospitalFields } from '../kpi-schema.js';
+import { validateKpiFields,currentKpiValues,currentMonthlyValues,kpiResponseSchema } from '../kpi-data.js';
+import { protocolFieldSource,protocolFieldVersion } from '../protocol-fields.js';
+const take=(fields,extra={})=>({source:kpiSource,version:kpiSchemaVersion,kind:'dictation',text:'Synthetic source only',recordedAt:'2026-11-24T08:00:00+05:30',fields,...extra});
+assert.deepEqual(validateKpiFields([{id:'uhid',value:'000123'},{id:'acuteStroke',value:'yes'}]),{uhid:'000123',acuteStroke:'Yes'});
+for(const fields of [[{id:'unknown',value:'x'}],[{id:'name',value:'A'},{id:'name',value:'B'}],[{id:'name',value:12}],[{id:'age',value:'131'}],[{id:'medicationErrors',value:'0.5'}],[{id:'mrs90Days',value:'7'}],[{id:'arrivalTime',value:'2026-11-24T08:00:00'}],[{id:'arrivalTime',value:'2026-02-30T08:00:00+05:30'}],[{id:'arrivalTime',value:'8 AM'}],[{id:'acuteStroke',value:'probably'}]])assert.throws(()=>validateKpiFields(fields));
+assert.throws(()=>validateKpiFields([{id:'ivtGiven',value:'Yes'}],kpiSections[0].fields),'Cross-section outputs are rejected');
+assert.deepEqual(validateKpiFields([{id:'name',value:''}],kpiFields,{allowEmpty:true}),{name:''});
+assert.throws(()=>validateKpiFields([{id:'name',value:''}]));
+const original={patientData:{name:'NIL',uhid:'NIL'},protocolDictations:{page1:{legacy:{text:'Legacy full text',pageNumber:1,fieldSource:protocolFieldSource,fieldVersion:protocolFieldVersion,fields:{name:'Legacy patient',uhid:'001',dm:'Yes'}}}},kpiEntries:{a:take({age:'56',ivtGiven:'No'}),b:take({name:'Corrected',uhid:''},{kind:'manual-edit',recordedAt:'2026-11-24T08:01:00+05:30'}),c:take({name:'Wrong schema'},{source:'other-source'})}};
+const current=currentKpiValues(original);assert.equal(current.name,'Corrected');assert.equal(current.uhid,'');assert.equal(current.age,'56');assert.equal(current.ivtGiven,'No');assert(!Object.hasOwn(current,'dm'));assert.equal(original.protocolDictations.page1.legacy.text,'Legacy full text');
+assert.deepEqual(currentMonthlyValues({kpiMonthlyEntries:{a:take({medicationOpportunities:'0'})}}),{medicationOpportunities:'0'});
+assert.throws(()=>validateKpiFields([{id:'age',value:'3'}],hospitalFields));
+assert(kpiResponseSchema().properties.warnings);
+console.log('PASS: KPI field contracts, date/type validation, section isolation, source/version isolation, leading-zero UHID, manual clears, legacy identity-only fallback and monthly zero.');
