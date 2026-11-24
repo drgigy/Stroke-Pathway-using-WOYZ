@@ -74,7 +74,7 @@ async function createCase(){
  finally{creating=false;if(uid===author&&current===generation)render();}
 }
 function home(){
- if(!isReviewPage){const start=button(pendingDraft?'Retry new Code 7':'Start New Code 7',createCase,'primary-cta');start.dataset.startCode7='';start.disabled=creating;screen.append(start);}
+ if(!isReviewPage){const start=button(pendingDraft?'Retry new Code 7':'Start New Code 7',createCase,'primary-cta');start.dataset.startCode7='';start.disabled=creating;screen.append(start);return;}
  const all=records();
  if(all.length&&isReviewPage)screen.append(button('REVIEW LATEST CASE',()=>openCase(all[0].id),'primary-cta'));
  screen.append(title('Recent cases'));for(const r of all.slice(0,8))screen.append(card(r));if(!all.length)screen.append(empty('No shared cases have been recorded yet.'));

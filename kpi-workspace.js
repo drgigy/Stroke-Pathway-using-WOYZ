@@ -6,7 +6,7 @@ import { calculateKpis } from './kpi-calculations.js';
 import { configureKpiStore, saveKpiEdit, saveKpiMonthly } from './kpi-store.js';
 import { mountProtocolDictationControls, setProtocolDictationContext, protocolDictationBusy, onProtocolDictationChange, cancelProtocolDictation, parkProtocolDictation, restoreProtocolDictation } from './protocol-dictation.js';
 import { protocolFormEditingBusy, configureProtocolFormEditing, onProtocolFormEditChange, parkProtocolFormEditing, restoreProtocolFormEditing } from './protocol-form-editor.js';
-import { showProtocolCase as showArchive, hideProtocolViewer as hideArchive } from './protocol-viewer.js';
+import { showProtocolCase as showArchive, hideProtocolViewer as hideArchive, toggleProtocolPages } from './protocol-viewer.js';
 
 const caseSections=kpiSections.filter(section=>section.id!=='kpiResults');
 let standalone=false, parameterHome=false, caseTabs;
@@ -60,8 +60,10 @@ export function ingestKpiSnapshot(snapshot){
 function ensureToolbar(){
  if(rows.length)return;
  const topbar=document.querySelector('.main-topbar'),mobile=topbar.querySelector('.mobile-visit-row');
- caseTabs=el('nav','case-workspace-tabs');caseTabs.setAttribute('role','tablist');caseTabs.setAttribute('aria-label','Case workspace');
- for(const [form,label]of [[true,'Stroke Protocol Form'],[false,'Other Parameters']]){const button=el('button','',label);button.type='button';button.dataset.caseMode=form?'form':'parameters';button.setAttribute('role','tab');button.setAttribute('aria-controls','mainScroll');button.addEventListener('click',()=>switchCaseMode(form));caseTabs.append(button);}
+ caseTabs=el('div','case-workspace-tabs');caseTabs.setAttribute('role','group');caseTabs.setAttribute('aria-label','Case workspace');
+ const modes=el('div','case-mode-tabs');modes.setAttribute('role','tablist');modes.setAttribute('aria-label','Case content');caseTabs.append(modes);
+ for(const [form,label]of [[true,isReviewPage?'Stroke Protocol Form':'Stroke pathway'],[false,isReviewPage?'Other Parameters':'KPI parameters']]){const button=el('button','',label);button.type='button';button.dataset.caseMode=form?'form':'parameters';button.setAttribute('role','tab');button.setAttribute('aria-controls','mainScroll');button.addEventListener('click',()=>switchCaseMode(form));modes.append(button);}
+ if(!isReviewPage){caseTabs.classList.add('case-workspace-tabs-user');const pages=el('button','case-pages-trigger','Pages');pages.type='button';pages.dataset.protocolPagesTrigger='';pages.setAttribute('aria-expanded','false');pages.addEventListener('click',()=>{if(busy())return;if(!archive)switchCaseMode(true);toggleProtocolPages();});caseTabs.append(pages);}
  topbar.before(caseTabs);
  for(const [parent,suffix] of [[topbar,mobile?'desktop':'primary'],...(mobile?[[mobile,'mobile']]:[])]){
   const row=el('div','protocol-heading-row protocol-heading-'+suffix+' kpi-heading');
@@ -76,13 +78,13 @@ function ensureToolbar(){
  picker=el('nav','kpi-section-picker');picker.setAttribute('aria-label','KPI sections');picker.hidden=true;
  caseSections.forEach((s,i)=>{const button=el('button','',`${i+1}. ${s.title}`);button.type='button';button.dataset.section=s.id;button.addEventListener('click',()=>changeSection(i));picker.append(button);});
  topbar.parentElement.classList.add('protocol-viewer-host');topbar.parentElement.append(picker);
- const position=()=>topbar.parentElement.style.setProperty('--protocol-top',(topbar.getBoundingClientRect().bottom-topbar.parentElement.getBoundingClientRect().top)+'px');new ResizeObserver(position).observe(topbar);new ResizeObserver(position).observe(caseTabs);position();
+ const position=()=>{const anchor=topbar.hidden?caseTabs:topbar;topbar.parentElement.style.setProperty('--protocol-top',(anchor.getBoundingClientRect().bottom-topbar.parentElement.getBoundingClientRect().top)+'px');};new ResizeObserver(position).observe(topbar);new ResizeObserver(position).observe(caseTabs);position();
  document.addEventListener('pointerdown',e=>{if(!picker.hidden&&!picker.contains(e.target)&&!e.target.closest('.kpi-title'))picker.hidden=true;});
  document.addEventListener('keydown',e=>{if(e.key==='Escape')picker.hidden=true;});
 }
 function updateNavigation(){
- const topbar=document.querySelector('.main-topbar');if(topbar)topbar.hidden=active&&!standalone&&!archive&&parameterHome;
- if(caseTabs){caseTabs.hidden=!active||standalone;for(const button of caseTabs.children){const selected=(button.dataset.caseMode==='form')===archive;button.setAttribute('aria-selected',String(selected));button.disabled=busy();}}
+ const topbar=document.querySelector('.main-topbar');if(topbar)topbar.hidden=active&&!standalone&&((!isReviewPage&&archive)||(!archive&&parameterHome));
+ if(caseTabs){caseTabs.hidden=!active||standalone;for(const button of caseTabs.querySelectorAll('[data-case-mode]')){const selected=(button.dataset.caseMode==='form')===archive;button.setAttribute('aria-selected',String(selected));button.disabled=busy();}const pages=caseTabs.querySelector('[data-protocol-pages-trigger]');if(pages)pages.disabled=busy();}
  for(const {row,prev,title,next}of rows){row.hidden=!active||archive||parameterHome;const mic=row.querySelector('.protocol-dictation');if(mic)mic.hidden=standalone;title.textContent=parameterHome?'Other Parameters':['Patient','Assessment','IVT / EVT','Complications','Follow-up','KPIs'][section];title.title=kpiSections[section].title;title.setAttribute('aria-label','Choose section: '+kpiSections[section].title);title.disabled=busy()||standalone||parameterHome;prev.hidden=parameterHome;next.hidden=parameterHome;prev.disabled=busy()||standalone||section===0;next.disabled=busy()||standalone||section>=caseSections.length-1;row.classList.toggle('protocol-dictation-active',protocolDictationBusy()&&!document.getElementById('dictationTopbar'));}
  if(picker)for(const b of picker.children){b.disabled=busy();b.setAttribute('aria-current',b.dataset.section===kpiSections[section].id?'step':'false');}
 }

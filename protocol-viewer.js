@@ -62,7 +62,7 @@ function ensureToolbar() {
       currentPage = index;
       expanded = false;
       renderPage();
-      toggle.focus({ preventScroll: true });
+      (document.querySelector('[data-protocol-pages-trigger]')||toggle).focus({ preventScroll: true });
     });
     pages.append(button);
   }
@@ -80,12 +80,12 @@ function ensureToolbar() {
     if (event.key === 'Escape' && expanded) {
       expanded = false;
       updateToolbar();
-      toggle.focus({ preventScroll: true });
+      (document.querySelector('[data-protocol-pages-trigger]')||toggle).focus({ preventScroll: true });
       event.preventDefault();
     }
   });
   document.addEventListener('pointerdown', event => {
-    if (expanded && !toolbar.hidden && !toolbar.contains(event.target)) {
+    if (expanded && !toolbar.hidden && !toolbar.contains(event.target)&&!event.target.closest('[data-protocol-pages-trigger]')) {
       expanded = false;
       updateToolbar();
     }
@@ -111,7 +111,7 @@ function ensureToolbar() {
   }
   topbar.parentElement.classList.add('protocol-viewer-host');
   topbar.parentElement.append(toolbar);
-  const positionPicker = () => topbar.parentElement.style.setProperty('--protocol-top', `${topbar.getBoundingClientRect().bottom-topbar.parentElement.getBoundingClientRect().top}px`);
+  const positionPicker=()=>{const anchor=topbar.hidden?topbar.parentElement.querySelector('.case-workspace-tabs'):topbar;if(anchor)topbar.parentElement.style.setProperty('--protocol-top',`${anchor.getBoundingClientRect().bottom-topbar.parentElement.getBoundingClientRect().top}px`);};
   new ResizeObserver(positionPicker).observe(topbar);
   positionPicker();
   onProtocolDictationChange(() => { if (!toolbar.hidden) updateToolbar(); });
@@ -127,7 +127,8 @@ function updateToolbar() {
   for (const { button, direction } of stepButtons) button.disabled = (protocolDictationBusy() || protocolFormEditingBusy()) || (direction === -1 ? currentPage === 0 : currentPage === protocolPages.length - 1);
   for (const row of headingRows) row.classList.toggle('protocol-dictation-active', protocolDictationBusy()&&!document.getElementById('dictationTopbar'));
   toolbar.querySelector('#protocolPageButtons').hidden = !expanded;
-  const toggle = toolbar.querySelector('#protocolExpandBtn');
+  const toggle = toolbar.querySelector('#protocolExpandBtn'),external=document.querySelector('[data-protocol-pages-trigger]');
+  toggle.hidden=!isReviewPage&&!!external;if(external){external.setAttribute('aria-expanded',String(expanded));external.setAttribute('aria-controls','protocolPageButtons');}
   toggle.textContent = expanded ? '\u00d7' : String(currentPage + 1);
   toggle.title = expanded ? 'Close page picker' : `Choose page (${currentPage + 1} of ${protocolPages.length})`;
   toggle.setAttribute('aria-label', toggle.title);
@@ -207,9 +208,14 @@ export function showProtocolCase(target, caseId, options = {}) {
 export function hideProtocolViewer({ reset = false } = {}) {
   if (reset) { disposeZoom?.(); disposeZoom = null; cancelProtocolFormEditing(); cancelProtocolDictation(); caseDictations = {}; referenceDictationContext=null; }
   if (toolbar) toolbar.hidden = true;
-  expanded = false;
+  expanded = false;document.querySelector('[data-protocol-pages-trigger]')?.setAttribute('aria-expanded','false');
   for (const title of titleElements) title.hidden = true;
   for (const row of headingRows) row.hidden = true;
   container?.classList.remove('protocol-scroll');
   if (reset) { currentCase = null; currentPage = 0; expanded = false; }
+}
+
+export function toggleProtocolPages(){
+ if(!toolbar||toolbar.hidden||protocolDictationBusy()||protocolFormEditingBusy())return;
+ expanded=!expanded;updateToolbar();if(expanded)toolbar.querySelector('[aria-current="page"]')?.focus({preventScroll:true});
 }
