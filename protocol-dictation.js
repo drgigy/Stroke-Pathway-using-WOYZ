@@ -180,7 +180,7 @@ async function finish() {
     }
     if (session !== active || config.auth.currentUser?.uid !== active.uid) return;
     phase = 'saving'; render();
-    const entry = { text:active.text, fields:active.output.fields, ...(active.kind === 'kpi' ? {source:kpiSource,version:kpiSchemaVersion,sectionId:active.sectionId,sectionTitle:active.title,kind:'dictation',warnings:active.output.warnings||[]} : {fieldSource:protocolFieldSource,fieldVersion:protocolFieldVersion,pageNumber:active.pageNumber,pageTitle:active.title}), recordedAt:active.recordedAt, createdBy:active.uid, createdAt:serverTimestamp(), reviewStatus:'unreviewed' };
+    const entry = { text:active.text, fields:active.output.fields, ...(active.kind === 'kpi' ? {source:kpiSource,version:kpiSchemaVersion,sectionId:active.sectionId,sectionTitle:active.title,...(active.referencePageNumber?{referencePageNumber:active.referencePageNumber}:{}),kind:'dictation',warnings:active.output.warnings||[]} : {fieldSource:protocolFieldSource,fieldVersion:protocolFieldVersion,pageNumber:active.pageNumber,pageTitle:active.title}), recordedAt:active.recordedAt, createdBy:active.uid, createdAt:serverTimestamp(), reviewStatus:'unreviewed' };
     const prefix = active.kind === 'kpi' ? `kpiEntries.${active.id}` : `protocolDictations.page${active.pageNumber}.${active.id}`;
     let savedEntry = active.sourceEntry ? { ...active.sourceEntry, fields: entry.fields, fieldSource: protocolFieldSource, fieldVersion: protocolFieldVersion } : entry;
     const changes = active.sourceEntry ? {

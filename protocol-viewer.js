@@ -13,6 +13,7 @@ let expanded = false;
 let caseDictations = {};
 let disposeZoom;
 let archiveOnly=false;
+let referenceDictationContext=null;
 const pageTitles = protocolPages.map(page => page.title);
 const titleElements = [];
 const headingRows = [];
@@ -122,7 +123,7 @@ function updateToolbar() {
     title.textContent = pageTitles[currentPage] || `Page ${currentPage + 1}`;
     title.hidden = false;
   }
-  for (const row of headingRows) { row.hidden = false; for(const control of row.querySelectorAll('.protocol-dictation,.protocol-edit-status'))control.hidden=archiveOnly; }
+  for (const row of headingRows) { row.hidden = false; for(const control of row.querySelectorAll('.protocol-dictation,.protocol-edit-status'))control.hidden=archiveOnly&&!(referenceDictationContext&&!isReviewPage&&control.matches('.protocol-dictation')); }
   for (const { button, direction } of stepButtons) button.disabled = (protocolDictationBusy() || protocolFormEditingBusy()) || (direction === -1 ? currentPage === 0 : currentPage === protocolPages.length - 1);
   for (const row of headingRows) row.classList.toggle('protocol-dictation-active', protocolDictationBusy());
   toolbar.querySelector('#protocolPageButtons').hidden = !expanded;
@@ -162,6 +163,7 @@ function renderPage() {
   renderSavedDictations(sheet);
   const caseId = currentCase, pageNumber = currentPage + 1;
   const setContext = isReviewPage ? setProtocolFormEditContext : setProtocolDictationContext;
+  if(archiveOnly&&referenceDictationContext&&!isReviewPage)setProtocolDictationContext(referenceDictationContext({caseId,pageNumber,title:pageTitles[currentPage]}));
   if(!archiveOnly)setContext({ caseId, pageNumber, title: pageTitles[currentPage], imageSrc: page.src,
     onSaved(id, entry) {
       if (currentCase !== caseId) return;
@@ -181,6 +183,7 @@ function renderSavedDictations(sheet) {
 
 export function showProtocolCase(target, caseId, options = {}) {
   archiveOnly=options.readOnly===true;
+  referenceDictationContext=typeof options.dictationContext==='function'?options.dictationContext:null;
   ensureToolbar();
   if (currentCase === caseId && container === target && target.querySelector('.protocol-page-sheet')) {
     toolbar.hidden = false;
@@ -204,7 +207,7 @@ export function showProtocolCase(target, caseId, options = {}) {
 }
 
 export function hideProtocolViewer({ reset = false } = {}) {
-  if (reset) { disposeZoom?.(); disposeZoom = null; cancelProtocolFormEditing(); cancelProtocolDictation(); caseDictations = {}; }
+  if (reset) { disposeZoom?.(); disposeZoom = null; cancelProtocolFormEditing(); cancelProtocolDictation(); caseDictations = {}; referenceDictationContext=null; }
   if (toolbar) toolbar.hidden = true;
   expanded = false;
   for (const title of titleElements) title.hidden = true;

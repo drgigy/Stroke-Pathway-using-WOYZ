@@ -30,7 +30,7 @@ export function configureKpiWorkspace(config){
 }
 function discardRecovery(){parked?.voice?.active?.abort?.abort();parked=null;recoveryButton?.remove();recoveryButton=null;}
 function parkOfflineInput(){
- if(parked||!active||archive||!busy()||!storeConfig.auth.currentUser)return;
+ if(parked||!active||!busy()||!storeConfig.auth.currentUser)return;
  const pending=[...(runningJob?[runningJob]:[]),...(failed?[failed]:[]),...jobs];
  for(const [key,value]of dirty){if(pending.some(job=>job.key===key&&job.token===value))continue;const monthly=key.startsWith('monthly:'),id=key.replace(/^monthly:/,''),field=(monthly?hospitalFields:kpiFields).find(f=>f.id===id);if(!field)continue;pending.push({caseId,sectionId:kpiSections[section].id,month:reportMonth,fields:{[id]:field.type==='datetime'&&value?value+(value.length===16?':00':'')+'+05:30':value},key,token:value,monthly});}
  parked={uid:storeConfig.auth.currentUser.uid,caseId,section,month:reportMonth,jobs:pending,voice:parkProtocolDictation(),settling:runningTask};
@@ -116,6 +116,10 @@ async function flush(){
  }catch(error){job.operation=error.operation;if(generation!==epoch)return;failed=job;break;}finally{if(runningJob===job){runningJob=null;runningTask=null;}}}
  if(generation===epoch){saveBusy=false;updateStatus();}
 }
+function archiveOptions(dictations){
+ const currentId=caseId;
+ return {dictations,readOnly:true,...(!isReviewPage?{dictationContext:({caseId:id,pageNumber,title})=>({kind:'kpi',caseId:id,pageNumber,referencePageNumber:pageNumber,sectionId:'protocolReference',title:'Protocol reference · '+title,fieldDefinitions:kpiFields,onSaved(takeId,entry){if(caseId!==currentId)return;caseData={...caseData,kpiEntries:{...caseData.kpiEntries,[takeId]:entry}};allData.set(caseId,caseData);}})}:{})};
+}
 function setVoiceContext(){if(isReviewPage||standalone)return;const currentId=caseId;setProtocolDictationContext({kind:'kpi',caseId,pageNumber:section+1,sectionId:kpiSections[section].id,title:kpiSections[section].title,fieldDefinitions:section===5?kpiFields:kpiSections[section].fields,onSaved(id,entry){if(caseId!==currentId)return;caseData={...caseData,kpiEntries:{...caseData.kpiEntries,[id]:entry}};allData.set(caseId,caseData);refresh();}});}
 function reviewSources(){
  const dialog=el('dialog','kpi-source-dialog'),head=el('header'),title=el('h2','','Source dictation'),close=el('button','','Close');close.type='button';close.addEventListener('click',()=>dialog.close());head.append(title,close);dialog.append(head);
@@ -127,19 +131,19 @@ function reviewSources(){
 function build(){
  target.classList.remove('protocol-scroll');target.classList.add('kpi-scroll');target.scrollTop=0;target.scrollLeft=0;
  root=el('section','kpi-workspace');root.dataset.kpiSection=kpiSections[section].id;
- const head=el('header','kpi-section-head'),kicker=el('span','kpi-kicker',standalone?'SHARED REPORTING':`SECTION ${section+1} OF 6`),name=el('h1','',kpiSections[section].title),identity=el('p','kpi-case-identity');if(standalone)head.append(kicker,name);else head.classList.add('kpi-case-head');head.append(identity);if(isReviewPage&&!standalone){const review=el('button','kpi-source-button','Review dictation');review.type='button';review.addEventListener('click',reviewSources);head.append(review);}root.append(head);
+ const head=el('header','kpi-section-head'),kicker=el('span','kpi-kicker',standalone?'SHARED REPORTING':`SECTION ${section+1} OF 6`),name=el('h1','',kpiSections[section].title),identity=el('p','kpi-case-identity');if(standalone)head.append(kicker,name,identity);else{head.classList.add('kpi-case-head');head.hidden=!isReviewPage;}if(isReviewPage&&!standalone){const review=el('button','kpi-source-button','Review dictation');review.type='button';review.addEventListener('click',reviewSources);head.append(review);}root.append(head);
  if(section!==5){
   const grid=el('div','kpi-fields');for(const field of kpiSections[section].fields)grid.append(fieldRow(field));root.append(grid);
   const empty=el('p','kpi-empty-section','Complete the relevant choices in earlier sections to show applicable fields.');root.append(empty);
  }else buildReport(root);
- if(caseData.protocolDictations&&Object.keys(caseData.protocolDictations).length){const old=el('button','kpi-archive-button','View previous protocol form');old.type='button';old.addEventListener('click',()=>{if(busy())return;archive=true;cancelProtocolDictation();updateNavigation();target.classList.remove('kpi-scroll');showArchive(target,caseId,{dictations:caseData.protocolDictations,readOnly:true});const back=el('button','kpi-archive-return','Return to KPI sections');back.type='button';back.addEventListener('click',()=>{if(busy())return;archive=false;hideArchive({reset:true});back.remove();build();});target.parentElement.append(back);});root.append(old);}
+ if(caseData.protocolDictations&&Object.keys(caseData.protocolDictations).length){const old=el('button','kpi-archive-button','View previous protocol form');old.type='button';old.addEventListener('click',()=>{if(busy())return;archive=true;cancelProtocolDictation();updateNavigation();target.classList.remove('kpi-scroll');showArchive(target,caseId,archiveOptions(caseData.protocolDictations));const back=el('button','kpi-archive-return','Return to KPI sections');back.type='button';back.addEventListener('click',()=>{if(busy())return;archive=false;hideArchive({reset:true});back.remove();build();});target.parentElement.append(back);});root.append(old);}
  const foot=el('footer','kpi-section-foot');for(const [label,index]of [['Previous section',section-1],['Next section',section+1]]){const b=el('button','',label);b.type='button';b.disabled=index<0||index>=6;b.addEventListener('click',()=>changeSection(index));foot.append(b);}foot.hidden=standalone;root.append(foot);
  target.replaceChildren(root);updateNavigation();setVoiceContext();refresh();
 }
 function refresh(){
  if(!root?.isConnected||archive||!active)return;
  const values=currentKpiValues(caseData),identity=[values.name,values.age?(/^\d+(?:\.\d+)?$/.test(values.age)?values.age+' years':values.age):'',values.uhid?'UHID '+values.uhid:''].filter(Boolean).join(' · ');
- root.querySelector('.kpi-case-identity').textContent=standalone?'All shared cases':identity||'New shared case';
+ const identityNode=root.querySelector('.kpi-case-identity');if(identityNode)identityNode.textContent=standalone?'All shared cases':identity||'New shared case';
  let shown=0;
  for(const wrap of root.querySelectorAll('.kpi-field')){
   const monthly=wrap.dataset.monthly==='true',defs=monthly?hospitalFields:kpiFields,field=defs.find(f=>f.id===wrap.dataset.field),control=wrap.querySelector('[data-kpi-field]'),read=wrap.querySelector('.kpi-read-value');
@@ -184,7 +188,7 @@ function describeMissing(value,records){
 function exportReport(){const {results}=reportData(),quote=v=>'"'+String(v??'').replaceAll('"','""')+'"';const rows=[['KPI','Indicator','Result','Status','Numerator','Denominator','Missing','Definition note'],...results.map(r=>[r.no,r.title,r.value,r.status,r.numerator,r.denominator,(r.missing||[]).join('; '),r.note])];const blob=new Blob(['\uFEFF'+rows.map(r=>r.map(quote).join(',')).join('\r\n')],{type:'text/csv;charset=utf-8'}),url=URL.createObjectURL(blob),a=el('a');a.href=url;a.download='stroke-kpi-'+reportMonth+'.csv';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
 export function showProtocolCase(container,id,options={}){
  ensureToolbar();if(caseId&&caseId!==id&&busy())return;standalone=false;
- if(archive&&caseId===id){active=true;document.querySelector('.kpi-archive-return')?.removeAttribute('hidden');showArchive(container,id,{dictations:options.data?.protocolDictations||caseData.protocolDictations,readOnly:true});return;}
+ if(archive&&caseId===id){active=true;document.querySelector('.kpi-archive-return')?.removeAttribute('hidden');showArchive(container,id,archiveOptions(options.data?.protocolDictations||caseData.protocolDictations));return;}
  if(caseId!==id){archive=false;document.querySelector('.kpi-archive-return')?.remove();hideArchive();}
  const same=caseId===id&&target===container&&root?.isConnected;
  caseId=id;target=container;caseData=options.data||allData.get(id)||{};allData.set(id,caseData);active=true;

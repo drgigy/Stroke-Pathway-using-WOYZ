@@ -109,10 +109,10 @@ function render(){
  if(!uid)return;const reviewing=!!selectedId||view==='kpi';shell.classList.toggle('dashboard-wide',view==='dashboard');const installs=$('installControls');if(installs)installs.hidden=view!=='more'||!!selectedId;panel.classList.toggle('standalone-report',view==='kpi'&&!selectedId);screen.hidden=reviewing;panel.hidden=!reviewing;recoveryNotice();
  for(const b of shell.querySelectorAll('[data-view]')){b.classList.toggle('active',b.dataset.view===view);b.setAttribute('aria-current',b.dataset.view===view?'page':'false');}
  $('viewTitle').textContent=selectedId?(isReviewPage?'Case review':'Case dictation'):({home:'Home',cases:'Cases',dashboard:'Dashboard',kpi:'NABH KPI Analysis',analysis:'Analysis',more:'More'})[view];$('viewSubtitle').textContent=selectedId?'Shared patient record':isReviewPage?'Shared case review':'Shared case workspace';
- if(reviewing){if(selectedId){const r=records().find(r=>r.id===selectedId);if(!r){selectedId=null;hideProtocolViewer({reset:true});render();return;}$('reviewPatient').textContent=fullName(r)+(r.uhid?' · UHID '+r.uhid:'');$('backToCases').hidden=false;showProtocolCase(scroller,r.id,{data:r._data});}else{$('reviewPatient').textContent='Monthly shared KPI report';$('backToCases').hidden=true;showKpiReport(scroller,{month});}fitReviewPanel();return;}
+ if(reviewing){if(selectedId){const r=records().find(r=>r.id===selectedId);if(!r){selectedId=null;hideProtocolViewer({reset:true});render();return;}showProtocolCase(scroller,r.id,{data:r._data});}else{showKpiReport(scroller,{month});}fitReviewPanel();return;}
  hideProtocolViewer();screen.replaceChildren();({home,cases,dashboard,analysis:analyses,more})[view]?.();
 }
-for(const b of shell.querySelectorAll('[data-view]'))b.addEventListener('click',()=>navigate(b.dataset.view));$('backToCases').addEventListener('click',()=>navigate('cases'));
+for(const b of shell.querySelectorAll('[data-view]'))b.addEventListener('click',()=>navigate(b.dataset.view));
 window.addEventListener('kpi-report-month-changed',event=>{month=event.detail.month;});
 window.addEventListener('kpi-case-recovered',event=>{selectedId=event.detail.caseId;view='cases';render();queueMicrotask(recoveryNotice);});
 if(isReviewPage)$('loginForm').addEventListener('submit',async event=>{event.preventDefault();$('loginSubmit').disabled=true;$('loginError').textContent='';try{await signInWithEmailAndPassword(auth,$('loginEmail').value.trim(),$('loginPassword').value);$('loginPassword').value='';}catch{$('loginError').textContent='Unable to sign in. Check your email and password.';}finally{$('loginSubmit').disabled=false;}});
@@ -121,7 +121,7 @@ function locked(message=''){
  if(!auth.currentUser||/blocked|revoked/i.test(message))pendingDraft=null;
  hideProtocolViewer({reset:true,clearRecords:true,allowRecovery:/offline|reconnect|waiting|confirm|verif/i.test(message),discardPending:/blocked|revoked/i.test(message)});
  shell.hidden=true;shell.classList.remove('authenticated');$('loginScreen').hidden=false;$('loginScreen').classList.remove('hidden');const error=$('loginError')||$('deviceStatus');if(error)error.textContent=message;
- screen.replaceChildren();scroller.replaceChildren();$('reviewPatient').textContent='';$('recoveryNotice')?.remove();for(const d of document.querySelectorAll('dialog[open]'))d.close();
+ screen.replaceChildren();scroller.replaceChildren();$('recoveryNotice')?.remove();for(const d of document.querySelectorAll('dialog[open]'))d.close();
 }
 function granted(user,details){
  if(pendingDraft&&pendingDraft.uid!==user.uid)pendingDraft=null;

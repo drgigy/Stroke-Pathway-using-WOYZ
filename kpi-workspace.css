@@ -58,4 +58,4 @@
 
 .protocol-dictation[hidden],.protocol-edit-status[hidden]{display:none!important;}
 
-.kpi-case-head { border:0; padding:0; margin-bottom:14px; }
+.kpi-case-head { display:flow-root; border:0; padding:0; margin-bottom:14px; }
