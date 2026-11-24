@@ -71,9 +71,8 @@ async function createCase(){
  finally{creating=false;if(uid===author&&current===generation)render();}
 }
 function home(){
- screen.append(title(isReviewPage?'Shared case review':'Stroke workspace',isReviewPage?'Review stroke pathway timings, outcomes and NABH indicators.':'Start a Code 7 case or open any shared case to dictate.'));
  if(!isReviewPage){const start=button(pendingDraft?'RETRY NEW CODE 7':'START NEW CODE 7',createCase,'primary-cta');start.dataset.startCode7='';start.disabled=creating;screen.append(start);}
- const all=records(),stats=node('div','review-stat-grid');for(const [label,count]of [['Shared cases',all.length],['This month',all.filter(r=>episodeDate(r).slice(0,7)===dateKey(new Date()).slice(0,7)).length],['IVT received',all.filter(r=>r.ivtGiven==='Yes').length],['EVT received',all.filter(r=>r.evtGiven==='Yes').length]]){const stat=node('div','review-stat');stat.append(node('span','',label),node('strong','',String(count)));stats.append(stat);}screen.append(stats);
+ const all=records();
  if(all.length)screen.append(button(isReviewPage?'REVIEW LATEST CASE':'OPEN LATEST CASE',()=>openCase(all[0].id),'primary-cta'));
  screen.append(title('Recent cases'));for(const r of all.slice(0,8))screen.append(card(r));if(!all.length)screen.append(empty('No shared cases have been recorded yet.'));
 }
