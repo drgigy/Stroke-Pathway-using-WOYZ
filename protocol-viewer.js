@@ -110,7 +110,7 @@ function ensureToolbar() {
   }
   topbar.parentElement.classList.add('protocol-viewer-host');
   topbar.parentElement.append(toolbar);
-  const positionPicker = () => topbar.parentElement.style.setProperty('--protocol-top', `${topbar.getBoundingClientRect().height}px`);
+  const positionPicker = () => topbar.parentElement.style.setProperty('--protocol-top', `${topbar.getBoundingClientRect().bottom-topbar.parentElement.getBoundingClientRect().top}px`);
   new ResizeObserver(positionPicker).observe(topbar);
   positionPicker();
   onProtocolDictationChange(() => { if (!toolbar.hidden) updateToolbar(); });

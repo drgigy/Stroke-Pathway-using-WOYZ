@@ -71,7 +71,7 @@ function ensureToolbar(){
  picker=el('nav','kpi-section-picker');picker.setAttribute('aria-label','KPI sections');picker.hidden=true;
  kpiSections.forEach((s,i)=>{const button=el('button','',`${i+1}. ${s.title}`);button.type='button';button.dataset.section=s.id;button.addEventListener('click',()=>changeSection(i));picker.append(button);});
  topbar.parentElement.classList.add('protocol-viewer-host');topbar.parentElement.append(picker);
- const position=()=>topbar.parentElement.style.setProperty('--protocol-top',topbar.getBoundingClientRect().height+'px');new ResizeObserver(position).observe(topbar);position();
+ const position=()=>topbar.parentElement.style.setProperty('--protocol-top',(topbar.getBoundingClientRect().bottom-topbar.parentElement.getBoundingClientRect().top)+'px');new ResizeObserver(position).observe(topbar);position();
  document.addEventListener('pointerdown',e=>{if(!picker.hidden&&!picker.contains(e.target)&&!e.target.closest('.kpi-title'))picker.hidden=true;});
  document.addEventListener('keydown',e=>{if(e.key==='Escape')picker.hidden=true;});
 }
