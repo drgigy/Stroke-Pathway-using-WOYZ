@@ -136,7 +136,7 @@ function build(){
   const grid=el('div','kpi-fields');for(const field of kpiSections[section].fields)grid.append(fieldRow(field));root.append(grid);
   const empty=el('p','kpi-empty-section','Complete the relevant choices in earlier sections to show applicable fields.');root.append(empty);
  }else buildReport(root);
- if(caseData.protocolDictations&&Object.keys(caseData.protocolDictations).length){const old=el('button','kpi-archive-button','View previous protocol form');old.type='button';old.addEventListener('click',()=>{if(busy())return;archive=true;cancelProtocolDictation();updateNavigation();target.classList.remove('kpi-scroll');showArchive(target,caseId,archiveOptions(caseData.protocolDictations));const back=el('button','kpi-archive-return','Return to KPI sections');back.type='button';back.addEventListener('click',()=>{if(busy())return;archive=false;hideArchive({reset:true});back.remove();build();});target.parentElement.append(back);});root.append(old);}
+ if(caseData.protocolDictations&&Object.keys(caseData.protocolDictations).length){const old=el('button','kpi-archive-button','View previous protocol form');old.type='button';old.addEventListener('click',()=>{if(busy())return;archive=true;cancelProtocolDictation();updateNavigation();target.classList.remove('kpi-scroll');showArchive(target,caseId,archiveOptions(caseData.protocolDictations));});root.append(old);}
  const foot=el('footer','kpi-section-foot');for(const [label,index]of [['Previous section',section-1],['Next section',section+1]]){const b=el('button','',label);b.type='button';b.disabled=index<0||index>=6;b.addEventListener('click',()=>changeSection(index));foot.append(b);}foot.hidden=standalone;root.append(foot);
  target.replaceChildren(root);updateNavigation();setVoiceContext();refresh();
 }
@@ -188,8 +188,8 @@ function describeMissing(value,records){
 function exportReport(){const {results}=reportData(),quote=v=>'"'+String(v??'').replaceAll('"','""')+'"';const rows=[['KPI','Indicator','Result','Status','Numerator','Denominator','Missing','Definition note'],...results.map(r=>[r.no,r.title,r.value,r.status,r.numerator,r.denominator,(r.missing||[]).join('; '),r.note])];const blob=new Blob(['\uFEFF'+rows.map(r=>r.map(quote).join(',')).join('\r\n')],{type:'text/csv;charset=utf-8'}),url=URL.createObjectURL(blob),a=el('a');a.href=url;a.download='stroke-kpi-'+reportMonth+'.csv';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
 export function showProtocolCase(container,id,options={}){
  ensureToolbar();if(caseId&&caseId!==id&&busy())return;standalone=false;
- if(archive&&caseId===id){active=true;document.querySelector('.kpi-archive-return')?.removeAttribute('hidden');showArchive(container,id,archiveOptions(options.data?.protocolDictations||caseData.protocolDictations));return;}
- if(caseId!==id){archive=false;document.querySelector('.kpi-archive-return')?.remove();hideArchive();}
+ if(archive&&caseId===id){active=true;showArchive(container,id,archiveOptions(options.data?.protocolDictations||caseData.protocolDictations));return;}
+ if(caseId!==id){archive=false;hideArchive();}
  const same=caseId===id&&target===container&&root?.isConnected;
  caseId=id;target=container;caseData=options.data||allData.get(id)||{};allData.set(id,caseData);active=true;
  if(!same){section=0;reportMonth=indianMonth(currentKpiValues(caseData).admissionTime||currentKpiValues(caseData).arrivalTime)||caseData.visitDate?.slice(0,7)||indianMonth(new Date().toISOString());build();}
@@ -202,6 +202,6 @@ export function showKpiReport(container,{month}={}){
 }
 export function hideProtocolViewer({reset=false,clearRecords=false,allowRecovery=false,discardPending=false}={}){
  if(discardPending)discardRecovery();else if(reset&&clearRecords&&allowRecovery)parkOfflineInput();
- active=false;document.querySelector('.kpi-source-dialog')?.remove();hideArchive();const archiveReturn=document.querySelector('.kpi-archive-return');if(archiveReturn)archiveReturn.hidden=true;if(picker)picker.hidden=true;for(const {row}of rows)row.hidden=true;target?.classList.remove('kpi-scroll');
- if(reset){epoch++;cancelProtocolDictation();hideArchive({reset:true});document.querySelector('.kpi-archive-return')?.remove();if(clearRecords){allData.clear();cohortReady=false;}caseData={};caseId=null;root=null;dirty.clear();jobs=[];failed=null;saveBusy=false;localSaved=false;archive=false;standalone=false;}
+ active=false;document.querySelector('.kpi-source-dialog')?.remove();hideArchive();archive=false;if(picker)picker.hidden=true;for(const {row}of rows)row.hidden=true;target?.classList.remove('kpi-scroll');
+ if(reset){epoch++;cancelProtocolDictation();hideArchive({reset:true});if(clearRecords){allData.clear();cohortReady=false;}caseData={};caseId=null;root=null;dirty.clear();jobs=[];failed=null;saveBusy=false;localSaved=false;archive=false;standalone=false;}
 }
