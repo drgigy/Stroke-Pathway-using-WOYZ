@@ -64,7 +64,7 @@ function ensureToolbar(){
   for(const [button,label,delta]of [[prev,'Previous section',-1],[next,'Next section',1]]){button.type='button';button.setAttribute('aria-label',label);button.addEventListener('click',()=>changeSection(section+delta));}
   title.type='button';title.setAttribute('aria-label','Choose KPI section');title.addEventListener('click',()=>{picker.hidden=!picker.hidden;title.setAttribute('aria-expanded',String(!picker.hidden));});
   nav.append(prev,title,next);row.append(nav);
-  if(!isReviewPage)mountProtocolDictationControls(row);
+  if(!isReviewPage&&!document.getElementById('dictationTopbar'))mountProtocolDictationControls(row);
   const status=el('div','protocol-edit-status'),text=el('span'),retry=el('button','','Retry save');text.setAttribute('role','status');retry.type='button';retry.hidden=true;retry.addEventListener('click',()=>{if(failed){jobs.unshift(failed);failed=null;flush();}});status.append(text,retry);row.append(status);statusNodes.push(status);
   parent.append(row);rows.push({row,prev,title,next});
  }
@@ -76,7 +76,7 @@ function ensureToolbar(){
  document.addEventListener('keydown',e=>{if(e.key==='Escape')picker.hidden=true;});
 }
 function updateNavigation(){
- for(const {row,prev,title,next}of rows){row.hidden=!active||archive;const mic=row.querySelector('.protocol-dictation');if(mic)mic.hidden=standalone;title.textContent=['Patient','Assessment','IVT / EVT','Complications','Follow-up','KPIs'][section];title.title=kpiSections[section].title;title.setAttribute('aria-label','Choose section: '+kpiSections[section].title);title.disabled=busy()||standalone;prev.disabled=busy()||standalone||section===0;next.disabled=busy()||standalone||section===kpiSections.length-1;row.classList.toggle('protocol-dictation-active',protocolDictationBusy());}
+ for(const {row,prev,title,next}of rows){row.hidden=!active||archive;const mic=row.querySelector('.protocol-dictation');if(mic)mic.hidden=standalone;title.textContent=['Patient','Assessment','IVT / EVT','Complications','Follow-up','KPIs'][section];title.title=kpiSections[section].title;title.setAttribute('aria-label','Choose section: '+kpiSections[section].title);title.disabled=busy()||standalone;prev.disabled=busy()||standalone||section===0;next.disabled=busy()||standalone||section===kpiSections.length-1;row.classList.toggle('protocol-dictation-active',protocolDictationBusy()&&!document.getElementById('dictationTopbar'));}
  if(picker)for(const b of picker.children){b.disabled=busy();b.setAttribute('aria-current',b.dataset.section===kpiSections[section].id?'step':'false');}
 }
 function changeSection(index){if(standalone||busy()||index<0||index>=kpiSections.length)return;section=index;picker.hidden=true;build();}

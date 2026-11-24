@@ -103,7 +103,7 @@ function ensureToolbar() {
     navigation.className = 'protocol-heading-nav';
     navigation.append(stepButton(-1, suffix), title, stepButton(1, suffix));
     row.append(navigation);
-    if (!isReviewPage) mountProtocolDictationControls(row);
+    if (!isReviewPage) { if(!document.getElementById('dictationTopbar'))mountProtocolDictationControls(row); }
     else mountProtocolFormEditStatus(row);
     target.append(row);
     headingRows.push(row);
@@ -125,7 +125,7 @@ function updateToolbar() {
   }
   for (const row of headingRows) { row.hidden = false; for(const control of row.querySelectorAll('.protocol-dictation,.protocol-edit-status'))control.hidden=archiveOnly&&!(referenceDictationContext&&!isReviewPage&&control.matches('.protocol-dictation')); }
   for (const { button, direction } of stepButtons) button.disabled = (protocolDictationBusy() || protocolFormEditingBusy()) || (direction === -1 ? currentPage === 0 : currentPage === protocolPages.length - 1);
-  for (const row of headingRows) row.classList.toggle('protocol-dictation-active', protocolDictationBusy());
+  for (const row of headingRows) row.classList.toggle('protocol-dictation-active', protocolDictationBusy()&&!document.getElementById('dictationTopbar'));
   toolbar.querySelector('#protocolPageButtons').hidden = !expanded;
   const toggle = toolbar.querySelector('#protocolExpandBtn');
   toggle.textContent = expanded ? '\u00d7' : String(currentPage + 1);

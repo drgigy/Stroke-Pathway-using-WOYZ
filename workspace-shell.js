@@ -4,9 +4,9 @@ import { getFirestore, collection, onSnapshot, doc, runTransaction, serverTimest
 import { firebaseConfig } from './firebase-config.js';
 import { isReviewPage } from './page-mode.js';
 import { mountDeviceAccess } from './access.js';
-import { configureProtocolDictation } from './protocol-dictation.js';
+import { configureProtocolDictation, mountProtocolDictationControls } from './protocol-dictation.js';
 import { mountDashboardAccess } from './dashboard-access.js';
-import { mountPwa } from './pwa.js';
+import { mountPwa, setProtocolCacheAccess } from './pwa.js';
 import { configureKpiWorkspace, ingestKpiSnapshot, showProtocolCase, showKpiReport, hideProtocolViewer, kpiWorkspaceBusy } from './kpi-workspace.js';
 import { currentKpiValues, currentMonthlyValues, isKpiReportingCase } from './kpi-data.js';
 import { kpiFields } from './kpi-schema.js';
@@ -16,6 +16,7 @@ const app=initializeApp(firebaseConfig),auth=getAuth(app),db=getFirestore(app);
 configureKpiWorkspace({auth,db});
 if(!isReviewPage)configureProtocolDictation({auth,db});
 const $=id=>document.getElementById(id),shell=$('appShell'),screen=$('screen'),panel=$('reviewPanel'),scroller=$('mainScroll');
+if(!isReviewPage&&$('dictationTopbar'))mountProtocolDictationControls($('dictationTopbar'));
 let pendingDraft=null,creating=false,accessDetails=null;
 let documents=[],stopNotes,uid=null,generation=0,view='home',selectedId=null,query='',rangeMode='all',from='',to='',ivtOnly=false,evtOnly=false,analysisMode='',indicator=1;
 const india=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Kolkata',year:'numeric',month:'2-digit',day:'2-digit'});
@@ -99,13 +100,14 @@ function more(){screen.append(title('More'));const menu=node('div','review-more'
 function settings(){const dialog=node('dialog','review-settings'),head=node('header');head.append(node('h2','','Settings'),button('Close',()=>dialog.close()));dialog.append(head,node('p','','Hospital timezone: Asia/Kolkata.'),node('p','','All approved users share the same cases. Review-page corrections save automatically; staff can dictate from the user page.'),node('p','','Reports use admission/arrival-month cohorts. Source-definition conflicts remain flagged until clarified.'));dialog.addEventListener('close',()=>dialog.remove(),{once:true});document.body.append(dialog);dialog.showModal();}
 function fitReviewPanel(){if(!panel.hidden){const bottom=shell.querySelector('.bottom-nav').getBoundingClientRect().height;panel.style.height=Math.max(220,window.innerHeight-panel.getBoundingClientRect().top-bottom-12)+'px';}}
 window.addEventListener('resize',fitReviewPanel);
+new ResizeObserver(fitReviewPanel).observe(shell.querySelector('.topbar'));
 function recoveryNotice(){
  const pending=document.querySelector('.kpi-recovery');let notice=$('recoveryNotice');
  if(!pending||!panel.hidden){notice?.remove();return;}
  if(!notice){notice=node('div','review-top-message');notice.id='recoveryNotice';notice.append(node('span','','Pending input is available after reconnecting. '),button('Recover pending input',()=>pending.click()));shell.querySelector('.topbar').after(notice);}
 }
 function render(){
- if(!uid)return;const reviewing=!!selectedId||view==='kpi';shell.classList.toggle('dashboard-wide',view==='dashboard');const installs=$('installControls');if(installs)installs.hidden=view!=='more'||!!selectedId;panel.classList.toggle('standalone-report',view==='kpi'&&!selectedId);screen.hidden=reviewing;panel.hidden=!reviewing;recoveryNotice();
+ if(!uid)return;if($('dictationTopbar'))$('dictationTopbar').hidden=!selectedId;const reviewing=!!selectedId||view==='kpi';shell.classList.toggle('dashboard-wide',view==='dashboard');const installs=$('installControls');if(installs)installs.hidden=view!=='more'||!!selectedId;panel.classList.toggle('standalone-report',view==='kpi'&&!selectedId);screen.hidden=reviewing;panel.hidden=!reviewing;recoveryNotice();
  for(const b of shell.querySelectorAll('[data-view]')){b.classList.toggle('active',b.dataset.view===view);b.setAttribute('aria-current',b.dataset.view===view?'page':'false');}
  $('viewTitle').textContent=selectedId?(isReviewPage?'Case review':'Case dictation'):({home:'Home',cases:'Cases',dashboard:'Dashboard',kpi:'NABH KPI Analysis',analysis:'Analysis',more:'More'})[view];$('viewSubtitle').textContent=selectedId?'Shared patient record':isReviewPage?'Shared case review':'Shared case workspace';
  if(reviewing){if(selectedId){const r=records().find(r=>r.id===selectedId);if(!r){selectedId=null;hideProtocolViewer({reset:true});render();return;}showProtocolCase(scroller,r.id,{data:r._data});}else{showKpiReport(scroller,{month});}fitReviewPanel();return;}
@@ -116,6 +118,7 @@ window.addEventListener('kpi-report-month-changed',event=>{month=event.detail.mo
 window.addEventListener('kpi-case-recovered',event=>{selectedId=event.detail.caseId;view='cases';render();queueMicrotask(recoveryNotice);});
 if(isReviewPage)$('loginForm').addEventListener('submit',async event=>{event.preventDefault();$('loginSubmit').disabled=true;$('loginError').textContent='';try{await signInWithEmailAndPassword(auth,$('loginEmail').value.trim(),$('loginPassword').value);$('loginPassword').value='';}catch{$('loginError').textContent='Unable to sign in. Check your email and password.';}finally{$('loginSubmit').disabled=false;}});
 function locked(message=''){
+ setProtocolCacheAccess(false);
  generation++;stopNotes?.();stopNotes=null;uid=null;documents=[];selectedId=null;creating=false;
  if(!auth.currentUser||/blocked|revoked/i.test(message))pendingDraft=null;
  hideProtocolViewer({reset:true,clearRecords:true,allowRecovery:/offline|reconnect|waiting|confirm|verif/i.test(message),discardPending:/blocked|revoked/i.test(message)});
@@ -123,6 +126,7 @@ function locked(message=''){
  screen.replaceChildren();scroller.replaceChildren();$('recoveryNotice')?.remove();for(const d of document.querySelectorAll('dialog[open]'))d.close();
 }
 function granted(user,details){
+ setProtocolCacheAccess(true);
  if(pendingDraft&&pendingDraft.uid!==user.uid)pendingDraft=null;
  accessDetails=details;uid=user.uid;const current=++generation;shell.hidden=false;shell.classList.add('authenticated');$('loginScreen').hidden=true;$('syncStatus').textContent='Connecting';view='home';selectedId=null;stopNotes?.();
  stopNotes=onSnapshot(collection(db,'workspaces','stroke','notes'),snapshot=>{if(current!==generation||!uid)return;ingestKpiSnapshot(snapshot);documents=snapshot.docs.map(d=>({id:d.id,...d.data()})).filter(d=>d.deleted!==true);$('syncStatus').textContent='Shared · live';render();},()=>{if(current!==generation)return;$('syncStatus').textContent='Sync unavailable';message('Shared cases could not be refreshed. Reconnect and verify access.');});

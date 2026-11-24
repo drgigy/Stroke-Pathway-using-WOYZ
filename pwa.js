@@ -1,6 +1,12 @@
 import { isReviewPage } from './page-mode.js';
 import { onProtocolDictationChange, protocolDictationBusy } from './protocol-dictation.js';
-let mounted = false, installPrompt;
+let mounted = false, installPrompt, protocolCacheApproved=false;
+function warmProtocolForms(){
+ if(!protocolCacheApproved||!('serviceWorker' in navigator))return;
+ navigator.serviceWorker.ready.then(registration=>{if(protocolCacheApproved)registration.active?.postMessage({type:'CACHE_PROTOCOL_FORMS'});}).catch(()=>{});
+}
+export function setProtocolCacheAccess(approved){protocolCacheApproved=approved===true;if(protocolCacheApproved)warmProtocolForms();}
+
 const standalone = () => window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
 window.addEventListener('beforeinstallprompt', event => { if (isReviewPage) return; event.preventDefault(); installPrompt = event; });
 export function mountPwa() {
@@ -24,6 +30,7 @@ export function mountPwa() {
   update.addEventListener('click', () => { if (!protocolDictationBusy()) window.location.reload(); });
   onProtocolDictationChange(() => { update.disabled = protocolDictationBusy(); });
   navigator.serviceWorker.addEventListener('controllerchange', () => {
+    warmProtocolForms();
     if (hadController) { update.hidden = false; update.disabled = protocolDictationBusy(); }
   });
   navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' }).then(registration => registration.update()).catch(() => {});
