@@ -149,3 +149,9 @@ export function kpiContract(definitions = kpiFields) {
     ].filter(Boolean).join(' ')
   }));
 }
+
+/** Preserve source cohort exclusions without hiding imported cases from the workspace. */
+export function isKpiReportingCase(data = {}) {
+ const value=currentKpiValues(data).includeInReporting;
+ return value==='Yes'||(value!=='No'&&!data.importProvenance?.requiresInclusionReview);
+}

@@ -1,7 +1,7 @@
 import { onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js';
 import { isReviewPage } from './page-mode.js';
 import { kpiSections, kpiFields, hospitalFields } from './kpi-schema.js';
-import { currentKpiValues, currentMonthlyValues } from './kpi-data.js';
+import { currentKpiValues, currentMonthlyValues, isKpiReportingCase } from './kpi-data.js';
 import { calculateKpis } from './kpi-calculations.js';
 import { configureKpiStore, saveKpiEdit, saveKpiMonthly } from './kpi-store.js';
 import { mountProtocolDictationControls, setProtocolDictationContext, protocolDictationBusy, onProtocolDictationChange, cancelProtocolDictation, parkProtocolDictation, restoreProtocolDictation } from './protocol-dictation.js';
@@ -76,7 +76,7 @@ function ensureToolbar(){
  document.addEventListener('keydown',e=>{if(e.key==='Escape')picker.hidden=true;});
 }
 function updateNavigation(){
- for(const {row,prev,title,next}of rows){row.hidden=!active||archive;title.textContent=['Patient','Assessment','IVT / EVT','Complications','Follow-up','KPIs'][section];title.title=kpiSections[section].title;title.setAttribute('aria-label','Choose section: '+kpiSections[section].title);title.disabled=busy()||standalone;prev.disabled=busy()||standalone||section===0;next.disabled=busy()||standalone||section===kpiSections.length-1;row.classList.toggle('protocol-dictation-active',protocolDictationBusy());}
+ for(const {row,prev,title,next}of rows){row.hidden=!active||archive;const mic=row.querySelector('.protocol-dictation');if(mic)mic.hidden=standalone;title.textContent=['Patient','Assessment','IVT / EVT','Complications','Follow-up','KPIs'][section];title.title=kpiSections[section].title;title.setAttribute('aria-label','Choose section: '+kpiSections[section].title);title.disabled=busy()||standalone;prev.disabled=busy()||standalone||section===0;next.disabled=busy()||standalone||section===kpiSections.length-1;row.classList.toggle('protocol-dictation-active',protocolDictationBusy());}
  if(picker)for(const b of picker.children){b.disabled=busy();b.setAttribute('aria-current',b.dataset.section===kpiSections[section].id?'step':'false');}
 }
 function changeSection(index){if(standalone||busy()||index<0||index>=kpiSections.length)return;section=index;picker.hidden=true;build();}
@@ -116,7 +116,7 @@ async function flush(){
  }catch(error){job.operation=error.operation;if(generation!==epoch)return;failed=job;break;}finally{if(runningJob===job){runningJob=null;runningTask=null;}}}
  if(generation===epoch){saveBusy=false;updateStatus();}
 }
-function setVoiceContext(){if(isReviewPage)return;const currentId=caseId;setProtocolDictationContext({kind:'kpi',caseId,pageNumber:section+1,sectionId:kpiSections[section].id,title:kpiSections[section].title,fieldDefinitions:section===5?kpiFields:kpiSections[section].fields,onSaved(id,entry){if(caseId!==currentId)return;caseData={...caseData,kpiEntries:{...caseData.kpiEntries,[id]:entry}};allData.set(caseId,caseData);refresh();}});}
+function setVoiceContext(){if(isReviewPage||standalone)return;const currentId=caseId;setProtocolDictationContext({kind:'kpi',caseId,pageNumber:section+1,sectionId:kpiSections[section].id,title:kpiSections[section].title,fieldDefinitions:section===5?kpiFields:kpiSections[section].fields,onSaved(id,entry){if(caseId!==currentId)return;caseData={...caseData,kpiEntries:{...caseData.kpiEntries,[id]:entry}};allData.set(caseId,caseData);refresh();}});}
 function reviewSources(){
  const dialog=el('dialog','kpi-source-dialog'),head=el('header'),title=el('h2','','Source dictation'),close=el('button','','Close');close.type='button';close.addEventListener('click',()=>dialog.close());head.append(title,close);dialog.append(head);
  const entries=Object.values(caseData.kpiEntries||{}).filter(entry=>entry.kind==='dictation'&&(section===5||entry.sectionId===kpiSections[section].id)).sort((a,b)=>String(b.recordedAt||'').localeCompare(String(a.recordedAt||'')));
@@ -128,6 +128,7 @@ function build(){
  target.classList.remove('protocol-scroll');target.classList.add('kpi-scroll');target.scrollTop=0;target.scrollLeft=0;
  root=el('section','kpi-workspace');root.dataset.kpiSection=kpiSections[section].id;
  const head=el('header','kpi-section-head'),kicker=el('span','kpi-kicker',standalone?'SHARED REPORTING':`SECTION ${section+1} OF 6`),name=el('h1','',kpiSections[section].title),identity=el('p','kpi-case-identity');head.append(kicker,name,identity);if(isReviewPage&&!standalone){const review=el('button','kpi-source-button','Review dictation');review.type='button';review.addEventListener('click',reviewSources);head.append(review);}root.append(head);
+ if(caseData.importProvenance&&!standalone){const notice=el('p','kpi-section-help','Imported historical case. Source suspicion is not a confirmed diagnosis. Confirm diagnosis, admission and follow-up details; unavailable evidence remains pending. KPI inclusion can be reviewed in Patient and admission.');root.append(notice);}
  if(section!==5){
   const help=el('p','kpi-section-help',isReviewPage?'Correct a field here. Changes save to the shared case.':'Dictate the details you know. Unstated information stays pending.');root.append(help);
   const grid=el('div','kpi-fields');for(const field of kpiSections[section].fields)grid.append(fieldRow(field));root.append(grid);
@@ -160,13 +161,13 @@ function refresh(){
 function buildReport(parent){
  const controls=el('div','kpi-report-controls'),label=el('label','','Reporting month'),input=el('input');input.type='month';input.value=reportMonth;input.setAttribute('aria-label','Reporting month');input.addEventListener('change',()=>{if(busy()){input.value=reportMonth;return;}if(validMonth(input.value)){reportMonth=input.value;window.dispatchEvent(new CustomEvent('kpi-report-month-changed',{detail:{month:reportMonth}}));refresh();}});label.append(input);controls.append(label);
  const download=el('button','','Export CSV');download.type='button';download.addEventListener('click',exportReport);controls.append(download);parent.append(controls);
- parent.append(el('p','kpi-report-policy','Cases are grouped by admission/arrival month. Later outcomes update that original cohort. Missing eligibility remains pending. Conflicting definitions in the supplied NABH document are flagged for clarification.'));
+ parent.append(el('p','kpi-report-policy','Cases are grouped by admission/arrival month. Imported exclusions and cases awaiting inclusion confirmation are omitted from KPI calculations; all remain available in Cases. Later outcomes update that original cohort. Missing eligibility remains pending. Conflicting definitions in the supplied NABH document are flagged for clarification.'));
  const summary=el('p','kpi-report-summary');parent.append(summary);
  const monthly=el('details','kpi-monthly');monthly.open=isReviewPage;monthly.append(el('summary','','Shared hospital monthly inputs'));const grid=el('div','kpi-fields');for(const f of hospitalFields)grid.append(fieldRow(f,true));monthly.append(grid);parent.append(monthly);
  parent.append(el('div','kpi-results'));
 }
 function reportData(){
- const records=[...allData.entries()].filter(([,d])=>d.noteType==='code7'&&!d.deleted).map(([id,d])=>({id,...currentKpiValues(d),_date:d.visitDate}));
+ const records=[...allData.entries()].filter(([,d])=>d.noteType==='code7'&&!d.deleted&&isKpiReportingCase(d)).map(([id,d])=>({id,...currentKpiValues(d),_date:d.visitDate}));
  const recordsForMonth=records.filter(v=>(indianMonth(v.admissionTime||v.arrivalTime)||v._date?.slice(0,7))===reportMonth);
  const monthly=currentMonthlyValues(allData.get('kpi-month-'+reportMonth)||{});
  return {records:recordsForMonth,results:calculateKpis(recordsForMonth,monthly)};
@@ -193,7 +194,7 @@ export function showProtocolCase(container,id,options={}){
  else{target.classList.add('kpi-scroll');refresh();}updateNavigation();updateStatus();
 }
 export function showKpiReport(container,{month}={}){
- if(busy())return;ensureToolbar();hideArchive();archive=false;caseId=null;caseData={};target=container;active=true;
+ if(busy())return;ensureToolbar();if(!isReviewPage)cancelProtocolDictation();hideArchive();archive=false;caseId=null;caseData={};target=container;active=true;
  if(standalone&&root?.isConnected&&(!validMonth(month)||month===reportMonth)){refresh();updateNavigation();return;}
  standalone=true;localSaved=false;section=5;reportMonth=validMonth(month)?month:indianMonth(new Date().toISOString());build();updateStatus();
 }

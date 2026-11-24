@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { kpiFields,kpiSections,kpiSource,kpiSchemaVersion,hospitalFields } from '../kpi-schema.js';
-import { validateKpiFields,currentKpiValues,currentMonthlyValues,kpiResponseSchema } from '../kpi-data.js';
+import { validateKpiFields,currentKpiValues,currentMonthlyValues,kpiResponseSchema,isKpiReportingCase } from '../kpi-data.js';
 import { protocolFieldSource,protocolFieldVersion } from '../protocol-fields.js';
 const take=(fields,extra={})=>({source:kpiSource,version:kpiSchemaVersion,kind:'dictation',text:'Synthetic source only',recordedAt:'2026-11-24T08:00:00+05:30',fields,...extra});
 assert.deepEqual(validateKpiFields([{id:'uhid',value:'000123'},{id:'acuteStroke',value:'yes'}]),{uhid:'000123',acuteStroke:'Yes'});
@@ -14,3 +14,10 @@ assert.deepEqual(currentMonthlyValues({kpiMonthlyEntries:{a:take({medicationOppo
 assert.throws(()=>validateKpiFields([{id:'age',value:'3'}],hospitalFields));
 assert(kpiResponseSchema().properties.warnings);
 console.log('PASS: KPI field contracts, date/type validation, section isolation, source/version isolation, leading-zero UHID, manual clears, legacy identity-only fallback and monthly zero.');
+
+const imported={importProvenance:{requiresInclusionReview:true},kpiEntries:{}};
+assert.equal(isKpiReportingCase(imported),false);
+assert.equal(isKpiReportingCase({...imported,kpiEntries:{a:take({includeInReporting:'No'})}}),false);
+assert.equal(isKpiReportingCase({...imported,kpiEntries:{a:take({includeInReporting:'Yes'})}}),true);
+assert.equal(isKpiReportingCase({}),true);
+console.log('PASS: Imported cohort exclusions, pending inclusion and explicit review approval.');

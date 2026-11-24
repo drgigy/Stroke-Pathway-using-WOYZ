@@ -16,6 +16,7 @@ export const kpiSections = [
     field('name', 'Name', 'text', []),
     field('uhid', 'UHID', 'text', []),
     field('age', 'Age (optional)', 'number', []),
+    choice('includeInReporting', 'Include case in KPI reporting', []),
     choice('acuteStroke', 'Acute stroke', [1, 2, 9, 17]),
     field('diagnosis', 'Diagnosis', 'choice', [2, 6, 7, 17, 21, 22, 23, 24], { choices: ['Ischemic Stroke', 'Hemorrhagic Stroke', 'TIA', 'Stroke mimic', 'Undetermined'] }),
     choice('admitted', 'Admitted', [4, 5, 6, 9, 12, 13, 19]),
