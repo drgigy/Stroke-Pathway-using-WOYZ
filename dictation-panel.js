@@ -1,6 +1,6 @@
-import { onProtocolDictationChange, protocolDictationState, pauseProtocolDictation, finishProtocolDictation } from './protocol-dictation.js';
+import { onProtocolDictationChange, protocolDictationState, pauseProtocolDictation, finishProtocolDictation, startProtocolDictation } from './protocol-dictation.js';
 import { isReviewPage } from './page-mode.js';
-let panel,canvas,ctx,source,analyser,samples,stream,frame,elapsed=0,recordingSince=null,takeId,lastBusy=false,lastNotice='',position=null,drag=null;
+let panel,canvas,ctx,source,analyser,samples,stream,frame,elapsed=0,recordingSince=null,takeId,caseScope=null,dismissedNotice='',position=null,drag=null;
 function releaseAudio(){source?.disconnect();source=null;analyser=null;samples=null;stream=null;if(ctx){ctx.close().catch(()=>{});ctx=null;}}
 function unlockAudio(){
  try{const Audio=window.AudioContext||window.webkitAudioContext;if(!Audio)return;if(!ctx||ctx.state==='closed')ctx=new Audio();ctx.resume().catch(()=>{});}catch{}
@@ -28,8 +28,8 @@ function draw(now){
  paint.stroke();
  if(!panel.hidden)frame=requestAnimationFrame(draw);else frame=null;
 }
-function hide(){panel.hidden=true;document.querySelector('.dictation-panel-open')?.setAttribute('aria-expanded','false');}
-function reveal(){panel.hidden=false;document.querySelector('.dictation-panel-open')?.setAttribute('aria-expanded','true');if(position)placePanel(position);if(!frame)frame=requestAnimationFrame(draw);}
+function hide(){panel.hidden=true;}
+function reveal(){panel.hidden=false;if(position)placePanel(position);if(!frame)frame=requestAnimationFrame(draw);}
 function placePanel(value){
  const viewport=window.visualViewport,rect=panel.getBoundingClientRect(),left=(viewport?.offsetLeft||0)+8,top=(viewport?.offsetTop||0)+8,right=left+(viewport?.width||innerWidth)-16,bottom=top+(viewport?.height||innerHeight)-16;
  position={x:Math.max(left,Math.min(value.x,Math.max(left,right-rect.width))),y:Math.max(top,Math.min(value.y,Math.max(top,bottom-rect.height)))};
@@ -52,27 +52,31 @@ function update(){
  panel.dataset.state=state.phase;
  const labels={saved:'Saved',requesting:'Opening microphone…',recording:'Recording',paused:'Paused',transcribing:'Transcribing…',saving:'Saving…','save-error':'Save failed','transcribe-error':'Retry needed'};
  panel.querySelector('.dictation-panel-status').textContent=state.phase==='recording'&&state.stream&&!analyser?'Recording · waveform unavailable':labels[state.phase]||'Dictation';
+ const start=panel.querySelector('.dictation-panel-start');start.hidden=state.busy;start.disabled=!state.canStart||state.caseId!==caseScope;
+ panel.classList.toggle('is-idle',!state.busy);panel.querySelector('.dictation-wave-area').hidden=!state.busy;
  const pause=panel.querySelector('.dictation-panel-pause'),stop=panel.querySelector('.dictation-panel-stop');
  pause.hidden=!state.busy;pause.disabled=!['recording','paused'].includes(state.phase);pause.textContent=state.phase==='paused'?'▶ Resume':'Ⅱ Pause';
  stop.hidden=!state.busy;stop.disabled=['requesting','transcribing','saving'].includes(state.phase);stop.textContent=state.phase==='save-error'?'Retry save':state.phase==='transcribe-error'?'Retry':stop.disabled?'…':'■ Stop';stop.setAttribute('aria-label',state.phase==='save-error'?'Retry save':state.phase==='transcribe-error'?'Retry transcription':'Stop and transcribe');stop.title='Stop recording and transcribe';
- panel.querySelector('.dictation-panel-dismiss').hidden=state.busy||!state.message;
- const detail=panel.querySelector('.dictation-panel-message');detail.textContent=state.message;detail.hidden=!state.message;
- const open=document.querySelector('.dictation-panel-open');open.hidden=!state.busy;open.textContent=labels[state.phase]||'Dictation';
- if(state.busy&&!lastBusy)reveal();
- if(!state.busy&&state.message){const notice=state.phase+'|'+state.message;if(lastNotice!==notice){lastNotice=notice;reveal();}}
- if(!state.message)lastNotice='';
- if(!state.busy&&!state.message)hide();
- lastBusy=state.busy;
+ if(!state.message)dismissedNotice='';
+ const notice=state.phase+'|'+state.message,showMessage=!!state.message&&notice!==dismissedNotice;
+ panel.querySelector('.dictation-panel-dismiss').hidden=state.busy||!showMessage;
+ const detail=panel.querySelector('.dictation-panel-message');detail.textContent=state.message;detail.hidden=!showMessage;
+ panel.classList.toggle('has-message',showMessage);
+ if(caseScope)reveal();else hide();
+
+}
+export function setDictationPanelCase(id){
+ const next=id||null;if(next!==caseScope){position=null;dismissedNotice='';if(panel)for(const key of ['left','top','bottom','transform'])panel.style[key]='';}
+ caseScope=next;if(panel)update();
 }
 export function mountDictationPanel(host){
  if(isReviewPage||panel||!host)return;
  document.body.classList.add('floating-dictation-enabled');
- const open=document.createElement('button');open.type='button';open.className='dictation-panel-open';open.hidden=true;open.setAttribute('aria-controls','dictationRecorder');open.setAttribute('aria-expanded','false');open.addEventListener('click',()=>{if(panel.hidden)reveal();else hide();});host.append(open);
  panel=document.createElement('section');panel.className='dictation-panel';panel.id='dictationRecorder';panel.hidden=true;panel.setAttribute('role','region');panel.setAttribute('aria-label','Dictation recorder');
- panel.innerHTML='<span class="dictation-panel-status" role="status" aria-live="polite"></span><button type="button" class="dictation-panel-pause">Ⅱ Pause</button><div class="dictation-wave-area" tabindex="0" role="group" aria-label="Move recorder: drag here or use arrow keys. Home resets its position."><time class="dictation-timer">00:00</time><canvas class="dictation-waveform" role="img" aria-label="Microphone waveform"></canvas></div><button type="button" class="dictation-panel-stop" aria-label="Stop and transcribe">■ Stop</button><button type="button" class="dictation-panel-dismiss" aria-label="Dismiss recorder message" hidden>×</button><p class="dictation-panel-message" role="status" hidden></p>';
+ panel.innerHTML='<button type="button" class="dictation-panel-start">Start</button><span class="dictation-panel-status" role="status" aria-live="polite"></span><button type="button" class="dictation-panel-pause">Ⅱ Pause</button><div class="dictation-wave-area" tabindex="0" role="group" aria-label="Move recorder: drag here or use arrow keys. Home resets its position."><time class="dictation-timer">00:00</time><canvas class="dictation-waveform" role="img" aria-label="Microphone waveform"></canvas></div><button type="button" class="dictation-panel-stop" aria-label="Stop and transcribe">■ Stop</button><button type="button" class="dictation-panel-dismiss" aria-label="Dismiss recorder message" hidden>×</button><p class="dictation-panel-message" role="status" hidden></p>';
  canvas=panel.querySelector('.dictation-waveform');
- panel.querySelector('.dictation-panel-dismiss').addEventListener('click',hide);
- panel.addEventListener('keydown',event=>{if(event.key==='Escape'){hide();event.preventDefault();}});
+ panel.querySelector('.dictation-panel-dismiss').addEventListener('click',()=>{const state=protocolDictationState();dismissedNotice=state.phase+'|'+state.message;update();});
+ panel.querySelector('.dictation-panel-start').addEventListener('click',()=>{unlockAudio();startProtocolDictation();});
  panel.querySelector('.dictation-panel-pause').addEventListener('click',()=>{unlockAudio();pauseProtocolDictation();});
  panel.querySelector('.dictation-panel-stop').addEventListener('click',finishProtocolDictation);
  document.body.append(panel);mountDrag(panel.querySelector('.dictation-wave-area'));

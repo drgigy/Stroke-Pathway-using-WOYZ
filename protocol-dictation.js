@@ -33,7 +33,8 @@ export function configureProtocolDictation(options) {
 
 export function onProtocolDictationChange(callback) { observers.add(callback); }
 export function protocolDictationBusy() { return busy(); }
-export function protocolDictationState(){return {phase,busy:busy(),message,takeId:session?.id,stream:session?.stream};}
+export function protocolDictationState(){return {phase,busy:busy(),message,takeId:session?.id,stream:session?.stream,caseId:context?.caseId,canStart:!!config&&!!context};}
+export const startProtocolDictation=()=>start();
 export const pauseProtocolDictation=()=>pauseResume();
 export const finishProtocolDictation=()=>finish();
 export async function fillSavedProtocolDictation(id, entry) {

@@ -7,7 +7,7 @@ import { mountDeviceAccess } from './access.js';
 import { configureProtocolDictation, mountProtocolDictationControls, onProtocolDictationChange } from './protocol-dictation.js';
 import { mountDashboardAccess } from './dashboard-access.js';
 import { printFilledProtocol, cancelProtocolPrint } from './protocol-print.js';
-import { mountDictationPanel } from './dictation-panel.js';
+import { mountDictationPanel, setDictationPanelCase } from './dictation-panel.js';
 import { mountPwa, setProtocolCacheAccess } from './pwa.js';
 import { configureKpiWorkspace, ingestKpiSnapshot, showProtocolCase, showKpiReport, hideProtocolViewer, kpiWorkspaceBusy } from './kpi-workspace.js';
 import { currentKpiValues, currentMonthlyValues, isKpiReportingCase } from './kpi-data.js';
@@ -121,7 +121,7 @@ function recoveryNotice(){
  if(!notice){notice=node('div','review-top-message');notice.id='recoveryNotice';notice.append(node('span','','Pending input is available after reconnecting. '),button('Recover pending input',()=>pending.click()));shell.querySelector('.topbar').after(notice);}
 }
 function render(){
- if(!uid)return;if($('adminCaseActions'))$('adminCaseActions').hidden=!selectedId;refreshPrintAction();if($('dictationTopbar'))$('dictationTopbar').hidden=!selectedId;const reviewing=!!selectedId||view==='kpi';shell.classList.toggle('dashboard-wide',view==='dashboard');const installs=$('installControls');if(installs)installs.hidden=view!=='more'||!!selectedId;panel.classList.toggle('standalone-report',view==='kpi'&&!selectedId);screen.hidden=reviewing;panel.hidden=!reviewing;recoveryNotice();
+ if(!uid)return;document.body.classList.toggle('user-case-open',!isReviewPage&&!!selectedId);if(!isReviewPage)setDictationPanelCase(selectedId);if($('adminCaseActions'))$('adminCaseActions').hidden=!selectedId;refreshPrintAction();if($('dictationTopbar'))$('dictationTopbar').hidden=!selectedId;const reviewing=!!selectedId||view==='kpi';shell.classList.toggle('dashboard-wide',view==='dashboard');const installs=$('installControls');if(installs)installs.hidden=view!=='more'||!!selectedId;panel.classList.toggle('standalone-report',view==='kpi'&&!selectedId);screen.hidden=reviewing;panel.hidden=!reviewing;recoveryNotice();
  for(const b of shell.querySelectorAll('[data-view]')){b.classList.toggle('active',b.dataset.view===view);b.setAttribute('aria-current',b.dataset.view===view?'page':'false');}
  $('viewTitle').textContent=selectedId?(isReviewPage?'Case review':'Case dictation'):({home:'Home',cases:'Cases',dashboard:'Dashboard',kpi:'NABH KPI Analysis',analysis:'Analysis',more:'More'})[view];$('viewSubtitle').textContent=selectedId?'Shared patient record':isReviewPage?'Shared case review':'Shared case workspace';
  if(reviewing){if(selectedId){const r=records().find(r=>r.id===selectedId);if(!r){selectedId=null;hideProtocolViewer({reset:true});render();return;}showProtocolCase(scroller,r.id,{data:r._data});}else{showKpiReport(scroller,{month});}fitReviewPanel();return;}
@@ -132,6 +132,7 @@ window.addEventListener('kpi-report-month-changed',event=>{month=event.detail.mo
 window.addEventListener('kpi-case-recovered',event=>{selectedId=event.detail.caseId;view='cases';render();queueMicrotask(recoveryNotice);});
 if(isReviewPage)$('loginForm').addEventListener('submit',async event=>{event.preventDefault();$('loginSubmit').disabled=true;$('loginError').textContent='';try{await signInWithEmailAndPassword(auth,$('loginEmail').value.trim(),$('loginPassword').value);$('loginPassword').value='';}catch{$('loginError').textContent='Unable to sign in. Check your email and password.';}finally{$('loginSubmit').disabled=false;}});
 function locked(message=''){
+ document.body.classList.remove('user-case-open');if(!isReviewPage)setDictationPanelCase(null);
  cancelProtocolPrint();
  setProtocolCacheAccess(false);
  generation++;stopNotes?.();stopNotes=null;uid=null;documents=[];selectedId=null;creating=false;
