@@ -1,6 +1,21 @@
 // Field placements checked against Stroke_Protocol_Form.pdf, PDF-point coordinates.
-export const protocolFieldSource = "4a1d6157a582d92a14c8fa9eaa49f3d850950057526d25095b1965d219e54eed";
-export const protocolFieldVersion = 1;
+export const protocolFieldSource = "28146b3079e05e54e8363d752ff81052a32a0bceca031ed68b75b6370f5fe3bb";
+export const protocolFieldVersion = 2;
+export const protocolLegacyRevisions = [
+  {
+    "source": "4a1d6157a582d92a14c8fa9eaa49f3d850950057526d25095b1965d219e54eed",
+    "version": 1,
+    "fieldAliases": {
+      "1": {
+        "urea_creatinine_tsh": "urea_creatinine"
+      }
+    },
+    "unavailableFields": [
+      "urea_creatinine",
+      "reason_anticoagulation"
+    ]
+  }
+];
 export const protocolFields = [
   [
     {
@@ -614,8 +629,8 @@ export const protocolFields = [
       ]
     },
     {
-      "id": "urea_creatinine_tsh",
-      "label": "Blood urea / Creatinine / TSH drawn",
+      "id": "urea_creatinine",
+      "label": "Blood urea / Creatinine drawn",
       "kind": "check",
       "choices": [
         "Yes",
@@ -2257,6 +2272,21 @@ export const protocolFields = [
       ],
       "box": [
         47,
+        710.7,
+        10,
+        10
+      ]
+    },
+    {
+      "id": "reason_anticoagulation",
+      "label": "Reason for non-treatment: Patient on anticoagulation",
+      "kind": "check",
+      "choices": [
+        "Yes",
+        "No"
+      ],
+      "box": [
+        315,
         710.7,
         10,
         10

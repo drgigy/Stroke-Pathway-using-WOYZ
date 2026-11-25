@@ -7,8 +7,8 @@ export const protocolPages = [
     "height": 1684,
     "pdfWidthPoints": 594.95996,
     "pdfHeightPoints": 841.91998,
-    "sha256": "2b0f3a9715097666cc0c628a63bb71fe93cec27f82ab5c4f6e57aa94bbfe7573",
-    "sourceTextCharacters": 2323
+    "sha256": "600d8804c99a5fc031a17eef27126472970a17ae07242f21154cd42a7da683b3",
+    "sourceTextCharacters": 2318
   },
   {
     "number": 2,
@@ -62,8 +62,8 @@ export const protocolPages = [
     "height": 1684,
     "pdfWidthPoints": 594.95996,
     "pdfHeightPoints": 841.91998,
-    "sha256": "127a02aec6140d16b1ca466ddf4490853f5ba2050e468f5392fecf40fc4ad177",
-    "sourceTextCharacters": 2276
+    "sha256": "eeac9edd6859a027e1a97236dfe16fccec1baeb69777a217276b6aeb08f319ef",
+    "sourceTextCharacters": 2304
   },
   {
     "number": 7,
