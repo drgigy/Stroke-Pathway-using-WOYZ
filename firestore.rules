@@ -77,6 +77,10 @@ service cloud.firestore {
       allow create, update: if access() && self(uid)
         && request.resource.data.keys().hasOnly(['credentialName', 'credentialUpdatedAt', 'prescriptionLayout', 'prescriptionLayoutUpdatedAt', 'email', 'emailUpdatedAt']);
     }
+    match /workspaces/stroke/dictationJobs/{jobId} {
+      allow read: if access();
+      allow create, update, delete: if false;
+    }
     match /workspaces/stroke/notes/{noteId} {
       allow read: if reviewAccess();
       allow create: if access() && validNote() && request.resource.data.createdBy == request.auth.uid

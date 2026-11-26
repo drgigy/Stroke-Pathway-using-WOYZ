@@ -1,1 +1,19 @@
-{ "firestore": { "rules": "firestore.rules", "indexes": "firestore.indexes.json" } }
+{
+  "firestore": {
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  },
+  "functions": [
+    {
+      "source": "functions",
+      "codebase": "stroke-background",
+      "runtime": "nodejs22",
+      "predeploy": [
+        "node scripts/sync-functions.mjs"
+      ]
+    }
+  ],
+  "storage": {
+    "rules": "storage.rules"
+  }
+}

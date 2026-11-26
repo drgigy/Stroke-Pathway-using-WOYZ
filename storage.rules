@@ -1,0 +1,28 @@
+rules_version = '2';
+service firebase.storage {
+ match /b/{bucket}/o {
+  // Preserve the existing unrelated user-owned storage path unchanged.
+  match /users/{userId}/{allPaths=**} {
+   allow read, write: if request.auth != null && request.auth.uid == userId;
+  }
+  function approved() {
+   return request.auth != null && (
+    (request.auth.uid == 'C7uoRRiH1XdpJzLDZMCZHLsmpNv1' && request.auth.token.get('admin', false) == true)
+    || (firestore.exists(/databases/(default)/documents/deviceApprovals/$(request.auth.uid))
+     && firestore.get(/databases/(default)/documents/deviceApprovals/$(request.auth.uid)).data.status == 'approved')
+    || (request.auth.token.get('firebase', {}).get('sign_in_provider', '') == 'password'
+     && firestore.exists(/databases/(default)/documents/dashboardApprovals/$(request.auth.uid))
+     && firestore.get(/databases/(default)/documents/dashboardApprovals/$(request.auth.uid)).data.status == 'approved'));
+  }
+  match /stroke-dictation/{uid}/{jobId}/audio {
+   function job() { return firestore.get(/databases/(default)/documents/workspaces/stroke/dictationJobs/$(jobId)).data; }
+   allow create: if bucket == 'minutes-woyz-3.firebasestorage.app' && approved() && request.auth.uid == uid
+    && job().createdBy == uid && job().status == 'awaiting_upload'
+    && request.time < job().createdAt + duration.value(24, 'h')
+    && request.resource.size > 0 && request.resource.size <= 14 * 1024 * 1024
+    && request.resource.contentType in ['audio/mp4', 'audio/webm']
+    && request.resource.metadata.jobId == jobId;
+   allow read, update, delete: if false;
+  }
+ }
+}

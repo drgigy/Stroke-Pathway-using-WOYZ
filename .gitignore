@@ -4,3 +4,5 @@ firebase-debug.log
 *-debug.log
 .env*
 test-results/
+
+functions/shared/

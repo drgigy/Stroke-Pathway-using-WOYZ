@@ -1,4 +1,4 @@
-import { onProtocolDictationChange, protocolDictationState, pauseProtocolDictation, finishProtocolDictation, startProtocolDictation } from './protocol-dictation.js';
+import { onProtocolDictationChange, protocolDictationState, pauseProtocolDictation, finishProtocolDictation, startProtocolDictation, retryProtocolProcessing } from './protocol-dictation.js';
 import { isReviewPage } from './page-mode.js';
 let panel,canvas,ctx,source,analyser,samples,stream,frame,elapsed=0,recordingSince=null,takeId,caseScope=null,dismissedNotice='',position=null,drag=null;
 function releaseAudio(){source?.disconnect();source=null;analyser=null;samples=null;stream=null;if(ctx){ctx.close().catch(()=>{});ctx=null;}}
@@ -50,13 +50,14 @@ function update(){
  if(state.phase!=='recording'&&recordingSince!==null){elapsed+=Math.max(0,performance.now()-recordingSince);recordingSince=null;}
  if(['recording','paused'].includes(state.phase)&&state.stream)attachAudio(state.stream);else if(state.phase!=='requesting')releaseAudio();
  panel.dataset.state=state.phase;
- const labels={saved:'Saved',requesting:'Opening microphone…',recording:'Recording',paused:'Paused',transcribing:'Transcribing…',saving:'Saving…','save-error':'Save failed','transcribe-error':'Retry needed'};
+ const labels={saved:'Saved',requesting:'Opening microphone…',recording:'Recording',paused:'Paused',transcribing:'Transcribing…',saving:'Saving…',uploading:'Uploading…',uploaded:'Uploaded','upload-error':'Upload needs retry','save-error':'Save failed','transcribe-error':'Retry needed'};
  panel.querySelector('.dictation-panel-status').textContent=state.phase==='recording'&&state.stream&&!analyser?'Recording · waveform unavailable':labels[state.phase]||'Dictation';
  const start=panel.querySelector('.dictation-panel-start');start.hidden=state.busy;start.disabled=!state.canStart||state.caseId!==caseScope;
  panel.classList.toggle('is-idle',!state.busy);panel.querySelector('.dictation-wave-area').hidden=!state.busy;
  const pause=panel.querySelector('.dictation-panel-pause'),stop=panel.querySelector('.dictation-panel-stop');
  pause.hidden=!state.busy;pause.disabled=!['recording','paused'].includes(state.phase);pause.textContent=state.phase==='paused'?'▶ Resume':'Ⅱ Pause';
- stop.hidden=!state.busy;stop.disabled=['requesting','transcribing','saving'].includes(state.phase);stop.textContent=state.phase==='save-error'?'Retry save':state.phase==='transcribe-error'?'Retry':stop.disabled?'…':'■ Stop';stop.setAttribute('aria-label',state.phase==='save-error'?'Retry save':state.phase==='transcribe-error'?'Retry transcription':'Stop and transcribe');stop.title='Stop recording and transcribe';
+ stop.hidden=!state.busy;stop.disabled=['requesting','transcribing','saving','uploading'].includes(state.phase);stop.textContent=state.phase==='upload-error'?'Retry upload':state.phase==='save-error'?'Retry save':state.phase==='transcribe-error'?'Retry':stop.disabled?'…':'■ Stop';stop.setAttribute('aria-label',state.phase==='upload-error'?'Retry upload':state.phase==='save-error'?'Retry save':state.phase==='transcribe-error'?'Retry transcription':state.background?'Stop and upload':'Stop and transcribe');stop.title='Stop recording and transcribe';
+ const retry=panel.querySelector('.dictation-panel-retry');retry.hidden=state.busy||!state.failedJobId;
  if(!state.message)dismissedNotice='';
  const notice=state.phase+'|'+state.message,showMessage=!!state.message&&notice!==dismissedNotice;
  panel.querySelector('.dictation-panel-dismiss').hidden=state.busy||!showMessage;
@@ -73,7 +74,8 @@ export function mountDictationPanel(host){
  if(isReviewPage||panel||!host)return;
  document.body.classList.add('floating-dictation-enabled');
  panel=document.createElement('section');panel.className='dictation-panel';panel.id='dictationRecorder';panel.hidden=true;panel.setAttribute('role','region');panel.setAttribute('aria-label','Dictation recorder');
- panel.innerHTML='<button type="button" class="dictation-panel-start">Start</button><span class="dictation-panel-status" role="status" aria-live="polite"></span><button type="button" class="dictation-panel-pause">Ⅱ Pause</button><div class="dictation-wave-area" tabindex="0" role="group" aria-label="Move recorder: drag here or use arrow keys. Home resets its position."><time class="dictation-timer">00:00</time><canvas class="dictation-waveform" role="img" aria-label="Microphone waveform"></canvas></div><button type="button" class="dictation-panel-stop" aria-label="Stop and transcribe">■ Stop</button><button type="button" class="dictation-panel-dismiss" aria-label="Dismiss recorder message" hidden>×</button><p class="dictation-panel-message" role="status" hidden></p>';
+ panel.innerHTML='<button type="button" class="dictation-panel-start">Start</button><span class="dictation-panel-status" role="status" aria-live="polite"></span><button type="button" class="dictation-panel-pause">Ⅱ Pause</button><div class="dictation-wave-area" tabindex="0" role="group" aria-label="Move recorder: drag here or use arrow keys. Home resets its position."><time class="dictation-timer">00:00</time><canvas class="dictation-waveform" role="img" aria-label="Microphone waveform"></canvas></div><button type="button" class="dictation-panel-stop" aria-label="Stop and transcribe">■ Stop</button><button type="button" class="dictation-panel-dismiss" aria-label="Dismiss recorder message" hidden>×</button><button type="button" class="dictation-panel-retry" hidden>Retry processing</button><p class="dictation-panel-message" role="status" hidden></p>';
+ panel.querySelector('.dictation-panel-retry').addEventListener('click',retryProtocolProcessing);
  canvas=panel.querySelector('.dictation-waveform');
  panel.querySelector('.dictation-panel-dismiss').addEventListener('click',()=>{const state=protocolDictationState();dismissedNotice=state.phase+'|'+state.message;update();});
  panel.querySelector('.dictation-panel-start').addEventListener('click',()=>{unlockAudio();startProtocolDictation();});

@@ -4,7 +4,7 @@ import { getFirestore, collection, onSnapshot, doc, runTransaction, serverTimest
 import { firebaseConfig } from './firebase-config.js';
 import { isReviewPage } from './page-mode.js';
 import { mountDeviceAccess } from './access.js';
-import { configureProtocolDictation, mountProtocolDictationControls, onProtocolDictationChange } from './protocol-dictation.js';
+import { configureProtocolDictation, setProtocolDictationAccess, mountProtocolDictationControls, onProtocolDictationChange } from './protocol-dictation.js';
 import { mountDashboardAccess } from './dashboard-access.js';
 import { printFilledProtocol, cancelProtocolPrint } from './protocol-print.js';
 import { mountDictationPanel, setDictationPanelCase } from './dictation-panel.js';
@@ -132,6 +132,7 @@ window.addEventListener('kpi-report-month-changed',event=>{month=event.detail.mo
 window.addEventListener('kpi-case-recovered',event=>{selectedId=event.detail.caseId;view='cases';render();queueMicrotask(recoveryNotice);});
 if(isReviewPage)$('loginForm').addEventListener('submit',async event=>{event.preventDefault();$('loginSubmit').disabled=true;$('loginError').textContent='';try{await signInWithEmailAndPassword(auth,$('loginEmail').value.trim(),$('loginPassword').value);$('loginPassword').value='';}catch{$('loginError').textContent='Unable to sign in. Check your email and password.';}finally{$('loginSubmit').disabled=false;}});
 function locked(message=''){
+ if(!isReviewPage)setProtocolDictationAccess(null);
  document.body.classList.remove('user-case-open');if(!isReviewPage)setDictationPanelCase(null);
  cancelProtocolPrint();
  setProtocolCacheAccess(false);
@@ -142,6 +143,7 @@ function locked(message=''){
  screen.replaceChildren();scroller.replaceChildren();$('recoveryNotice')?.remove();for(const d of document.querySelectorAll('dialog[open]'))d.close();
 }
 function granted(user,details){
+ if(!isReviewPage)setProtocolDictationAccess(user.uid);
  if(uid&&uid!==user.uid)hideProtocolViewer({reset:true,clearRecords:true,discardPending:true});
  setProtocolCacheAccess(true);
  if(pendingDraft&&pendingDraft.uid!==user.uid)pendingDraft=null;

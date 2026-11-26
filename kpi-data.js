@@ -1,4 +1,5 @@
 import { kpiFields, hospitalFields, kpiSource, kpiSchemaVersion } from './kpi-schema.js';
+import { compareEntries } from './entry-order.js';
 import { currentFieldValues } from './protocol-field-output.js';
 
 const MAX_VALUE = 4000;
@@ -69,25 +70,12 @@ export function normalizeKpiFields(fields, definitions = kpiFields, { allowEmpty
 // Alias for callers which describe normalization as validation. Both return a string map.
 export const validateKpiFields = normalizeKpiFields;
 
-function entryTime(entry) {
-  const stamp = entry.createdAt;
-  if (Number.isFinite(stamp?.seconds)) return [stamp.seconds, stamp.nanoseconds || 0];
-  const milliseconds = Date.parse(entry.recordedAt || '');
-  if (!Number.isFinite(milliseconds)) return [0, 0];
-  const seconds = Math.floor(milliseconds / 1000);
-  return [seconds, (milliseconds - seconds * 1000) * 1e6];
-}
-
 function mergedEntries(entries, definitions) {
   const allowed = definitionsMap(definitions), result = {};
   const ordered = Object.entries(isMap(entries) ? entries : {})
     .filter(([, entry]) => isMap(entry) && entry.source === kpiSource
       && entry.version === kpiSchemaVersion && isMap(entry.fields))
-    .sort(([aId, a], [bId, b]) => {
-      const at = entryTime(a), bt = entryTime(b);
-      return at[0] - bt[0] || at[1] - bt[1]
-        || String(a.recordedAt || '').localeCompare(String(b.recordedAt || '')) || aId.localeCompare(bId);
-    });
+    .sort(([aId,a],[bId,b])=>compareEntries(a,b,aId,bId));
   for (const [, entry] of ordered) {
     for (const [id, value] of Object.entries(entry.fields)) {
       if (allowed.has(id) && typeof value === 'string' && value.length <= MAX_VALUE

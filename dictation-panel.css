@@ -25,3 +25,5 @@ body.user-case-open #appShell>.topbar{display:none!important}
 .dictation-panel-start{grid-column:1/-1;background:#b5121b;color:white;min-width:96px}
 .dictation-panel.is-idle:not(.has-message){width:auto;grid-template-columns:auto;padding:4px;border-radius:28px}
 .dictation-panel.is-idle.has-message{grid-template-columns:1fr auto}.dictation-panel.is-idle.has-message .dictation-panel-start{grid-column:1}.dictation-panel.is-idle.has-message .dictation-panel-dismiss{grid-column:2}
+
+.dictation-panel-retry{grid-column:1/-1;background:#603338;color:#fff}.dictation-panel.is-idle:has(.dictation-panel-retry:not([hidden])){width:min(460px,calc(100vw - 24px));grid-template-columns:1fr auto}

@@ -1,5 +1,7 @@
 import { protocolFields, protocolFieldSource, protocolFieldVersion, protocolLegacyRevisions } from './protocol-fields.js';
 
+import { compareEntries } from './entry-order.js';
+
 export { protocolFieldSource, protocolFieldVersion };
 export function fieldContract(pageNumber) {
   const fields = protocolFields[pageNumber - 1];
@@ -28,14 +30,9 @@ export function validateFieldOutput(parsed, pageNumber) {
   }
   return { text: parsed.text.trim(), fields };
 }
-function entryTime(entry) {
-  return Number.isFinite(entry.createdAt?.seconds) ? entry.createdAt.seconds : (Date.parse(entry.recordedAt || '') || 0) / 1000;
-}
 export function orderedDictations(dictations) {
-  return Object.entries(dictations || {}).filter(([, entry]) => entry && typeof entry.text === 'string').sort((a, b) =>
-    entryTime(a[1]) - entryTime(b[1])
-    || (a[1].createdAt?.nanoseconds || 0) - (b[1].createdAt?.nanoseconds || 0)
-    || String(a[1].recordedAt || '').localeCompare(String(b[1].recordedAt || '')) || a[0].localeCompare(b[0]));
+  return Object.entries(dictations || {}).filter(([, entry]) => entry && typeof entry.text === 'string')
+    .sort(([aId,a],[bId,b])=>compareEntries(a,b,aId,bId));
 }
 export function currentFieldValues(dictations, pageNumber) {
   const allowed = new Set(fieldContract(pageNumber).map(field => field.id)), values = {};
