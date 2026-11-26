@@ -52,7 +52,7 @@ export const setProtocolDictationAccess=uid=>setBackgroundAccess(uid);
 export async function retryProtocolProcessing(){const id=backgroundSummary(context?.caseId).failedJobId;if(!id)return;try{await retryBackgroundProcessing(id);message='Processing retry queued.';}catch{message='Unable to retry processing. Check access and connection.';}render();}
 export function onProtocolDictationChange(callback) { observers.add(callback); }
 export function protocolDictationBusy() { return busy(); }
-export function protocolDictationState(){const queue=backgroundSummary(context?.caseId);return {phase,busy:busy(),localMessage:message,lastUpload,uploadProgress:session?.uploadProgress??null,message:backgroundEnabled&&!busy()?(queue.message||message):message,failedJobId:queue.failedJobId,background:backgroundEnabled,takeId:session?.id,stream:session?.stream,caseId:context?.caseId,canStart:!!config&&!!context};}
+export function protocolDictationState(){const queue=backgroundSummary(context?.caseId),receipt=queue.noSpeechNotice&&(!lastUpload||queue.noSpeechNotice.confirmedAt>lastUpload.confirmedAt)?queue.noSpeechNotice:lastUpload;return {phase,busy:busy(),localMessage:message,lastUpload:receipt,uploadProgress:session?.uploadProgress??null,message:backgroundEnabled&&!busy()?(queue.message||message):message,failedJobId:queue.failedJobId,background:backgroundEnabled,takeId:session?.id,stream:session?.stream,caseId:context?.caseId,canStart:!!config&&!!context};}
 export const startProtocolDictation=()=>start();
 export const pauseProtocolDictation=()=>pauseResume();
 export const finishProtocolDictation=()=>finish();
@@ -198,7 +198,7 @@ async function finish() {
   if (!active || ['requesting', 'transcribing', 'saving', 'uploading'].includes(phase)) return;
   if(active.background){
     phase='uploading';active.uploadProgress=null;message='Uploading recording…';render();
-    try{const blob=await capture(active);if(session!==active)return;if(!blob.size){session=null;phase='idle';message='No audio was captured. Please start dictation again.';render();return;}await uploadBackgroundRecording(active,blob,percent=>{if(session===active){active.uploadProgress=percent;message='Uploading recording… '+percent+'%';render();}});if(session!==active)return;lastUpload={id:active.id,caseId:active.caseId,confirmedAt:Date.now()};session=null;phase='uploaded';message='Uploaded. Processing continues in the background; you can continue working.';render();}
+    try{const blob=await capture(active);if(session!==active)return;if(!blob.size){lastUpload={id:active.id,caseId:active.caseId,confirmedAt:Date.now(),noSpeech:true};session=null;phase='uploaded';message='';render();return;}await uploadBackgroundRecording(active,blob,percent=>{if(session===active){active.uploadProgress=percent;message='Uploading recording… '+percent+'%';render();}});if(session!==active)return;lastUpload={id:active.id,caseId:active.caseId,confirmedAt:Date.now(),noSpeech:!!active.noSpeech};session=null;phase='uploaded';message='Uploaded. Processing continues in the background; you can continue working.';render();}
     catch{releaseMic(active);if(session!==active)return;phase='upload-error';message='Upload not confirmed. Keep this page open and retry upload. Audio is still held on this device.';render();}
     return;
   }

@@ -4,14 +4,11 @@
 .protocol-print-page{width:210mm;height:297mm;position:relative;box-sizing:border-box;page:protocol;break-inside:avoid;break-after:page;margin:0;padding:0;background:#fff}
 .protocol-print-page:last-child{break-after:auto}.protocol-print-page .protocol-form-canvas{position:relative;width:100%;height:100%;container-type:inline-size}.protocol-print-image{display:block;width:100%;height:100%;max-width:none}.protocol-print-page .protocol-field-layer{position:absolute;inset:0;pointer-events:none}
 .protocol-print-value{position:absolute;box-sizing:border-box;margin:0;padding:0 1px;border:0;background:transparent;color:#000;font-family:Arial,sans-serif;font-weight:600;line-height:1.1;white-space:pre-wrap;overflow-wrap:anywhere;overflow:hidden;text-align:left}
-.protocol-print-tick{padding:0;display:grid;place-items:center}.protocol-print-tick svg{display:block;width:100%;height:100%}.protocol-print-continuations{page:continuation;width:182mm;margin:0 auto;background:white;color:black;font:11pt/1.4 Arial,sans-serif}.protocol-print-continuations h1{font-size:16pt}.protocol-print-continuations h2{font-size:11pt;break-after:avoid;margin:16pt 0 5pt}.protocol-print-continuations p{margin:0;white-space:pre-wrap;overflow-wrap:anywhere;orphans:3;widows:3}
-@media(max-width:600px){.topbar:has(.admin-case-actions:not([hidden])) .brand-mark{width:32px;height:32px;border-radius:11px}.topbar:has(.admin-case-actions:not([hidden])) .brand h1{font-size:15px;line-height:1.2}.admin-case-actions button{font-size:12px;max-width:110px;padding:8px}}
+.protocol-print-tick{padding:0;display:grid;place-items:center}.protocol-print-tick svg{display:block;width:100%;height:100%}@media(max-width:600px){.topbar:has(.admin-case-actions:not([hidden])) .brand-mark{width:32px;height:32px;border-radius:11px}.topbar:has(.admin-case-actions:not([hidden])) .brand h1{font-size:15px;line-height:1.2}.admin-case-actions button{font-size:12px;max-width:110px;padding:8px}}
 @media print{
  @page protocol{size:A4 portrait;margin:0}
- @page continuation{size:A4 portrait;margin:14mm}
  body.printing-filled-protocol{margin:0!important;padding:0!important;background:white!important;min-width:0!important}
  body.printing-filled-protocol>:not(#protocolPrintRoot){display:none!important}
  body.printing-filled-protocol #protocolPrintRoot{display:block!important;position:static!important;left:auto!important;top:auto!important;width:210mm!important;height:auto!important;overflow:visible!important;opacity:1!important;pointer-events:none;z-index:auto;print-color-adjust:exact;-webkit-print-color-adjust:exact}
  .protocol-print-page{width:210mm!important;height:297mm!important;max-width:none!important;box-shadow:none!important;border:0!important}
- .protocol-print-continuations{padding:0;box-sizing:border-box}
 }

@@ -40,7 +40,7 @@ export function createDictationService({db,auth,bucket,now,stamp,serverTime,tran
   const ref=jobRef(parsed.id),snapshot=await ref.get();
   if(!snapshot.exists){await bucket.file(path).delete({ignoreNotFound:true});return {ignored:true};}
   const job=snapshot.data();if(job.createdBy!==parsed.uid)throw failure('permission-denied');
-  if(['completed','cancelled'].includes(job.status)){await bucket.file(path).delete({ignoreNotFound:true});return {status:job.status};}
+  if(['completed','no_speech','cancelled'].includes(job.status)){await bucket.file(path).delete({ignoreNotFound:true});return {status:job.status};}
   if(job.status!=='awaiting_upload')return {status:job.status};
   const [metadata]=await bucket.file(path).getMetadata();
   if(Number(metadata.size)<=0||Number(metadata.size)>MAX_BYTES||!['audio/mp4','audio/webm'].includes(metadata.contentType)
@@ -55,7 +55,7 @@ export function createDictationService({db,auth,bucket,now,stamp,serverTime,tran
   await userAccess(uid,s.data().provider);
   const path=audioPath(uid,request.data.id),[exists]=await bucket.file(path).exists();
   if(exists)await queueAudio(path);
-  return {uploaded:exists||['queued','processing','completed'].includes(s.data().status),status:(await ref.get()).data().status};
+  return {uploaded:exists||['queued','processing','completed','no_speech'].includes(s.data().status),status:(await ref.get()).data().status};
  }
  async function retry(request){
   const uid=request.auth?.uid;if(!uid)throw failure('unauthenticated');const ref=jobRef(request.data?.id),s=await ref.get();
@@ -68,7 +68,7 @@ export function createDictationService({db,auth,bucket,now,stamp,serverTime,tran
   const ref=jobRef(id);let claimed;
   await db.runTransaction(async tx=>{
    const s=await tx.get(ref);if(!s.exists)return;const job=s.data();
-   if(job.status==='completed'){claimed={...job,id,alreadyDone:true};return;}
+   if(['completed','no_speech'].includes(job.status)){claimed={...job,id,alreadyDone:true};return;}
    if(!['queued','processing'].includes(job.status))return;
    if(job.status==='processing'&&job.leaseUntil?.toMillis()>now())throw failure('lease-busy');
    if((job.attempts||0)>=3){tx.update(ref,{status:'failed',errorCode:'retry-limit',updatedAt:serverTime()});return;}
@@ -89,19 +89,19 @@ export function createDictationService({db,auth,bucket,now,stamp,serverTime,tran
    await db.runTransaction(async tx=>{
     const [current,note]=await Promise.all([tx.get(ref),tx.get(db.doc(CASE+claimed.caseId))]);
     await userAccess(claimed.createdBy,claimed.provider,tx);
-    if(current.data()?.status==='completed')return;
+    if(['completed','no_speech'].includes(current.data()?.status))return;
     if(current.data()?.lease!==claimed.lease)throw failure('lease-changed');
     if(!note.exists||note.data().deleted||note.data().noteType!=='code7')throw failure('case-unavailable');
-    const plan=backgroundMergePlan(note.data(),claimed,output,serverTime());
-    tx.update(db.doc(CASE+claimed.caseId),plan.patch);
-    tx.update(ref,{status:'completed',completedAt:serverTime(),updatedAt:serverTime(),skipped:plan.skipped,warnings:plan.warnings,leaseUntil:stamp(0),errorCode:''});
+    const plan=output.noSpeech?null:backgroundMergePlan(note.data(),claimed,output,serverTime());
+    if(plan)tx.update(db.doc(CASE+claimed.caseId),plan.patch);
+    tx.update(ref,{status:output.noSpeech?'no_speech':'completed',completedAt:serverTime(),updatedAt:serverTime(),skipped:plan?.skipped||[],warnings:plan?.warnings||[],leaseUntil:stamp(0),errorCode:''});
    });
    await file.delete({ignoreNotFound:true});
   }catch(error){
    const code=['permission-denied','auth/user-not-found','case-unavailable','invalid-audio','form-version-changed'].includes(error.code)?error.code
     :error.code==='key-unavailable'?'key-unavailable':error.code==='invalid-output'?'invalid-output':'processing-unavailable';
    const terminal=code!=='processing-unavailable'||claimed.attempts>=3;
-   await db.runTransaction(async tx=>{const s=await tx.get(ref);if(s.data()?.status==='completed'||s.data()?.lease!==claimed.lease)return;tx.update(ref,{status:terminal?'failed':'processing',errorCode:code,leaseUntil:stamp(0),updatedAt:serverTime()});});
+   await db.runTransaction(async tx=>{const s=await tx.get(ref);if(['completed','no_speech'].includes(s.data()?.status)||s.data()?.lease!==claimed.lease)return;tx.update(ref,{status:terminal?'failed':'processing',errorCode:code,leaseUntil:stamp(0),updatedAt:serverTime()});});
    if(['permission-denied','auth/user-not-found','case-unavailable'].includes(code))await file.delete({ignoreNotFound:true});
    if(!terminal)throw failure('processing-unavailable');
   }

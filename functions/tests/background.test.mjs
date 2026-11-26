@@ -30,15 +30,15 @@ test('completion order does not determine clinical order; newer manual edits and
  assert.equal(note.protocolDictations.page6.recording.createdAt.seconds,200);assert.equal(note.protocolDictations.page6.recording.effectiveAt.seconds,100);
 });
 function fixture(){
- let clock=1000000,approved=true,disabled=false,transcriptions=0,failures=0,hold=null;
+ let clock=1000000,approved=true,disabled=false,transcriptions=0,failures=0,hold=null,customOutput=null;
  const docs=new Map([['workspaces/stroke/notes/patientA',{noteType:'code7'}],['workspaces/stroke/notes/patientB',{noteType:'code7'}],['runtimeSecrets/gemini',{enabled:true,key:'synthetic-not-a-real-key'}]]),files=new Map();
  const read=path=>path==='deviceApprovals/approved-user'?{status:approved?'approved':'blocked'}:docs.get(path);
  const db={doc:path=>({path,async get(){const data=read(path);return {exists:!!data,data:()=>data};},async update(patch){apply(docs.get(path),patch);}}),async runTransaction(fn){const changes=[];const tx={get:ref=>ref.get(),create:(ref,value)=>{if(docs.has(ref.path))throw Error('exists');changes.push(()=>docs.set(ref.path,value));},update:(ref,patch)=>changes.push(()=>apply(docs.get(ref.path),patch))};const result=await fn(tx);for(const change of changes)change();return result;}};
  const bucket={file:path=>({async getMetadata(){const value=files.get(path);if(!value)throw Error('not-found');return [value];},async download(){if(!files.has(path))throw Error('not-found');return [Buffer.from('synthetic')];},async exists(){return [files.has(path)];},async delete(){files.delete(path);}})};
- const service=createDictationService({db,auth:{getUser:async()=>({disabled})},bucket,now:()=>clock,stamp:ms=>time(ms/1000),serverTime:()=>time(clock/1000),transcribe:async()=>{transcriptions++;if(hold)await hold;if(failures-->0)throw Error('temporary');return output();}});
+ const service=createDictationService({db,auth:{getUser:async()=>({disabled})},bucket,now:()=>clock,stamp:ms=>time(ms/1000),serverTime:()=>time(clock/1000),transcribe:async()=>{transcriptions++;if(hold)await hold;if(failures-->0)throw Error('temporary');return customOutput||output();}});
  const request=(id='take1',caseId='patientA')=>({auth:{uid:'approved-user',token:{firebase:{sign_in_provider:'anonymous'}}},data:{id,caseId,source,version,recordedAt:'2026-11-26T07:00:00+05:30'}});
  const upload=async(id='take1')=>{const path=audioPath('approved-user',id);files.set(path,{size:'100',contentType:'audio/mp4',generation:'1',metadata:{jobId:id}});await service.queueAudio(path);};
- return {docs,files,service,request,upload,clock:()=>clock,advance:ms=>clock+=ms,revoke:()=>approved=false,disable:()=>disabled=true,fail:n=>failures=n,count:()=>transcriptions,hold:p=>hold=p};
+ return {docs,files,service,request,upload,clock:()=>clock,advance:ms=>clock+=ms,revoke:()=>approved=false,disable:()=>disabled=true,fail:n=>failures=n,count:()=>transcriptions,hold:p=>hold=p,result:o=>customOutput=o};
 }
 test('reservation is idempotent and pins case; commit is atomic, duplicate delivery safe, audio removed',async()=>{
  const f=fixture();await f.service.prepare(f.request());await f.service.prepare(f.request());await assert.rejects(f.service.prepare(f.request('take1','patientB')));
@@ -77,4 +77,14 @@ test('password and anonymous approval branches match the user page and cannot by
  const f=fixture(),request=f.request();request.auth.token.firebase.sign_in_provider='password';await assert.rejects(f.service.prepare(request));
  f.docs.set('dashboardApprovals/approved-user',{status:'approved'});await f.service.prepare(request);
  f.docs.set('dashboardApprovals/approved-user',{status:'blocked'});await assert.rejects(f.service.prepare({...request,data:{...request.data,id:'other'}}));
+});
+
+test('silence is a terminal no-speech result, never writes case fields or offers processing retry',async()=>{
+ const silent=validateCaseWideOutput({speechDetected:false,text:'',pages:[],kpiFields:[]});assert.equal(silent.noSpeech,true);
+ assert.throws(()=>validateCaseWideOutput({speechDetected:false,text:'A dictated name',pages:[],kpiFields:[]}));
+ assert.throws(()=>validateCaseWideOutput({speechDetected:false,text:'',pages:[{pageNumber:'1',fields:[]}],kpiFields:[]}));
+ assert.equal(validateCaseWideOutput({speechDetected:true,text:'Yes',pages:[],kpiFields:[]}).text,'Yes');
+ const f=fixture();f.result(silent);await f.service.prepare(f.request());await f.upload();await f.service.process('take1');await f.service.process('take1');
+ assert.equal(f.count(),1);assert.equal(f.files.size,0);assert.equal(f.docs.get('workspaces/stroke/dictationJobs/take1').status,'no_speech');
+ assert.deepEqual(f.docs.get('workspaces/stroke/notes/patientA'),{noteType:'code7'});assert.equal((await f.service.confirm(f.request())).uploaded,true);await assert.rejects(f.service.retry(f.request()));
 });

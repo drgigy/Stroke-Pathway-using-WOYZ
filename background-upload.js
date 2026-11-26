@@ -1,7 +1,7 @@
 import { backgroundConfig as settings } from './background-config.js';
 import { protocolFieldSource,protocolFieldVersion } from './protocol-fields.js';
 let options,accessUid=null,stopWatching=null,epoch=0,jobs=[],sdkPromise;
-const listeners=new Set(),acknowledged=new Set();
+const listeners=new Set(),acknowledged=new Set(),seenSilentJobs=new Set(),speechNotices=new Map();
 export const backgroundEnabled=settings.enabled;
 export function configureBackgroundUpload(value){options=value;}
 export function onBackgroundChange(callback){listeners.add(callback);}
@@ -15,11 +15,13 @@ function guard(uid){if(!uid||accessUid!==uid||options?.auth.currentUser?.uid!==u
 async function call(name,data,uid){guard(uid);const api=await sdk();guard(uid);const response=await api.fn.httpsCallable(api.functions,name)(data);guard(uid);return response.data;}
 export function setBackgroundAccess(uid){
  if(!settings.enabled||uid===accessUid)return;
- accessUid=uid||null;const current=++epoch;stopWatching?.();stopWatching=null;jobs=[];acknowledged.clear();changed();
+ accessUid=uid||null;const current=++epoch;stopWatching?.();stopWatching=null;jobs=[];acknowledged.clear();seenSilentJobs.clear();speechNotices.clear();changed();
  if(!uid)return;
  sdk().then(api=>{if(current!==epoch)return;const f=api.firestore;
   stopWatching=f.onSnapshot(f.query(f.collection(options.db,'workspaces','stroke','dictationJobs'),f.where('createdBy','==',uid),f.orderBy('createdAt','desc'),f.limit(50)),snapshot=>{
-   if(current!==epoch)return;jobs=snapshot.docs.map(doc=>({id:doc.id,...doc.data()}));changed();
+   if(current!==epoch)return;jobs=snapshot.docs.map(doc=>({id:doc.id,...doc.data()}));
+   for(const job of jobs){if(job.status!=='no_speech'||seenSilentJobs.has(job.id))continue;seenSilentJobs.add(job.id);const completed=job.completedAt?.toMillis?.()??job.completedAt?.seconds*1000;if(Number.isFinite(completed)&&Date.now()-completed<60000)speechNotices.set(job.caseId,{id:job.id,caseId:job.caseId,confirmedAt:Date.now(),noSpeech:true});}
+   changed();
   },()=>{if(current===epoch){jobs=[];changed();}});
  }).catch(()=>{});
 }
@@ -30,7 +32,7 @@ export async function prepareBackgroundRecording(active){
 }
 export async function uploadBackgroundRecording(active,blob,progress){
  guard(active.uid);active.abort.signal.throwIfAborted();
- if(active.uploadAttempted){const check=await call('confirmStrokeDictation',{id:active.id},active.uid);if(check.uploaded){acknowledged.add(active.id);changed();return;}}
+ if(active.uploadAttempted){const check=await call('confirmStrokeDictation',{id:active.id},active.uid);if(check.uploaded){active.noSpeech=check.status==='no_speech';acknowledged.add(active.id);changed();return;}}
  const type=blob.type.split(';')[0];if(!blob.size||blob.size>14*1024*1024||!['audio/mp4','audio/webm'].includes(type))throw new Error('invalid-audio');
  const api=await sdk();guard(active.uid);active.abort.signal.throwIfAborted();
  active.uploadAttempted=true;
@@ -46,6 +48,6 @@ export function backgroundSummary(caseId){
  if(!settings.enabled||!accessUid)return {message:'',failedJobId:null};
  const entries=jobs.filter(job=>job.caseId===caseId),pending=entries.filter(job=>['queued','processing'].includes(job.status)||job.status==='awaiting_upload'&&acknowledged.has(job.id));
  const failed=entries.find(job=>job.status==='failed');
- return {message:pending.length?`${pending.length} uploaded recording${pending.length===1?'':'s'} processing. You can continue working.`:failed?'A recording needs a processing retry.':entries[0]?.status==='completed'?'Dictation saved.':'',failedJobId:failed?.id||null};
+ return {message:pending.length?`${pending.length} uploaded recording${pending.length===1?'':'s'} processing. You can continue working.`:failed?'A recording needs a processing retry.':entries[0]?.status==='completed'?'Dictation saved.':'',failedJobId:failed?.id||null,noSpeechNotice:speechNotices.get(caseId)||null};
 }
 export async function retryBackgroundProcessing(id){await call('retryStrokeDictation',{id},accessUid);}

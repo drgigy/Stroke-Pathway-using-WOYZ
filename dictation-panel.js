@@ -59,7 +59,7 @@ function update(){
  const progress=upload.querySelector('progress'),percent=state.uploadProgress;
  if(Number.isFinite(percent))progress.value=Math.max(0,Math.min(100,percent));else progress.removeAttribute('value');
  upload.querySelector('.dictation-upload-label').textContent=Number.isFinite(percent)?'Uploading… '+Math.round(percent)+'%':'Preparing upload…';
- const receipt=panel.querySelector('.dictation-uploaded');receipt.hidden=!uploaded;
+ const receipt=panel.querySelector('.dictation-uploaded');receipt.hidden=!uploaded;receipt.textContent=state.lastUpload?.noSpeech?'No speech detected':'Uploaded. You can continue your work.';
  panel.dataset.state=state.phase;
  const labels={saved:'Saved',requesting:'Opening microphone…',recording:'Recording',paused:'Paused',transcribing:'Transcribing…',saving:'Saving…',uploading:'Uploading…',uploaded:'Uploaded','upload-error':'Upload needs retry','save-error':'Save failed','transcribe-error':'Retry needed'};
  panel.querySelector('.dictation-panel-status').textContent=state.phase==='recording'&&state.stream&&!analyser?'Recording · waveform unavailable':labels[state.phase]||'Dictation';
