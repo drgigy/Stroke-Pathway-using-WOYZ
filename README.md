@@ -101,6 +101,6 @@ Dictation request latency (25 November 2026): repeated per-field instructions ar
 
 Protocol template revision 2 (25 November 2026) removes TSH from the page-1 blood urea/creatinine label and adds Patient on anticoagulation to the empty page-6 non-treatment row. The source PDF and only the page-1/page-6 SVGs change; the other seven SVGs remain byte-identical. Source provenance and both approved edits are recorded in protocol/source-manifest.json. The previous PDF fingerprint/version is explicitly recognized for read-only merging of existing entries; its laboratory ID maps to urea_creatinine, with no Firestore rewrite. New anticoagulation reason entries require revision 2; legacy and unrelated sources cannot fabricate the new field. Dictation must explicitly state anticoagulation as a non-treatment reason; medication use alone does not establish it.
 
-## Prepared background dictation
+## Background dictation
 
-Case-wide extraction and durable server processing are implemented behind a disabled feature flag. Activation is pending Blaze billing and scoped backend deployment in `minutes-woyz-3`; the live foreground workflow remains enabled. See [BACKGROUND-DICTATION.md](BACKGROUND-DICTATION.md) for architecture, checks, deployment prerequisites and rollback.
+Case-wide extraction and durable server processing are active in `minutes-woyz-3`. After upload acknowledgement, staff can navigate or record again while the server fills the original shared case. Newer manual corrections are protected; paper consent/counseling forms are excluded. See [BACKGROUND-DICTATION.md](BACKGROUND-DICTATION.md) for architecture, validation, deployment details and rollback.

@@ -72,3 +72,9 @@ test('Gemini request uses all clinical contracts; invalid or truncated output ne
   globalThis.fetch=async()=>({ok:true,json:async()=>({candidates:[{finishReason:'MAX_TOKENS'}]})});await assert.rejects(transcribeCase({audio:Buffer.from('x'),mimeType:'audio/mp4',key:'fake'}),{code:'invalid-output'});
  }finally{globalThis.fetch=original;}
 });
+
+test('password and anonymous approval branches match the user page and cannot bypass a revoked password approval',async()=>{
+ const f=fixture(),request=f.request();request.auth.token.firebase.sign_in_provider='password';await assert.rejects(f.service.prepare(request));
+ f.docs.set('dashboardApprovals/approved-user',{status:'approved'});await f.service.prepare(request);
+ f.docs.set('dashboardApprovals/approved-user',{status:'blocked'});await assert.rejects(f.service.prepare({...request,data:{...request.data,id:'other'}}));
+});

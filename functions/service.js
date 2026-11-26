@@ -13,8 +13,8 @@ export function createDictationService({db,auth,bucket,now,stamp,serverTime,tran
   const user=await auth.getUser(uid);if(user.disabled)throw failure('permission-denied');
   if(uid===OWNER&&user.customClaims?.admin===true)return;
   const read=ref=>tx?tx.get(ref):ref.get();
-  const [device,dashboard]=await Promise.all([read(db.doc('deviceApprovals/'+uid)),read(db.doc('dashboardApprovals/'+uid))]);
-  if(device.data()?.status!=='approved'&&!(provider==='password'&&dashboard.data()?.status==='approved'))throw failure('permission-denied');
+  const approval=await read(db.doc((provider==='password'?'dashboardApprovals/':'deviceApprovals/')+uid));
+  if(approval.data()?.status!=='approved')throw failure('permission-denied');
  }
  async function prepare(request){
   const uid=request.auth?.uid,provider=request.auth?.token?.firebase?.sign_in_provider||'';

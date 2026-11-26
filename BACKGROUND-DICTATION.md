@@ -1,7 +1,11 @@
-# Case-wide background dictation — prepared, not activated
+# Case-wide background dictation — active
 
 Scope: `drgigy/Stroke-Pathway-using-WOYZ`, Firebase `minutes-woyz-3` only.
-`background-config.js` deliberately has `enabled:false`. Existing foreground dictation remains active. No cloud functions, storage policies, billing settings, or deployed rules were changed while preparing this feature.
+`background-config.js` is enabled after deployment and synthetic live checks on 2026-11-26. Five functions, job/audio rules, the job query index, prefix-only audio lifecycle and job TTL are active in this project. All other repositories and Firebase projects were untouched.
+
+Live verification covered approved account/device shared access, denied unapproved access and forged job updates, cross-page extraction to pages 1/2/3/6/9 and KPI fields, paper-form exclusion, a manual correction made after recording began, original-case isolation, duplicate confirmation, private audio removal and revocation before commit. Temporary synthetic cases, accounts, jobs and audio were cleaned up. Mobile fixture tests cover navigation after upload, retry, reload and access loss.
+
+The worker's conditional Storage role is bound at project level with an exact bucket/audio-prefix condition, preserving the bucket's existing ACL mode. Private event receivers grant invocation only to the dedicated worker account. Storage checks one provider-appropriate approval record plus the reserved job, staying within its two-document rules limit. Completed audio is deleted from active storage; the bucket's pre-existing seven-day soft-delete recovery policy is unchanged.
 
 ## Workflow
 
@@ -13,7 +17,7 @@ Scope: `drgigy/Stroke-Pathway-using-WOYZ`, Firebase `minutes-woyz-3` only.
 6. Results retain server recording-start order. Newer recordings win when overlapping; any intervening manual correction or deliberate clear is preserved. Full dictated text remains saved in the case's existing dictation history, with skipped-field warnings for review.
 7. Jobs have finite retries and leases; duplicate events cannot save twice. Failed processing can be retried from the recorder without uploading again, while audio remains available. Revoked/disabled users are checked before processing and again before commit.
 
-This changes waiting behavior; it does not guarantee faster Gemini inference or a fixed completion time. No real clinical audio has been benchmarked for this prepared backend.
+This changes waiting behavior; it does not guarantee faster Gemini inference or a fixed completion time. Live testing used synthetic audio; real clinical latency has not been benchmarked.
 
 ## Validation
 
@@ -26,7 +30,7 @@ Run `node scripts/check-background-preflight.mjs` first. It refuses the wrong re
 After Blaze is enabled:
 
 1. Re-read active Firestore/Storage releases and back them up. Confirm only the new job match differs in Firestore. Storage keeps the pre-existing `/users/{uid}/...` path unchanged and adds only the reserved `/stroke-dictation/...` prefix. Back up bucket lifecycle settings and existing indexes before appending anything.
-2. Create only `stroke-dictation-worker@minutes-woyz-3.iam.gserviceaccount.com`. Give this worker Firestore data access, Firebase Auth read access, and the permissions required for its Eventarc delivery. Grant object access only to `stroke-dictation/` in the existing bucket `minutes-woyz-3.firebasestorage.app`; do not grant public reads or broad access to other buckets. Configure cross-service Storage rules access to Firestore through the Firebase Storage service agent.
+2. Create only `stroke-dictation-worker@minutes-woyz-3.iam.gserviceaccount.com`. Give this worker Firestore data access, Firebase Auth read access, and the permissions required for its Eventarc delivery. Grant object access only to `stroke-dictation/` in the existing bucket `minutes-woyz-3.firebasestorage.app`; do not grant public reads or broad access to other buckets. Configure cross-service Storage rules access to Firestore through the Firebase Storage service agent. Grant `roles/run.invoker` directly to this worker account on the two private services `queuestrokedictationupload` (us-east1) and `processstrokedictation` (asia-south1); never make these event receivers public.
 3. Append a seven-day audio deletion lifecycle rule for the reserved `stroke-dictation/` prefix, preserving all other lifecycle settings. Completed/cancelled jobs delete their audio immediately; failures retain it for retry. Set a 30-day TTL on `dictationJobs.expiresAt` for job metadata. Existing bucket location is us-east1; database is asia-south1.
 4. Deploy only the new codebase: `firebase deploy --project minutes-woyz-3 --only functions:stroke-background`. Callable/Firestore workers use asia-south1, Storage finalization uses us-east1. Dedicated service account, instance caps, timeouts and retry bounds are in `functions/index.js`. Do not delete or replace other functions.
 5. Publish the tested candidate rules and append the `dictationJobs` createdBy/createdAt index in this project only. Wait for the index to be ready. Do not blindly replace indexes added after this snapshot.

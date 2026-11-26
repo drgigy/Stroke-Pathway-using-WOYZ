@@ -6,13 +6,13 @@ service firebase.storage {
    allow read, write: if request.auth != null && request.auth.uid == userId;
   }
   function approved() {
+   // Storage rules permit two Firestore documents: one approval plus the job.
+   // Match the user-page sign-in branch, without probing both approval types.
    return request.auth != null && (
     (request.auth.uid == 'C7uoRRiH1XdpJzLDZMCZHLsmpNv1' && request.auth.token.get('admin', false) == true)
-    || (firestore.exists(/databases/(default)/documents/deviceApprovals/$(request.auth.uid))
-     && firestore.get(/databases/(default)/documents/deviceApprovals/$(request.auth.uid)).data.status == 'approved')
     || (request.auth.token.get('firebase', {}).get('sign_in_provider', '') == 'password'
-     && firestore.exists(/databases/(default)/documents/dashboardApprovals/$(request.auth.uid))
-     && firestore.get(/databases/(default)/documents/dashboardApprovals/$(request.auth.uid)).data.status == 'approved'));
+     ? firestore.get(/databases/(default)/documents/dashboardApprovals/$(request.auth.uid)).data.status == 'approved'
+     : firestore.get(/databases/(default)/documents/deviceApprovals/$(request.auth.uid)).data.status == 'approved'));
   }
   match /stroke-dictation/{uid}/{jobId}/audio {
    function job() { return firestore.get(/databases/(default)/documents/workspaces/stroke/dictationJobs/$(jobId)).data; }
