@@ -23,7 +23,7 @@ function prepareConnection(active) {
   }
 }
 
-let config, context, session, phase = 'idle', message = '';
+let config, context, session, phase = 'idle', message = '', lastUpload = null;
 const controls = new Set();
 const observers = new Set();
 const busy = () => Boolean(session);
@@ -52,7 +52,7 @@ export const setProtocolDictationAccess=uid=>setBackgroundAccess(uid);
 export async function retryProtocolProcessing(){const id=backgroundSummary(context?.caseId).failedJobId;if(!id)return;try{await retryBackgroundProcessing(id);message='Processing retry queued.';}catch{message='Unable to retry processing. Check access and connection.';}render();}
 export function onProtocolDictationChange(callback) { observers.add(callback); }
 export function protocolDictationBusy() { return busy(); }
-export function protocolDictationState(){const queue=backgroundSummary(context?.caseId);return {phase,busy:busy(),message:backgroundEnabled&&!busy()?(queue.message||message):message,failedJobId:queue.failedJobId,background:backgroundEnabled,takeId:session?.id,stream:session?.stream,caseId:context?.caseId,canStart:!!config&&!!context};}
+export function protocolDictationState(){const queue=backgroundSummary(context?.caseId);return {phase,busy:busy(),localMessage:message,lastUpload,uploadProgress:session?.uploadProgress??null,message:backgroundEnabled&&!busy()?(queue.message||message):message,failedJobId:queue.failedJobId,background:backgroundEnabled,takeId:session?.id,stream:session?.stream,caseId:context?.caseId,canStart:!!config&&!!context};}
 export const startProtocolDictation=()=>start();
 export const pauseProtocolDictation=()=>pauseResume();
 export const finishProtocolDictation=()=>finish();
@@ -110,7 +110,7 @@ function releaseMic(target) { target?.stream?.getTracks().forEach(track => track
 export function cancelProtocolDictation() {
   const previous = session;
   session = null; context = null; phase = 'idle'; message = '';
-  lastTiming = null;
+  lastTiming = null;lastUpload=null;
   previous?.abort?.abort();
   if (previous?.recorder?.state !== 'inactive') { try { previous?.recorder?.stop(); } catch {} }
   releaseMic(previous); render();
@@ -118,7 +118,7 @@ export function cancelProtocolDictation() {
 
 export function parkProtocolDictation() {
   const active=session;if(!active)return null;
-  session=null;context=null;phase='idle';message='';lastTiming=null;active.abort?.abort();
+  session=null;context=null;phase='idle';message='';lastTiming=null;lastUpload=null;active.abort?.abort();
   const ready=active.recorder?capture(active).catch(()=>{releaseMic(active);}):Promise.resolve();
   releaseMic(active);render();return {active,ready};
 }
@@ -139,7 +139,7 @@ async function start() {
     message = 'Microphone recording is unavailable in this browser. Open the HTTPS app in Safari or Chrome.'; render(); return;
   }
   const active = { ...context, uid: config.auth.currentUser.uid, id: 'take_' + crypto.randomUUID().replaceAll('-', ''), recordedAt: new Date().toISOString(), chunks: [], bytes: 0, abort: new AbortController() };
-  active.background=backgroundEnabled;lastTiming = null;if(!backgroundEnabled)prepareConnection(active);
+  active.background=backgroundEnabled;lastTiming = null;lastUpload=null;if(!backgroundEnabled)prepareConnection(active);
   session = active; phase = 'requesting'; message = ''; render();
   try {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -197,8 +197,8 @@ async function finish() {
   const active = session;
   if (!active || ['requesting', 'transcribing', 'saving', 'uploading'].includes(phase)) return;
   if(active.background){
-    phase='uploading';message='Uploading recording…';render();
-    try{const blob=await capture(active);if(session!==active)return;if(!blob.size){session=null;phase='idle';message='No audio was captured. Please start dictation again.';render();return;}await uploadBackgroundRecording(active,blob,percent=>{if(session===active){message='Uploading recording… '+percent+'%';render();}});if(session!==active)return;session=null;phase='uploaded';message='Uploaded. Processing continues in the background; you can continue working.';render();}
+    phase='uploading';active.uploadProgress=null;message='Uploading recording…';render();
+    try{const blob=await capture(active);if(session!==active)return;if(!blob.size){session=null;phase='idle';message='No audio was captured. Please start dictation again.';render();return;}await uploadBackgroundRecording(active,blob,percent=>{if(session===active){active.uploadProgress=percent;message='Uploading recording… '+percent+'%';render();}});if(session!==active)return;lastUpload={id:active.id,caseId:active.caseId,confirmedAt:Date.now()};session=null;phase='uploaded';message='Uploaded. Processing continues in the background; you can continue working.';render();}
     catch{releaseMic(active);if(session!==active)return;phase='upload-error';message='Upload not confirmed. Keep this page open and retry upload. Audio is still held on this device.';render();}
     return;
   }

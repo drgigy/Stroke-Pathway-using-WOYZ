@@ -10,7 +10,7 @@ The worker's conditional Storage role is bound at project level with an exact bu
 ## Workflow
 
 1. Start reserves a server job for the original case and captures the current field revisions. Recording still has live waveform, Pause/Resume and Stop.
-2. Stop uploads captured audio to the existing private bucket. Upload progress blocks navigation until confirmed. Failed uploads retain audio in page memory for retry; closing before acknowledgement can lose it.
+2. Stop uploads captured audio to the existing private bucket. An upload progress bar replaces the recording controls and blocks navigation until confirmed. A short “Uploaded. You can continue your work” confirmation then disappears after three seconds, leaving the compact Start button for the next recording. Failed uploads retain audio in page memory for retry; closing before acknowledgement can lose it.
 3. Acknowledged upload frees the recorder and navigation immediately. Storage finalization queues a Firestore job; the worker continues independently of the device.
 4. One Gemini request uses the current blank contracts for clinical pages 1,2,3,4,6,9 and all KPI fields. Explicit facts map across pages regardless of which page was open. Paper counseling/consent pages 5,7,8 are excluded.
 5. Strict validators reject unknown fields, ambiguous typed dates, invalid checkbox answers and incomplete model responses. Unstated facts stay absent. Backend atomically saves the entries and completed status. Shared note listeners refresh approved clients.
