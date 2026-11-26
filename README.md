@@ -6,14 +6,14 @@ Production: https://code7.codestroke.in/
 
 ## Entry points
 
-- `user.html`: approved staff/device workspace, shared cases and voice input.
+- `user.html`: approved account workspace, shared cases and voice input.
 - `index.html`: shared case review and direct field corrections, without recording.
 - `dashboard.html`: the same review workflow for approved email/password accounts.
-- `master-admin.html`: drgigy-only account/device approvals and shared Gemini key management.
+- `master-admin.html`: drgigy-only account approvals and shared Gemini key management.
 
 ## Admin layout
 
-The review entry points use the uploaded Stroke handover's visual layout and original stylesheet, preserved as `admin-reference.css`. A full-width Rajagiri Stroke Code header and fixed bottom navigation replace the former notes sidebar. Home shows case actions and recent cases; Cases provides search and date/treatment filters; Dashboard provides a horizontally scrollable timings table and print view; KPI opens all 24 indicators and shared monthly inputs without requiring a selected patient; Analysis provides KPI trends and individual recorded-event timelines; More contains Settings and Logout. Selecting a case opens the Stroke Protocol Form. Two side-by-side tabs switch between that form and Other Parameters, which lists the five patient parameter sections. Review pages support direct corrections; the user page supports voice input. Neither review entry point offers recording, user-workspace links, installation controls, or device management. The user page uses this same layout, with Start New Code 7 on Home and Start dictation beside the Rajagiri Stroke Code brand. Start opens a floating recorder with Pause/Resume and Stop & transcribe. The monthly aggregate report has no dictation target. Device and approved account sign-in remain available; all approved identities share the same case collection. Install controls are under More.
+The review entry points use the uploaded Stroke handover's visual layout and original stylesheet, preserved as `admin-reference.css`. A full-width Rajagiri Stroke Code header and fixed bottom navigation replace the former notes sidebar. Home shows case actions and recent cases; Cases provides search and date/treatment filters; Dashboard provides a horizontally scrollable timings table and print view; KPI opens all 24 indicators and shared monthly inputs without requiring a selected patient; Analysis provides KPI trends and individual recorded-event timelines; More contains Settings and Logout. Selecting a case opens the Stroke Protocol Form. Two side-by-side tabs switch between that form and Other Parameters, which lists the five patient parameter sections. Review pages support direct corrections; the user page supports voice input. Neither review entry point offers recording, user-workspace links, installation controls, or device management. The user page uses this same layout, with Start New Code 7 on Home and Start dictation beside the Rajagiri Stroke Code brand. Start opens a floating recorder with Pause/Resume and Stop & transcribe. The monthly aggregate report has no dictation target. User, Admin and Dashboard use one approved email/password account and Firebase local persistence. Returning in the same browser restores the session; Logout also notifies other open app tabs. Legacy anonymous device sessions require one account sign-in. All approved accounts share the same case collection. Install controls are under More.
 
 Source styling is reused, not the handover's Firebase configuration, PIN, records or application initialization. The current project's shared data model, calculation code and approval boundaries are retained.
 
@@ -65,7 +65,7 @@ KPI 21 follows the printed denominator of all ischemic stroke patients, not only
 
 ## Access and PWA
 
-The existing owner UID and claim checks in `roles.js`, approved device access and dashboard approval records are unchanged. Other accounts created by master admin receive their existing immediate approved shared access. Review versus dictation is a page-mode distinction, not a new Firebase role: approved users can open the authorized review page. The handover's Firebase project, browser PIN and device IDs are not copied.
+The existing owner UID and claim checks in `roles.js`, dashboard approval records remain the shared-access authority. Device approval records no longer grant clinical access and are retained as read-only history for the owner. Other accounts created by master admin receive their existing immediate approved shared access. Review versus dictation is a page-mode distinction, not a new Firebase role: approved users can open the authorized review page. The handover's Firebase project, browser PIN and device IDs are not copied.
 
 `runtimeSecrets/gemini` remains protected by the existing rules. No private key is included in source. PWA identity and start URL are retained; the service-worker cache version includes the new workflow modules. Case review pages remain free of recording, Workspace, Master admin and Install app controls.
 

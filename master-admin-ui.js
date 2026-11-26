@@ -14,7 +14,6 @@ export function mountMasterAdminDesign() {
   document.querySelectorAll('[data-icon]').forEach(element => { element.innerHTML = icon(element.dataset.icon); });
   const decorate = () => {
     for (const [id, name, symbol, description] of [
-      ['devicesBtn', 'Devices', 'access', 'Review requests and manage approved devices.'],
       ['dashboardUsersBtn', 'Users', 'user', 'Manage team access to shared cases.']
     ]) {
       const button = document.getElementById(id);

@@ -31,23 +31,23 @@ export function mountDashboardAccess({ auth, db, onAccess, onLocked }) {
         }
       }
       if (current !== generation) return;
-      lock('Awaiting administrator approval. Your dashboard request has been submitted.');
+      lock('Awaiting administrator approval. Your account request has been submitted.');
       unsubscribe = onSnapshot(ref, { includeMetadataChanges: true }, result => {
         if (current !== generation) return;
         if (result.metadata.fromCache || result.metadata.hasPendingWrites) {
-          lock('Waiting for server confirmation of dashboard access.'); return;
+          lock('Waiting for server confirmation of account access.'); return;
         }
         const status = result.data()?.status;
         if (status === 'approved') {
           if (!granted) { granted = true; onAccess(nextUser); }
         } else lock(status === 'blocked'
-          ? 'Dashboard access has been revoked. Contact your administrator.'
-          : 'Awaiting administrator approval. Your dashboard request has been submitted.');
-      }, () => lock('Dashboard access could not be verified. Reconnect and try again.'));
-    } catch { if (current === generation) lock('Dashboard access could not be verified. Reconnect and try again.'); }
+          ? 'Account access has been revoked. Contact your administrator.'
+          : 'Awaiting administrator approval. Your account request has been submitted.');
+      }, () => lock('Account access could not be verified. Reconnect and try again.'));
+    } catch { if (current === generation) lock('Account access could not be verified. Reconnect and try again.'); }
   }
   onAuthStateChanged(auth, verify);
-  window.addEventListener('offline', () => { ++generation; stop(); lock('Offline. Reconnect to verify dashboard access.'); });
+  window.addEventListener('offline', () => { ++generation; stop(); lock('Offline. Reconnect to verify account access.'); });
   window.addEventListener('online', () => verify(auth.currentUser));
 }
 
@@ -81,7 +81,7 @@ export function mountDashboardManager({ auth, db, host }) {
           actions.querySelectorAll('button').forEach(button => { button.disabled = true; });
           try {
             await updateDoc(doc(db, 'dashboardApprovals', record.id), { status: value, reviewedBy: auth.currentUser.uid, reviewedAt: serverTimestamp() });
-          } catch { status.textContent = 'Unable to update dashboard approval. Try again.'; actions.querySelectorAll('button').forEach(button => { button.disabled = false; }); }
+          } catch { status.textContent = 'Unable to update account approval. Try again.'; actions.querySelectorAll('button').forEach(button => { button.disabled = false; }); }
         });
         actions.append(control);
       }
@@ -89,10 +89,10 @@ export function mountDashboardManager({ auth, db, host }) {
     }
   }
   button.addEventListener('click', () => {
-    dialog.showModal(); unsubscribe?.(); list.replaceChildren(); status.textContent = 'Loading dashboard users...';
+    dialog.showModal(); unsubscribe?.(); list.replaceChildren(); status.textContent = 'Loading users...';
     unsubscribe = onSnapshot(collection(db, 'dashboardApprovals'), snapshot => {
       records = snapshot.docs.map(result => ({ ...result.data(), id: result.id })); render();
-    }, () => { list.replaceChildren(); status.textContent = 'Unable to load dashboard users.'; });
+    }, () => { list.replaceChildren(); status.textContent = 'Unable to load users.'; });
   });
   dialog.querySelector('[data-close]').addEventListener('click', () => dialog.close());
   dialog.querySelectorAll('[data-filter]').forEach(control => control.addEventListener('click', () => { filter = control.dataset.filter; render(); }));

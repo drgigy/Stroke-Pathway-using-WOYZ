@@ -1,9 +1,9 @@
+import { watchAccountLogout, logoutAccount } from './account-session.js';
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-app.js';
-import { getAuth, browserLocalPersistence, setPersistence, signInWithEmailAndPassword, signOut } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js';
+import { getAuth, browserLocalPersistence, setPersistence, signInWithEmailAndPassword } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js';
 import { getFirestore, collection, onSnapshot, doc, runTransaction, serverTimestamp } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-firestore.js';
 import { firebaseConfig } from './firebase-config.js';
 import { isReviewPage } from './page-mode.js';
-import { mountDeviceAccess } from './access.js';
 import { configureProtocolDictation, setProtocolDictationAccess, mountProtocolDictationControls, onProtocolDictationChange } from './protocol-dictation.js';
 import { mountDashboardAccess } from './dashboard-access.js';
 import { printFilledProtocol, cancelProtocolPrint } from './protocol-print.js';
@@ -15,6 +15,7 @@ import { kpiFields } from './kpi-schema.js';
 import { calculateKpis } from './kpi-calculations.js';
 
 const app=initializeApp(firebaseConfig),auth=getAuth(app),db=getFirestore(app);
+watchAccountLogout(auth);
 configureKpiWorkspace({auth,db});
 if(!isReviewPage)configureProtocolDictation({auth,db});
 const $=id=>document.getElementById(id),shell=$('appShell'),screen=$('screen'),panel=$('reviewPanel'),scroller=$('mainScroll');
@@ -98,7 +99,7 @@ function analyses(){
  const result=list[indicator-1],box=node('article','review-analysis-card');box.append(node('span','tag grey',`KPI ${result.no} · ${result.status==='complete'?'Complete':result.status==='clarification'?'Definition needs clarification':result.status==='not-applicable'?'No eligible cases':'Pending data'}`),node('h2','',result.title),node('div','big-value',result.value==null?'Pending':`${Number(result.value.toFixed(2))}${result.unit==='%'?'%':result.unit?' '+result.unit:''}`),node('p','review-intro',`Numerator: ${result.numerator??'—'} · Denominator: ${result.denominator??'—'}`));if(result.note)box.append(node('p','review-intro',result.note));
  const trend=node('div','review-trend');trend.setAttribute('role','img');trend.setAttribute('aria-label','Six-month trend; incomplete or unresolved months have no numeric bar.');const points=[];for(let n=5;n>=0;n--){const [year,m]=month.split('-').map(Number),date=new Date(Date.UTC(year,m-1-n,1)),key=date.toISOString().slice(0,7);points.push({month:key,result:report(key)[indicator-1]});}const max=Math.max(1,...points.map(p=>p.result.value||0));for(const p of points){const item=node('div'),value=p.result.value,bar=node('i');bar.style.height=value==null?'2px':`${Math.max(2,value/max*120)}px`;if(value==null)bar.style.background='#dce0e9';item.append(node('strong','',value==null?'—':Number(value.toFixed(1)).toString()),bar,node('span','',p.month));trend.append(item);}box.append(node('h3','','Monthly trend'),trend);const nav=node('div','review-filters'),prev=button('Previous KPI',()=>{indicator--;render();}),next=button('Next KPI',()=>{indicator++;render();});prev.disabled=indicator===1;next.disabled=indicator===24;nav.append(prev,next);box.append(nav);screen.append(box);
 }
-function more(){screen.append(title('More'));const menu=node('div','review-more');menu.append(node('div','section-card',`Signed in as ${auth.currentUser?.email||'Approved user'}`),button('Settings',settings),button('Logout',()=>signOut(auth)));screen.append(menu);}
+function more(){screen.append(title('More'));const menu=node('div','review-more');menu.append(node('div','section-card',`Signed in as ${auth.currentUser?.email||'Approved user'}`),button('Settings',settings),button('Logout',()=>logoutAccount(auth)));screen.append(menu);}
 function settings(){const dialog=node('dialog','review-settings'),head=node('header');head.append(node('h2','','Settings'),button('Close',()=>dialog.close()));dialog.append(head,node('p','','Hospital timezone: Asia/Kolkata.'),node('p','','All approved users share the same cases. Review-page corrections save automatically; staff can dictate from the user page.'),node('p','','Reports use admission/arrival-month cohorts. Source-definition conflicts remain flagged until clarified.'));dialog.addEventListener('close',()=>dialog.remove(),{once:true});document.body.append(dialog);dialog.showModal();}
 function fitReviewPanel(){if(!panel.hidden){const bottom=shell.querySelector('.bottom-nav').getBoundingClientRect().height;panel.style.height=Math.max(220,window.innerHeight-panel.getBoundingClientRect().top-bottom-12)+'px';}}
 window.addEventListener('resize',fitReviewPanel);
@@ -130,7 +131,7 @@ function render(){
 for(const b of shell.querySelectorAll('[data-view]'))b.addEventListener('click',()=>navigate(b.dataset.view));
 window.addEventListener('kpi-report-month-changed',event=>{month=event.detail.month;});
 window.addEventListener('kpi-case-recovered',event=>{selectedId=event.detail.caseId;view='cases';render();queueMicrotask(recoveryNotice);});
-if(isReviewPage)$('loginForm').addEventListener('submit',async event=>{event.preventDefault();$('loginSubmit').disabled=true;$('loginError').textContent='';try{await signInWithEmailAndPassword(auth,$('loginEmail').value.trim(),$('loginPassword').value);$('loginPassword').value='';}catch{$('loginError').textContent='Unable to sign in. Check your email and password.';}finally{$('loginSubmit').disabled=false;}});
+$('loginForm').addEventListener('submit',async event=>{event.preventDefault();$('loginSubmit').disabled=true;$('loginError').textContent='';try{await signInWithEmailAndPassword(auth,$('loginEmail').value.trim(),$('loginPassword').value);$('loginPassword').value='';}catch{$('loginError').textContent='Unable to sign in. Check your email and password.';}finally{$('loginSubmit').disabled=false;}});
 function locked(message=''){
  if(!isReviewPage)setProtocolDictationAccess(null);
  document.body.classList.remove('user-case-open');if(!isReviewPage)setDictationPanelCase(null);
@@ -151,7 +152,6 @@ function granted(user,details){
  stopNotes=onSnapshot(collection(db,'workspaces','stroke','notes'),snapshot=>{if(current!==generation||!uid)return;ingestKpiSnapshot(snapshot);documents=snapshot.docs.map(d=>({id:d.id,...d.data()})).filter(d=>d.deleted!==true);$('syncStatus').textContent='Shared · live';render();},()=>{if(current!==generation)return;$('syncStatus').textContent='Sync unavailable';message('Shared cases could not be refreshed. Reconnect and verify access.');});
 }
 setPersistence(auth,browserLocalPersistence).catch(()=>{}).then(()=>{
- if(isReviewPage)mountDashboardAccess({auth,db,onLocked:locked,onAccess:granted});
- else mountDeviceAccess({auth,db,onAccess:(user,details)=>{if(user)granted(user,details);else locked(details?.accessLockReason||'');}});
+ mountDashboardAccess({auth,db,onLocked:locked,onAccess:granted});
 });
 mountPwa();

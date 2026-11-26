@@ -3,7 +3,7 @@
 Scope: `drgigy/Stroke-Pathway-using-WOYZ`, Firebase `minutes-woyz-3` only.
 `background-config.js` is enabled after deployment and synthetic live checks on 2026-11-26. Five functions, job/audio rules, the job query index, prefix-only audio lifecycle and job TTL are active in this project. All other repositories and Firebase projects were untouched.
 
-Live verification covered approved account/device shared access, denied unapproved access and forged job updates, cross-page extraction to pages 1/2/3/6/9 and KPI fields, paper-form exclusion, a manual correction made after recording began, original-case isolation, duplicate confirmation, private audio removal and revocation before commit. Temporary synthetic cases, accounts, jobs and audio were cleaned up. Mobile fixture tests cover navigation after upload, retry, reload and access loss.
+Live verification covered approved account shared access, denied unapproved access and forged job updates, cross-page extraction to pages 1/2/3/6/9 and KPI fields, paper-form exclusion, a manual correction made after recording began, original-case isolation, duplicate confirmation, private audio removal and revocation before commit. Temporary synthetic cases, accounts, jobs and audio were cleaned up. Mobile fixture tests cover navigation after upload, retry, reload and access loss.
 
 The worker's conditional Storage role is bound at project level with an exact bucket/audio-prefix condition, preserving the bucket's existing ACL mode. Private event receivers grant invocation only to the dedicated worker account. Storage checks one provider-appropriate approval record plus the reserved job, staying within its two-document rules limit. Completed audio is deleted from active storage; the bucket's pre-existing seven-day soft-delete recovery policy is unchanged.
 
@@ -42,3 +42,5 @@ Runtime key stays in the existing `runtimeSecrets/gemini` record; never place cr
 ## Rollback
 
 Disable the frontend flag and publish a new app-cache version to return to foreground dictation. Already acknowledged jobs remain durable and should finish; do not delete their audio or jobs as part of UI rollback. Restore only backed-up rules/resources for this feature after pending work is resolved. Never alter another repository or Firebase project.
+
+Account access: all entry points require the same approved email/password account (or the existing owner identity). Anonymous device grants cannot prepare, upload or commit dictation. Master Admin remains restricted to the existing owner UID and admin claim.

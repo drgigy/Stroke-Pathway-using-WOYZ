@@ -11,8 +11,7 @@ service firebase.storage {
    return request.auth != null && (
     (request.auth.uid == 'C7uoRRiH1XdpJzLDZMCZHLsmpNv1' && request.auth.token.get('admin', false) == true)
     || (request.auth.token.get('firebase', {}).get('sign_in_provider', '') == 'password'
-     ? firestore.get(/databases/(default)/documents/dashboardApprovals/$(request.auth.uid)).data.status == 'approved'
-     : firestore.get(/databases/(default)/documents/deviceApprovals/$(request.auth.uid)).data.status == 'approved'));
+     && firestore.get(/databases/(default)/documents/dashboardApprovals/$(request.auth.uid)).data.status == 'approved'));
   }
   match /stroke-dictation/{uid}/{jobId}/audio {
    function job() { return firestore.get(/databases/(default)/documents/workspaces/stroke/dictationJobs/$(jobId)).data; }

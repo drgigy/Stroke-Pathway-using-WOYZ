@@ -5,11 +5,7 @@ service cloud.firestore {
       return request.auth != null && request.auth.uid == 'C7uoRRiH1XdpJzLDZMCZHLsmpNv1'
         && request.auth.token.get('admin', false) == true;
     }
-    function approved() {
-      return request.auth != null && exists(/databases/$(database)/documents/deviceApprovals/$(request.auth.uid))
-        && get(/databases/$(database)/documents/deviceApprovals/$(request.auth.uid)).data.status == 'approved';
-    }
-    function access() { return admin() || approved() || dashboard(); }
+    function access() { return admin() || dashboard(); }
     function dashboard() {
       return request.auth != null
         && request.auth.token.get('firebase', {}).get('sign_in_provider', '') == 'password'
@@ -38,25 +34,10 @@ service cloud.firestore {
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'reviewedBy', 'reviewedAt'])
         && request.resource.data.reviewedBy == request.auth.uid && request.resource.data.reviewedAt == request.time;
     }
-    function validDevice() {
-      return request.resource.data.name is string && request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 100
-        && request.resource.data.department is string && request.resource.data.department.size() > 0 && request.resource.data.department.size() <= 100
-        && request.resource.data.deviceLabel is string && request.resource.data.deviceLabel.size() <= 100;
-    }
+    // Historical device records are retained; they no longer grant clinical access.
     match /deviceApprovals/{uid} {
-      allow get: if self(uid) || admin();
-      allow list: if admin();
-      allow create: if self(uid) && validDevice()
-        && request.resource.data.keys().hasOnly(['name', 'department', 'deviceLabel', 'deviceCode', 'status', 'createdAt', 'lastSeenAt'])
-        && request.resource.data.status == 'pending' && request.resource.data.deviceCode is string
-        && request.resource.data.deviceCode.size() == 13
-        && request.resource.data.createdAt == request.time && request.resource.data.lastSeenAt == request.time;
-      allow update: if self(uid) && validDevice() && resource.data.status != 'blocked'
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'department', 'deviceLabel', 'lastSeenAt'])
-        && request.resource.data.lastSeenAt == request.time;
-      allow update: if admin() && request.resource.data.status in ['pending', 'approved', 'blocked']
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'reviewedBy', 'reviewedAt'])
-        && request.resource.data.reviewedBy == request.auth.uid && request.resource.data.reviewedAt == request.time;
+      allow read: if admin();
+      allow write: if false;
     }
     // Shared Gemini key is delivered only to server-approved identities.
     // The key never lives in public configuration, approval records or source files.

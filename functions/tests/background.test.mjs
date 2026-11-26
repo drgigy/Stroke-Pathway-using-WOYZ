@@ -32,11 +32,11 @@ test('completion order does not determine clinical order; newer manual edits and
 function fixture(){
  let clock=1000000,approved=true,disabled=false,transcriptions=0,failures=0,hold=null,customOutput=null;
  const docs=new Map([['workspaces/stroke/notes/patientA',{noteType:'code7'}],['workspaces/stroke/notes/patientB',{noteType:'code7'}],['runtimeSecrets/gemini',{enabled:true,key:'synthetic-not-a-real-key'}]]),files=new Map();
- const read=path=>path==='deviceApprovals/approved-user'?{status:approved?'approved':'blocked'}:docs.get(path);
+ const read=path=>path==='dashboardApprovals/approved-user'?(docs.get(path)||{status:approved?'approved':'blocked'}):docs.get(path);
  const db={doc:path=>({path,async get(){const data=read(path);return {exists:!!data,data:()=>data};},async update(patch){apply(docs.get(path),patch);}}),async runTransaction(fn){const changes=[];const tx={get:ref=>ref.get(),create:(ref,value)=>{if(docs.has(ref.path))throw Error('exists');changes.push(()=>docs.set(ref.path,value));},update:(ref,patch)=>changes.push(()=>apply(docs.get(ref.path),patch))};const result=await fn(tx);for(const change of changes)change();return result;}};
  const bucket={file:path=>({async getMetadata(){const value=files.get(path);if(!value)throw Error('not-found');return [value];},async download(){if(!files.has(path))throw Error('not-found');return [Buffer.from('synthetic')];},async exists(){return [files.has(path)];},async delete(){files.delete(path);}})};
  const service=createDictationService({db,auth:{getUser:async()=>({disabled})},bucket,now:()=>clock,stamp:ms=>time(ms/1000),serverTime:()=>time(clock/1000),transcribe:async()=>{transcriptions++;if(hold)await hold;if(failures-->0)throw Error('temporary');return customOutput||output();}});
- const request=(id='take1',caseId='patientA')=>({auth:{uid:'approved-user',token:{firebase:{sign_in_provider:'anonymous'}}},data:{id,caseId,source,version,recordedAt:'2026-11-26T07:00:00+05:30'}});
+ const request=(id='take1',caseId='patientA')=>({auth:{uid:'approved-user',token:{firebase:{sign_in_provider:'password'}}},data:{id,caseId,source,version,recordedAt:'2026-11-26T07:00:00+05:30'}});
  const upload=async(id='take1')=>{const path=audioPath('approved-user',id);files.set(path,{size:'100',contentType:'audio/mp4',generation:'1',metadata:{jobId:id}});await service.queueAudio(path);};
  return {docs,files,service,request,upload,clock:()=>clock,advance:ms=>clock+=ms,revoke:()=>approved=false,disable:()=>disabled=true,fail:n=>failures=n,count:()=>transcriptions,hold:p=>hold=p,result:o=>customOutput=o};
 }
@@ -73,10 +73,10 @@ test('Gemini request uses all clinical contracts; invalid or truncated output ne
  }finally{globalThis.fetch=original;}
 });
 
-test('password and anonymous approval branches match the user page and cannot bypass a revoked password approval',async()=>{
- const f=fixture(),request=f.request();request.auth.token.firebase.sign_in_provider='password';await assert.rejects(f.service.prepare(request));
- f.docs.set('dashboardApprovals/approved-user',{status:'approved'});await f.service.prepare(request);
+test('only approved password accounts can reserve jobs; device approval cannot bypass account access',async()=>{
+ const f=fixture(),request=f.request();await f.service.prepare(request);
  f.docs.set('dashboardApprovals/approved-user',{status:'blocked'});await assert.rejects(f.service.prepare({...request,data:{...request.data,id:'other'}}));
+ f.docs.set('deviceApprovals/approved-user',{status:'approved'});request.auth.token.firebase.sign_in_provider='anonymous';await assert.rejects(f.service.prepare({...request,data:{...request.data,id:'anonymous'}}));
 });
 
 test('silence is a terminal no-speech result, never writes case fields or offers processing retry',async()=>{

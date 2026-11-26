@@ -23,7 +23,7 @@ function notify(message, state = '') {
   window.dispatchEvent(new Event('woyz-key-status'));
 }
 function resolveReady() { settled = true; for (const resolve of waiting) resolve(); waiting.clear(); }
-function lock(message = 'Approve this device to enable the shared dictation key.') {
+function lock(message = 'Sign in with an approved account to enable dictation.') {
   approved = false; ++keyGeneration; clearManaged(); stopKey?.(); stopKey = null;
   notify(message); resolveReady();
 }
@@ -32,7 +32,7 @@ function installAdminForm() {
   const menu = document.getElementById('adminSettingsMenu');
   if (!menu?.hasAttribute('data-key-management') || adminForm) return;
   adminForm = document.createElement('form'); adminForm.className = 'protocol-key-form shared-key-form';
-  adminForm.innerHTML = '<label>Gemini API key<input type="password" autocomplete="new-password" aria-label="Shared Gemini key" maxlength="256" placeholder="Paste your Gemini API key"></label><button type="submit" class="btn">Save shared key</button><div class="shared-key-actions"><button type="button" class="btn" data-use-local title="Use the key already saved in this browser">Use saved key</button><button type="button" class="btn" data-disable>Disable key</button></div><p>Enabled users and approved devices receive key updates automatically. The key is stored locally on their devices.</p><span role="status"></span>';
+  adminForm.innerHTML = '<label>Gemini API key<input type="password" autocomplete="new-password" aria-label="Shared Gemini key" maxlength="256" placeholder="Paste your Gemini API key"></label><button type="submit" class="btn">Save shared key</button><div class="shared-key-actions"><button type="button" class="btn" data-use-local title="Use the key already saved in this browser">Use saved key</button><button type="button" class="btn" data-disable>Disable key</button></div><p>Approved accounts receive key updates automatically. The key is stored locally on their devices.</p><span role="status"></span>';
   adminForm.addEventListener('click', event => event.stopPropagation());
   async function save(value, enabled) {
     if (!admin || !config.auth.currentUser || config.auth.currentUser.uid !== currentUid) return;
@@ -46,7 +46,7 @@ function installAdminForm() {
       if (!admin || currentUid !== uid) return;
       adminForm.querySelector('input').value = '';
       status.dataset.state = 'success';
-      status.textContent = enabled ? 'Shared key saved. Approved devices receive it automatically.' : 'Shared key disabled. Managed copies are cleared when devices reconnect.';
+      status.textContent = enabled ? 'Shared key saved. Approved accounts receive it automatically.' : 'Shared key disabled. Managed copies are cleared when accounts reconnect.';
     } catch { status.dataset.state = 'error'; status.textContent = 'Unable to save the shared key. Check administrator access and connection.'; }
     finally { adminForm.querySelectorAll('button').forEach(button => { button.disabled = false; }); }
   }
@@ -78,15 +78,15 @@ async function verify(user) {
   const epoch = ++generation;
   stop(); approved = admin = false; currentUid = user?.uid || ''; settled = false; clearManaged();
   if (adminForm) { adminForm.remove(); adminForm = null; }
-  if (!user || !navigator.onLine) { lock(user ? 'Reconnect to verify device access.' : 'Sign in to receive the dictation key.'); return; }
+  if (!user || !navigator.onLine) { lock(user ? 'Reconnect to verify account access.' : 'Sign in to receive the dictation key.'); return; }
   notify('Verifying dictation access…', 'loading');
   try {
     const token = await user.getIdTokenResult();
     if (epoch !== generation) return;
     admin = isMasterAdmin(user, token);
     if (admin) { approved = true; installAdminForm(); subscribeKey(epoch); return; }
-    const password = token.claims.firebase?.sign_in_provider === 'password';
-    const approval = doc(config.db, password ? 'dashboardApprovals' : 'deviceApprovals', user.uid);
+    if(token.claims.firebase?.sign_in_provider!=='password'){lock('Sign in with your approved email and password.');return;}
+    const approval = doc(config.db, 'dashboardApprovals', user.uid);
     // Confirm approval with the server before opening the secret subscription.
     const snapshot = await getDocFromServer(approval);
     if (epoch !== generation) return;
@@ -106,7 +106,7 @@ export function configureSharedKey(options) {
   const menu = document.getElementById('adminSettingsMenu') || document.getElementById('settingsMenu');
   if (menu) { statusElement = document.createElement('p'); statusElement.className = 'shared-key-status'; statusElement.setAttribute('role', 'status'); menu.append(statusElement); }
   onAuthStateChanged(config.auth, verify);
-  window.addEventListener('offline', () => { ++generation; stop(); lock('Reconnect to verify device access.'); });
+  window.addEventListener('offline', () => { ++generation; stop(); lock('Reconnect to verify account access.'); });
   window.addEventListener('online', () => verify(config.auth.currentUser));
 }
 export async function getDictationKey() {

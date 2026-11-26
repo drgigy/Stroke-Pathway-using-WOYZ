@@ -18,7 +18,7 @@
     <div class="master-brand"><img src="./icons/icon-192.png" width="38" height="38" alt=""><div><strong>WOYZ Stroke</strong><span>Administration</span></div></div>
     <p class="nav-caption">WORKSPACE</p>
     <nav class="section-nav" aria-label="Administration sections">
-      <a href="#access" class="active" aria-current="location"><span data-icon="access"></span>Users &amp; devices</a>
+      <a href="#access" class="active" aria-current="location"><span data-icon="access"></span>Users</a>
       <a href="#create-user"><span data-icon="user"></span>Create user</a>
       <a href="#dictation"><span data-icon="key"></span>Dictation key</a>
     </nav>
@@ -30,7 +30,7 @@
       <div class="header-actions"><a class="btn review-link" href="./index.html"><span data-icon="arrow"></span>Case review</a><button class="btn logout-button" type="button" id="masterLogout" aria-label="Sign out" hidden><span data-icon="logout"></span><span>Sign out</span></button></div>
     </header>
     <main id="loginScreen" class="master-login">
-      <div class="login-intro"><span class="eyebrow">WORKSPACE ADMINISTRATION</span><h1>A single place<br>to manage access.</h1><p>Manage your team, approve devices and configure shared dictation.</p></div>
+      <div class="login-intro"><span class="eyebrow">WORKSPACE ADMINISTRATION</span><h1>A single place<br>to manage access.</h1><p>Manage approved user accounts and configure shared dictation.</p></div>
       <form class="login-card" id="masterLogin">
         <span class="login-lock" data-icon="shield"></span><h2>Master admin sign in</h2><p>Sign in with your workspace owner account.</p>
         <label for="masterEmail">Email<input id="masterEmail" type="email" autocomplete="username" placeholder="drgigy@gmail.com" required></label>
@@ -44,7 +44,7 @@
       <div class="page-heading"><div><span class="eyebrow">CONTROL CENTRE</span><h1>Workspace administration</h1><p>Manage who can access WOYZ Stroke.</p></div><span class="master-badge"><span data-icon="shield"></span>Master access</span></div>
       <nav class="mobile-section-nav" aria-label="Jump to section"><a href="#access">Access</a><a href="#create-user">Create user</a><a href="#dictation">Dictation key</a></nav>
       <section id="access" class="content-panel access-panel">
-        <div class="panel-heading"><div><h2>Users &amp; devices</h2><p>Review requests and manage workspace access.</p></div><span class="panel-icon" data-icon="access"></span></div>
+        <div class="panel-heading"><div><h2>Users</h2><p>Review requests and manage workspace access.</p></div><span class="panel-icon" data-icon="access"></span></div>
         <div class="management-controls" id="masterAccessControls"></div>
       </section>
       <div class="settings-grid">
@@ -64,16 +64,17 @@
 </div>
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-app.js';
-import { getAuth, onAuthStateChanged, setPersistence, browserLocalPersistence, signInWithEmailAndPassword, signOut } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js';
+import { getAuth, onAuthStateChanged, setPersistence, browserLocalPersistence, signInWithEmailAndPassword } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js';
 import { getFirestore } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-firestore.js';
 import { firebaseConfig } from './firebase-config.js';
-import { mountDeviceManager } from './access.js';
+import { watchAccountLogout, logoutAccount } from './account-session.js';
 import { mountDashboardManager } from './dashboard-access.js';
 import { configureSharedKey } from './shared-key.js';
 import { isMasterAdmin } from './roles.js';
 import { mountAccountProvisioning } from './account-provisioning.js';
 import { mountMasterAdminDesign } from './master-admin-ui.js';
 const app=initializeApp(firebaseConfig),auth=getAuth(app),db=getFirestore(app);
+watchAccountLogout(auth);
 const ready=setPersistence(auth,browserLocalPersistence).catch(()=>{});
 configureSharedKey({auth,db});
 mountMasterAdminDesign();
@@ -86,7 +87,7 @@ onAuthStateChanged(auth,async user=>{
  try{
   const token=await user.getIdTokenResult(true);if(epoch!==generation)return;
   if(!isMasterAdmin(user,token)){status.textContent='Master admin access is restricted to drgigy@gmail.com.';return;}
-  if(!mounted){mounted=true;const host=document.getElementById('masterAccessControls');mountDeviceManager({auth,db,host});mountDashboardManager({auth,db,host});mountAccountProvisioning({auth,db,host:document.getElementById('accountProvisioning')});}
+  if(!mounted){mounted=true;const host=document.getElementById('masterAccessControls');mountDashboardManager({auth,db,host});mountAccountProvisioning({auth,db,host:document.getElementById('accountProvisioning')});}
   login.hidden=true;workspace.hidden=false;
   document.body.classList.add('is-authenticated');document.getElementById('masterSidebar').hidden=false;document.getElementById('masterLogout').hidden=false;
  }catch{if(epoch===generation)status.textContent='Unable to verify administrator access. Reconnect and try again.';}
@@ -97,7 +98,7 @@ form.addEventListener('submit',async event=>{
  catch{status.textContent='Unable to sign in. Check your email and password.';}
  finally{button.disabled=false;}
 });
-document.getElementById('masterLogout').addEventListener('click',()=>signOut(auth));
+document.getElementById('masterLogout').addEventListener('click',()=>logoutAccount(auth));
 </script>
 </body>
 </html>
