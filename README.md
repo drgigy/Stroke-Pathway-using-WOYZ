@@ -104,3 +104,5 @@ Protocol template revision 2 (25 November 2026) removes TSH from the page-1 bloo
 ## Background dictation
 
 Case-wide extraction and durable server processing are active in `minutes-woyz-3`. After upload acknowledgement, staff can navigate or record again while the server fills the original shared case. Newer manual corrections are protected; paper consent/counseling forms are excluded. See [BACKGROUND-DICTATION.md](BACKGROUND-DICTATION.md) for architecture, validation, deployment details and rollback.
+
+Stroke Consultant Comments retain the complete minimally edited dictation, copied directly from the transcript while relevant facts also populate structured form/KPI fields. New recordings append in recording order. Manual corrections replace earlier narrative text and remain protected from delayed older jobs. Existing records are not rewritten.

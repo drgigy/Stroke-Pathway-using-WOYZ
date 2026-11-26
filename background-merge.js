@@ -21,6 +21,17 @@ function canApply(currentId, baselineId, existing, job) {
   if (!existing || existing.processingMode !== mode) return false;
   return compareEntries({processingMode:mode,effectiveAt:job.createdAt,recordedAt:job.recordedAt},existing,job.id,currentId) > 0;
 }
+// Narrative additions keep recording order even if workers finish out of order.
+// A subsequent manual replacement/clear still overrides earlier narrative takes.
+const isNarrativeAppend=entry=>entry?.consultantAppend===true&&entry.processingMode===mode&&entry.kind==='dictation';
+function canAppendConsultant(dictations,currentId,baselineId,job){
+ const existing=dictations?.[currentId];
+ if(currentId===baselineId)return true;
+ if(!isNarrativeAppend(existing))return canApply(currentId,baselineId,existing,job);
+ return !Object.entries(dictations||{}).some(([id,entry])=>!isNarrativeAppend(entry)
+  &&currentFieldValues({[id]:entry},3).consultant_comments
+  &&compareEntries(entry,{processingMode:mode,effectiveAt:job.createdAt,recordedAt:job.recordedAt},id,job.id)>0);
+}
 // Pure merge plan. Cloud code applies it atomically with the job's completed state.
 export function backgroundMergePlan(note, job, output, serverTime) {
   const patch = {}, skipped = [], common = { kind:'dictation',processingMode:mode,effectiveAt:job.createdAt,createdAt:serverTime,
@@ -29,10 +40,10 @@ export function backgroundMergePlan(note, job, output, serverTime) {
     const key='page'+page, current=currentFieldValues(note.protocolDictations?.[key],Number(page)), fields={};
     for (const [id,value] of Object.entries(proposed)) {
       const currentId=current[id]?.takeId, existing=note.protocolDictations?.[key]?.[currentId];
-      if (canApply(currentId,job.baseline.protocol[page]?.[id],existing,job)) fields[id]=value;
+      if (page==='3'&&id==='consultant_comments'?canAppendConsultant(note.protocolDictations?.[key],currentId,job.baseline.protocol[page]?.[id],job):canApply(currentId,job.baseline.protocol[page]?.[id],existing,job)) fields[id]=value;
       else skipped.push({page:Number(page),field:id});
     }
-    if(Object.keys(fields).length)patch[`protocolDictations.${key}.${job.id}`]={...common,pageNumber:Number(page),pageTitle:'Case-wide dictation',fieldSource:protocolFieldSource,fieldVersion:protocolFieldVersion,fields};
+    if(Object.keys(fields).length)patch[`protocolDictations.${key}.${job.id}`]={...common,pageNumber:Number(page),pageTitle:'Case-wide dictation',fieldSource:protocolFieldSource,fieldVersion:protocolFieldVersion,fields,...(page==='3'&&Object.hasOwn(fields,'consultant_comments')?{consultantAppend:true}:{})};
   }
   const current=kpiVersions(note), fields={};
   for(const [id,value]of Object.entries(output.kpiFields)) {

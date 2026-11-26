@@ -44,7 +44,7 @@ export function currentFieldValues(dictations, pageNumber) {
     for (const [rawId, value] of Object.entries(entry.fields || {})) {
       if(legacy?.unavailableFields.includes(rawId))continue;
       const id=legacy?.fieldAliases[pageNumber]?.[rawId]||rawId;
-      if (allowed.has(id) && typeof value === 'string' && (value.trim() || entry.kind === 'manual-edit')) values[id] = { value, takeId };
+      if (allowed.has(id) && typeof value === 'string' && (value.trim() || entry.kind === 'manual-edit')) values[id] = { value: pageNumber===3&&id==='consultant_comments'&&entry.consultantAppend===true&&entry.kind==='dictation'&&entry.processingMode==='server-case-wide-v1'&&values[id]?.value ? values[id].value+'\n\n'+value : value, takeId };
     }
   }
   return values;

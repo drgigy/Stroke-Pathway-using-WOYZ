@@ -88,3 +88,39 @@ test('silence is a terminal no-speech result, never writes case fields or offers
  assert.equal(f.count(),1);assert.equal(f.files.size,0);assert.equal(f.docs.get('workspaces/stroke/dictationJobs/take1').status,'no_speech');
  assert.deepEqual(f.docs.get('workspaces/stroke/notes/patientA'),{noteType:'code7'});assert.equal((await f.service.confirm(f.request())).uploaded,true);await assert.rejects(f.service.retry(f.request()));
 });
+
+test('consultant comments use the complete transcript unchanged while structured fields remain mapped',()=>{
+ const text='Patient came at 8. BP 140/90. No headache.\nPlan: CT first, then reassess. Not sure about onset.';
+ const result=validateCaseWideOutput({speechDetected:true,text,pages:[{pageNumber:'1',fields:[{id:'bp',value:'140/90'}]},{pageNumber:'3',fields:[{id:'consultant_comments',value:'A shortened and reworded summary.'}]}],kpiFields:[]});
+ assert.equal(result.text,text);assert.equal(result.pages[3].consultant_comments,text);assert.equal(result.pages[1].bp,'140/90');
+ assert.equal(validateCaseWideOutput({speechDetected:true,text:'Yes, not sure.',pages:[],kpiFields:[]}).pages[3].consultant_comments,'Yes, not sure.');
+ assert.deepEqual(validateCaseWideOutput({speechDetected:false,text:'',pages:[],kpiFields:[]}).pages,{});
+});
+test('consultant narrative appends in recording order, with manual replacements and clears protected',()=>{
+ const narrative=text=>validateCaseWideOutput({speechDetected:true,text,pages:[],kpiFields:[]});
+ for(const order of [[0,1],[1,0]]){
+  const note={},baseline=captureCaseBaseline(note),takes=[job('a',100,baseline),job('b',200,baseline)];
+  for(const i of order)apply(note,backgroundMergePlan(note,takes[i],narrative(i?'Second dictation, no headache.':'First dictation: arrived at 8.'),time(400+i)).patch);
+  assert.equal(currentFieldValues(note.protocolDictations.page3,3).consultant_comments.value,'First dictation: arrived at 8.\n\nSecond dictation, no headache.');
+  apply(note,backgroundMergePlan(note,takes[0],narrative('First dictation: arrived at 8.'),time(500)).patch);
+  assert.equal(currentFieldValues(note.protocolDictations.page3,3).consultant_comments.value,'First dictation: arrived at 8.\n\nSecond dictation, no headache.');
+ }
+ const note={protocolDictations:{page3:{prior:entry({consultant_comments:'Existing reviewed comments.'},10,{pageNumber:3})}}};
+ const before=JSON.stringify(note);const baseline=captureCaseBaseline(note),old=job('old',100,baseline);assert.equal(JSON.stringify(note),before);
+ note.protocolDictations.page3.manual=entry({consultant_comments:'Consultant manual correction.'},150,{pageNumber:3,kind:'manual-edit'});
+ const latest=job('new',200,captureCaseBaseline(note));apply(note,backgroundMergePlan(note,latest,narrative('New follow-up dictation.'),time(300)).patch);
+ const late=backgroundMergePlan(note,old,narrative('Delayed older dictation.'),time(350));assert(late.skipped.some(v=>v.page===3&&v.field==='consultant_comments'));apply(note,late.patch);
+ assert.equal(currentFieldValues(note.protocolDictations.page3,3).consultant_comments.value,'Consultant manual correction.\n\nNew follow-up dictation.');
+ note.protocolDictations.page3.clear=entry({consultant_comments:''},400,{pageNumber:3,kind:'manual-edit'});
+ assert.equal(currentFieldValues(note.protocolDictations.page3,3).consultant_comments.value,'');
+ const fresh=job('fresh',500,captureCaseBaseline(note));apply(note,backgroundMergePlan(note,fresh,narrative('Fresh dictated comment.'),time(600)).patch);
+ assert.equal(currentFieldValues(note.protocolDictations.page3,3).consultant_comments.value,'Fresh dictated comment.');
+});
+
+test('page-specific schema constrains IDs and accepts both current and in-flight response formats',async()=>{
+ const {caseWideResponseSchema}=await import('../shared/case-wide-dictation.js');const schema=caseWideResponseSchema(),pages=schema.properties.pages.properties;
+ assert(pages.page1.items.properties.id.enum.includes('name'));assert(!pages.page1.items.properties.id.enum.includes('er_arrival'));assert(pages.page2.items.properties.id.enum.includes('er_arrival'));assert.equal(pages.page5,undefined);
+ const result=validateCaseWideOutput({speechDetected:true,text:'Original dictated words.',pages:{page1:[{id:'name',value:'Test'}],page2:[],page3:[],page4:[],page6:[],page9:[]},kpiFields:[]});assert.equal(result.pages[1].name,'Test');assert.equal(result.pages[3].consultant_comments,'Original dictated words.');
+ assert.equal(validateCaseWideOutput({speechDetected:false,text:'',pages:{page1:[],page2:[],page3:[],page4:[],page6:[],page9:[]},kpiFields:[]}).noSpeech,true);
+ assert.throws(()=>validateCaseWideOutput({speechDetected:true,text:'x',pages:{page5:[]},kpiFields:[]}));
+});
