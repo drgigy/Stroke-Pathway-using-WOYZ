@@ -1,3 +1,4 @@
+// Original page numbers are stable field/data identifiers; display order is 1–6.
 export const protocolPages = [
   {
     "number": 1,
@@ -44,17 +45,6 @@ export const protocolPages = [
     "sourceTextCharacters": 2201
   },
   {
-    "number": 5,
-    "title": "Counselling Form",
-    "src": "protocol/page-5.svg",
-    "width": 1190,
-    "height": 1684,
-    "pdfWidthPoints": 594.95996,
-    "pdfHeightPoints": 841.91998,
-    "sha256": "0684e06e4a5345a3b5292ecce3dfe2c0c72299f193e20ffab253837d6a2303a7",
-    "sourceTextCharacters": 211
-  },
-  {
     "number": 6,
     "title": "Thrombolytic Checklist",
     "src": "protocol/page-6.svg",
@@ -64,28 +54,6 @@ export const protocolPages = [
     "pdfHeightPoints": 841.91998,
     "sha256": "eeac9edd6859a027e1a97236dfe16fccec1baeb69777a217276b6aeb08f319ef",
     "sourceTextCharacters": 2304
-  },
-  {
-    "number": 7,
-    "title": "Thrombolysis Consent (English)",
-    "src": "protocol/page-7.svg",
-    "width": 1190,
-    "height": 1684,
-    "pdfWidthPoints": 594.95996,
-    "pdfHeightPoints": 841.91998,
-    "sha256": "5e9d0202ecde5cc42962b2fcc871cbf487ffa4f4154080b6682760f704acdf70",
-    "sourceTextCharacters": 2086
-  },
-  {
-    "number": 8,
-    "title": "Thrombolysis Consent (Malayalam)",
-    "src": "protocol/page-8.svg",
-    "width": 1190,
-    "height": 1684,
-    "pdfWidthPoints": 594.95996,
-    "pdfHeightPoints": 841.91998,
-    "sha256": "44a822c4129cbeba732067b2d4a3f777fe50d9e56b890646994a86e00cf14c19",
-    "sourceTextCharacters": 1840
   },
   {
     "number": 9,

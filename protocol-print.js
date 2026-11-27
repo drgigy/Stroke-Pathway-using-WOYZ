@@ -34,7 +34,7 @@ export async function printFilledProtocol({dictations={},isCurrent=()=>true}={})
  const root=document.createElement('main');root.id='protocolPrintRoot';root.setAttribute('aria-hidden','true');prepared=root;document.body.append(root);
  try{
   const images=[],sheets=[];
-  for(const page of protocolPages.filter(page=>![5,7,8].includes(page.number))){
+  for(const page of protocolPages){
    const sheet=document.createElement('section');sheet.className='protocol-print-page';sheet.dataset.pageNumber=String(page.number);sheet.setAttribute('aria-label',page.title);
    const canvas=document.createElement('div');canvas.className='protocol-form-canvas';
    const image=document.createElement('img');image.className='protocol-print-image';image.src=new URL(page.src,import.meta.url).href;image.alt=page.title;image.width=page.width;image.height=page.height;image.decoding='sync';

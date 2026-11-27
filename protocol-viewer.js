@@ -3,7 +3,7 @@ import { protocolPages } from './protocol-pages.js';
 import { mountProtocolZoom } from './protocol-zoom.js';
 import { renderFilledProtocolForm } from './protocol-form-overlay.js';
 import { cancelProtocolFormEditing, mountProtocolFormEditStatus, onProtocolFormEditChange, protocolFormEditingBusy, setProtocolFormEditContext } from './protocol-form-editor.js';
-import { cancelProtocolDictation, mountProtocolDictationControls, onProtocolDictationChange, protocolDictationBusy, setProtocolDictationContext } from './protocol-dictation.js';
+import { cancelProtocolDictation, mountProtocolDictationControls, onProtocolDictationChange, protocolDictationBusy, protocolDictationState, setProtocolDictationContext } from './protocol-dictation.js';
 
 let toolbar;
 let container;
@@ -52,11 +52,11 @@ function ensureToolbar() {
     button.type = 'button';
     button.className = 'protocol-page-button';
     const number = document.createElement('span');
-    number.className = 'protocol-page-number'; number.textContent = String(page.number);
+    number.className = 'protocol-page-number'; number.textContent = String(index + 1);
     const name = document.createElement('span'); name.textContent = pageTitles[index];
     button.append(number, name);
     button.dataset.protocolPage = String(page.number);
-    button.setAttribute('aria-label', `Protocol page ${page.number}`);
+    button.setAttribute('aria-label', `Protocol page ${index + 1}: ${page.title}`);
     button.addEventListener('click', () => {
       if ((protocolDictationBusy() || protocolFormEditingBusy())) return;
       currentPage = index;
@@ -148,21 +148,26 @@ function renderPage() {
   image.src = new URL(page.src, import.meta.url).href;
   image.width = page.width;
   image.height = page.height;
-  image.alt = `Rajagiri Hospital stroke protocol page ${page.number} of ${protocolPages.length}`;
+  image.alt = `Rajagiri Hospital stroke protocol page ${currentPage + 1} of ${protocolPages.length}`;
   image.dataset.pageNumber = String(page.number);
   image.decoding = 'async';
   const sheet = document.createElement('section');
   sheet.className = 'protocol-page-sheet';
-  sheet.setAttribute('aria-label', `Protocol page ${page.number}`);
+  sheet.setAttribute('aria-label', `Protocol page ${currentPage + 1}: ${page.title}`);
   const canvas = document.createElement('div'); canvas.className = 'protocol-form-canvas';
   canvas.append(image); sheet.append(canvas);
   container.replaceChildren(sheet);
   container.scrollTop = 0;
   container.scrollLeft = 0;
-  disposeZoom = mountProtocolZoom(container, sheet);
+  disposeZoom = mountProtocolZoom(container, sheet, { onSwipe: direction => {
+    const state=protocolDictationState();
+    const canTurn=!protocolFormEditingBusy()&&(!state.busy||(state.background&&['recording','paused'].includes(state.phase)));
+    const next=Math.max(0,Math.min(protocolPages.length-1,currentPage+direction));
+    if(canTurn&&next!==currentPage){currentPage=next;expanded=false;renderPage();}
+  }});
   updateToolbar();
   renderSavedDictations(sheet);
-  const caseId = currentCase, pageNumber = currentPage + 1;
+  const caseId = currentCase, pageNumber = page.number;
   const onSaved=(id,entry)=>{
     if(currentCase!==caseId)return;
     const key=`page${pageNumber}`;caseDictations={...caseDictations,[key]:{...caseDictations[key],[id]:entry}};
@@ -175,7 +180,7 @@ function renderPage() {
 
 function renderSavedDictations(sheet) {
   sheet.querySelector('.protocol-saved-dictations')?.remove();
-  renderFilledProtocolForm(sheet, currentPage + 1, caseDictations[`page${currentPage + 1}`],{readOnly:archiveOnly});
+  renderFilledProtocolForm(sheet, protocolPages[currentPage].number, caseDictations[`page${protocolPages[currentPage].number}`],{readOnly:archiveOnly});
 
 }
 
@@ -195,7 +200,8 @@ export function showProtocolCase(target, caseId, options = {}) {
     if ((protocolDictationBusy() || protocolFormEditingBusy())) { toolbar.hidden = false; return; }
     currentPage = 0; expanded = false;
   }
-  if(Number.isInteger(options.pageNumber)&&options.pageNumber>=1&&options.pageNumber<=protocolPages.length)currentPage=options.pageNumber-1;
+  const requestedIndex=protocolPages.findIndex(page=>page.number===options.pageNumber);
+  if(requestedIndex!==-1)currentPage=requestedIndex;
   currentCase = caseId;
   caseDictations = options.dictations || {};
   toolbar.dataset.caseId = caseId;

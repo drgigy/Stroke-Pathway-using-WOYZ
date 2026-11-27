@@ -33,7 +33,7 @@ export function configureProtocolDictation(options) {
   config = options;
   if(backgroundEnabled)configureBackgroundUpload(options);else configureSharedKey(options);
   onBackgroundChange(render);
-  // Keep a recording on its original page until it has been saved or access ends.
+  // Keep a recording on its original case; case-wide recording permits form-page swipes.
   document.addEventListener('click', event => {
     if (busy() && event.target.closest('.entry, .user-pill, [data-start-code7], #userHomeBtn, #mobileHomeBtn, #newNoteBtn')) {
       event.preventDefault(); event.stopImmediatePropagation();
