@@ -63,3 +63,9 @@
 .kpi-continuous .kpi-fields { grid-template-columns:minmax(0,1fr); }
 .kpi-continuous .kpi-field { padding:12px 16px;gap:5px; }
 .kpi-field-condition { font-size:12px;line-height:1.4;color:#536d62; }
+
+.kpi-reuse-summary { margin:0 0 10px;font-size:14px;color:#536d62; }
+.kpi-show-captured { padding:8px 10px;margin:0 0 14px;background:white;color:#205e50;border:1px solid #c9dacf;border-radius:8px;font:600 13px/1.4 system-ui;cursor:pointer; }
+.kpi-readiness { margin:0 0 18px;padding:10px 12px;border:1px solid #d4e1db;border-radius:10px;font-size:13px;background:#fff; }
+.kpi-readiness summary { cursor:pointer;font-weight:700; }.kpi-readiness li { margin:6px 0;overflow-wrap:anywhere; }
+.kpi-field-reuse { font-size:12px;color:#805323;line-height:1.4;overflow-wrap:anywhere; }

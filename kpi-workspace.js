@@ -1,8 +1,8 @@
-import { kpiCalculationProfile } from './kpi-policy.js';
+import { kpiCalculationProfile, kpiDefinitions } from './kpi-policy.js';
 import { onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js';
 import { isReviewPage } from './page-mode.js';
 import { kpiSections, kpiFields, hospitalFields, kpiSource, kpiSchemaVersion } from './kpi-schema.js';
-import { currentKpiValues, currentMonthlyValues, isKpiReportingCase } from './kpi-data.js';
+import { currentKpiValues, currentMonthlyValues, isKpiReportingCase, resolveKpiValues } from './kpi-data.js';
 import { calculateKpis } from './kpi-calculations.js';
 import { configureKpiStore, saveKpiEdit, saveKpiMonthly } from './kpi-store.js';
 import { mountProtocolDictationControls, setProtocolDictationContext, protocolDictationBusy, onProtocolDictationChange, cancelProtocolDictation, parkProtocolDictation, restoreProtocolDictation } from './protocol-dictation.js';
@@ -10,7 +10,9 @@ import { protocolFormEditingBusy, configureProtocolFormEditing, onProtocolFormEd
 import { showProtocolCase as showArchive, hideProtocolViewer as hideArchive, toggleProtocolPages } from './protocol-viewer.js';
 
 const caseSections=kpiSections.filter(section=>section.id!=='kpiResults');
-const parameterFields=[...new Map(caseSections.flatMap(item=>item.fields).filter(field=>!['name','age','uhid'].includes(field.id)).map(field=>[field.id,field])).values()];
+const reportFields=new Set(['includeInReporting','pressureUlcerInitialStage',...kpiDefinitions.flatMap(item=>item.parameters).filter(id=>!id.startsWith('monthlyInputs.'))]);
+for(let prior=-1;prior!==reportFields.size;){prior=reportFields.size;for(const field of kpiFields.filter(item=>reportFields.has(item.id)))for(const condition of [...(field.showIf?(Array.isArray(field.showIf)?field.showIf:[field.showIf]):[]),...(field.showIfAny||[])])reportFields.add(condition.field);}
+const parameterFields=[...new Map(caseSections.flatMap(item=>item.fields).filter(field=>reportFields.has(field.id)).map(field=>[field.id,field])).values()];
 const fieldSection=id=>caseSections.find(item=>item.fields.some(field=>field.id===id))?.id||kpiSections[section].id;
 let standalone=false, parameterHome=false, caseTabs;
 export const kpiWorkspaceBusy=()=>busy();
@@ -95,6 +97,15 @@ function changeSection(index){if(standalone||busy()||index<0||index>=caseSection
 function humanDate(value){if(!value)return 'Not recorded';const date=new Date(value);return Number.isFinite(date.getTime())?new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Kolkata',day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:true}).format(date):value;}
 function localDateTime(value){if(!value)return '';const d=new Date(value);if(!Number.isFinite(d.getTime()))return '';const p=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Kolkata',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23'}).formatToParts(d),v=key=>p.find(x=>x.type===key)?.value;return `${v('year')}-${v('month')}-${v('day')}T${v('hour')}:${v('minute')}:${v('second')}`;}
 function visible(field,values){const conditions=field.showIf?Array.isArray(field.showIf)?field.showIf:[field.showIf]:[];return conditions.every(test=>test.values.includes(values[test.field]))&&(!field.showIfAny||field.showIfAny.some(test=>test.values.includes(values[test.field])));}
+function cueVisible(field,values){
+ const unknown=id=>values[id]===undefined||values[id]==='';
+ const conditions=field.showIf?(Array.isArray(field.showIf)?field.showIf:[field.showIf]):[];
+ if(!conditions.every(test=>unknown(test.field)||test.values.includes(values[test.field])))return false;
+ if(field.showIfAny&&!field.showIfAny.some(test=>unknown(test.field)||test.values.includes(values[test.field])))return false;
+ if(field.id==='evtStartTime'&&(values.evtDeviceTime||values.skinPunctureTime))return false;
+ if(field.id==='ivtIndicated'&&values.ivtGiven==='Yes')return false;
+ return true;
+}
 function fieldRow(field,monthly=false){
  const wrap=el('label','kpi-field');wrap.dataset.field=field.id;wrap.dataset.monthly=String(monthly);
  const label=el('span','kpi-field-label',field.label);wrap.append(label);
@@ -148,6 +159,9 @@ function buildParameterMenu(){
  if(isReviewPage){const review=el('button','kpi-source-button','Review dictation');review.type='button';review.addEventListener('click',reviewSources);head.append(review);
   const status=el('div','protocol-edit-status'),text=el('span'),retry=el('button','','Retry save');text.setAttribute('role','status');retry.type='button';retry.hidden=true;retry.addEventListener('click',()=>{if(failed){jobs.unshift(failed);failed=null;flush();}});status.append(text,retry);head.append(status);statusNodes=statusNodes.filter(node=>node.isConnected);statusNodes.push(status);
  }root.append(head);
+ const reused=el('p','kpi-reuse-summary');root.append(reused);
+ const toggle=el('button','kpi-show-captured','Show details already captured in Stroke pathway');toggle.type='button';toggle.setAttribute('aria-expanded','false');toggle.addEventListener('click',()=>{root.dataset.showCaptured=root.dataset.showCaptured==='true'?'false':'true';toggle.setAttribute('aria-expanded',root.dataset.showCaptured);toggle.textContent=root.dataset.showCaptured==='true'?'Hide captured details':'Show details already captured in Stroke pathway';refresh();});root.append(toggle);
+ const readiness=el('details','kpi-readiness');readiness.append(el('summary'),el('ul'));root.append(readiness);
  const list=el('div','kpi-fields');list.setAttribute('aria-label','KPI parameters');
  for(const field of parameterFields){
   const row=fieldRow(field);
@@ -184,20 +198,33 @@ function build(){
 }
 function refresh(){
  if(!root?.isConnected||archive||!active)return;
- const values=currentKpiValues(caseData),identity=[values.name,values.age?(/^\d+(?:\.\d+)?$/.test(values.age)?values.age+' years':values.age):'',values.uhid?'UHID '+values.uhid:''].filter(Boolean).join(' · ');
+ const reuse=resolveKpiValues(caseData),values=currentKpiValues(caseData),identity=[values.name,values.age?(/^\d+(?:\.\d+)?$/.test(values.age)?values.age+' years':values.age):'',values.uhid?'UHID '+values.uhid:''].filter(Boolean).join(' · ');
  const identityNode=root.querySelector('.kpi-case-identity');if(identityNode)identityNode.textContent=standalone?'Cases marked for KPI reporting':identity||'New shared case';
  let shown=0;
  for(const wrap of root.querySelectorAll('.kpi-field')){
   const monthly=wrap.dataset.monthly==='true',defs=monthly?hospitalFields:kpiFields,field=defs.find(f=>f.id===wrap.dataset.field),control=wrap.querySelector('[data-kpi-field]'),read=wrap.querySelector('.kpi-read-value');
   const source=monthly?currentMonthlyValues(allData.get('kpi-month-'+reportMonth)||{}):values;
-  wrap.hidden=!monthly&&!(parameterHome&&!isReviewPage)&&!visible(field,values);if(!wrap.hidden)shown++;
+  wrap.hidden=!monthly&&((parameterHome&&reuse.covered.has(field.id)&&root.dataset.showCaptured!=='true')||!(parameterHome&&!isReviewPage?cueVisible(field,values):visible(field,values)));if(!wrap.hidden)shown++;
   control.disabled=!isReviewPage||!!parked;
   const key=(monthly?'monthly:':'')+field.id,value=source[field.id]??'';
+  let note=wrap.querySelector('.kpi-field-reuse');const fact=parameterHome&&reuse.form[field.id],issue=parameterHome&&reuse.issues[field.id];
+  if(fact||issue){if(!note){note=el('span','kpi-field-reuse');wrap.append(note);}note.textContent=issue?(issue+' Saved form value: '+(fact?.raw||'blank')):'Already captured in Stroke pathway.';}else note?.remove();
   if(!dirty.has(key)&&document.activeElement!==control)control.value=field.type==='datetime'?localDateTime(value):value;
   read.textContent=value===''?'Not recorded':field.type==='datetime'?humanDate(value):value;read.classList.toggle('kpi-pending',value==='');
  }
  let warnings=root.querySelector('.kpi-warnings');const uncertain=Object.values(caseData.kpiEntries||{}).filter(entry=>(parameterHome||entry.sectionId===kpiSections[section].id)&&entry.warnings?.length).flatMap(entry=>entry.warnings);if(uncertain.length){if(!warnings){warnings=el('details','kpi-warnings');root.querySelector('.kpi-section-head').after(warnings);}warnings.replaceChildren(el('summary','','Dictated details needing clarification'));const list=el('ul');for(const message of uncertain)list.append(el('li','',message));warnings.append(list);}else warnings?.remove();
  const empty=root.querySelector('.kpi-empty-section');if(empty)empty.hidden=shown>0;
+ if(parameterHome){
+  const reusedCount=parameterFields.filter(field=>reuse.covered.has(field.id)).length;
+  root.querySelector('.kpi-reuse-summary').textContent=`${reusedCount} parameter${reusedCount===1?'':'s'} already captured in Stroke pathway. Only additional or unresolved details are shown.`;
+  root.querySelector('.kpi-show-captured').hidden=reusedCount===0;
+  const monthly=currentMonthlyValues(allData.get('kpi-month-'+reportMonth)||{}),results=calculateKpis([values],monthly),pending=results.filter(item=>item.status==='pending'),resolved=results.filter(item=>['complete','not-applicable'].includes(item.status));
+  const ready=root.querySelector('.kpi-readiness');ready.querySelector('summary').textContent=`24 KPI checks: ${resolved.length} resolved, ${pending.length} pending`;
+  const list=ready.querySelector('ul');list.replaceChildren();
+  if(values.includeInReporting!=='Yes')list.append(el('li','','Confirm inclusion in KPI reporting before this case enters the shared report.'));
+  for(const item of pending){const labels=[...new Set(item.missing.map(id=>describeMissing(id,[values])))];list.append(el('li','',`KPI ${item.no}: ${labels.join('; ')}`));}
+  if(!pending.length)list.append(el('li','','Applicable case data is complete for these checks. Indicators without an eligible case are not applicable; shared results use the reporting-month cohort.'));
+ }
  if(standalone&&section===5)refreshReport();
  for(const b of root.querySelectorAll('.kpi-section-foot button'))b.disabled=busy()||(b.textContent==='Previous section'?section===0:section>=caseSections.length-1);
  updateNavigation();
@@ -217,7 +244,7 @@ function reportData(){
  return {records:recordsForMonth,results:calculateKpis(recordsForMonth,monthly)};
 }
 function refreshReport(){
- const {records,results}=reportData(),summary=root.querySelector('.kpi-report-summary');summary.textContent=`${records.length} included case${records.length===1?'':'s'} · ${results.filter(r=>r.status==='complete').length} complete indicators`;
+ const {records,results}=reportData(),summary=root.querySelector('.kpi-report-summary');summary.textContent=`${records.length} included case${records.length===1?'':'s'} · ${results.filter(r=>r.status==='complete').length} complete · ${results.filter(r=>r.status==='not-applicable').length} without eligible cases · ${results.filter(r=>r.status==='pending').length} pending of 24 indicators`;
  const box=root.querySelector('.kpi-results');box.replaceChildren();
  for(const result of results){const card=el('article','kpi-result');card.dataset.kpiNumber=result.no;card.dataset.status=result.status;const top=el('div','kpi-result-head');top.append(el('span','kpi-number',String(result.no)),el('h2','',result.title));card.append(top);const labels={complete:'Complete',pending:'Pending data',clarification:'Definition needs clarification','not-applicable':'No eligible cases'};card.append(el('span','kpi-result-status',labels[result.status]||result.status));card.append(el('strong','kpi-result-value',result.value==null?'Awaiting data':typeof result.value==='number'?`${Number(result.value.toFixed(2))}${result.unit==='%'?'%':result.unit?' '+result.unit:''}`:String(result.value)));card.append(el('p','kpi-counts',`Numerator: ${result.numerator??'—'} · Denominator: ${result.denominator??'—'}`));const definition=el('details','kpi-definition');definition.append(el('summary','','Formula and parameters'),el('p','',result.formula),el('p','',kpiCalculationProfile.title),el('p','','Parameters depend on the applicable treatment/outcome and the stated fallbacks.'));const parameters=el('ul');for(const id of result.parameters){const key=id.replace('monthlyInputs.',''),field=[...kpiFields,...hospitalFields].find(f=>f.id===key);parameters.append(el('li','',field?.label||id));}definition.append(parameters);card.append(definition);if(result.note)definition.append(el('p','kpi-result-note',result.note));if(result.missing?.length){const details=el('details');details.append(el('summary','',`${result.missing.length} missing details`));const list=el('ul');for(const item of result.missing)list.append(el('li','',describeMissing(item,records)));details.append(list);card.append(details);}box.append(card);}
 }

@@ -1,6 +1,7 @@
 import { kpiFields, hospitalFields, kpiSource, kpiSchemaVersion } from './kpi-schema.js';
 import { compareEntries } from './entry-order.js';
 import { currentFieldValues } from './protocol-field-output.js';
+import {protocolKpiEvidence,protocolKpiMappings,sameKpiFact,protocolClockMatches} from './protocol-kpi-values.js';
 
 const MAX_VALUE = 4000;
 const own = (object, key) => Object.hasOwn(object, key);
@@ -85,9 +86,8 @@ function mergedEntries(entries, definitions) {
   return result;
 }
 
-/** Identity only: patient data, then explicit protocol mappings, then KPI takes.
- * NIL placeholders are absent evidence; a mapped manual clear stays explicit.
- * Protocol clinical values never become KPI evidence.
+/** Explicit validated form facts are reused without rewriting stored entries.
+ * Manual clears/corrections remain protected; no dates or eligibility are guessed.
  */
 export function currentKpiValues(data = {}) {
   const values = {}, patient = isMap(data.patientData) ? data.patientData : {};
@@ -103,7 +103,29 @@ export function currentKpiValues(data = {}) {
         && !/^nil$/i.test(mapped.trim())) values[id] = mapped.trim();
     }
   }
-  return Object.assign(values, mergedEntries(data.kpiEntries, kpiFields));
+  return Object.assign(values, resolveKpiValues(data).values);
+}
+
+export function resolveKpiValues(data={}){
+ const values=mergedEntries(data.kpiEntries,kpiFields),form=protocolKpiEvidence(data),covered=new Set(),issues={},sources={};
+ const typedEntries={};
+ for(const [key,entry]of Object.entries(data.kpiEntries||{}).filter(([,e])=>e&&e.source===kpiSource&&e.version===kpiSchemaVersion).sort(([a,x],[b,y])=>compareEntries(x,y,a,b)))
+  for(const [id,value]of Object.entries(entry.fields||{}))if(Object.hasOwn(values,id)&&typeof value==='string'&&value.length<=MAX_VALUE&&(value.trim()||entry.kind==='manual-edit'))typedEntries[id]={entry,key};
+ for(const [id,fact]of Object.entries(form)){
+  const definition=kpiFields.find(f=>f.id===id),typed=typedEntries[id];
+  const newerManual=fact.entry?.kind==='manual-edit'&&(!typed||compareEntries(fact.entry,typed.entry,fact.takeId,typed.key)>0);
+  const accepted=fact.value!==null&&!(id==='reperfusionTime'&&!['2B','2C','3'].includes(values.finalTici||form.finalTici?.value));
+  const valid=accepted?normalizeKpiFields([{id,value:fact.value}])[id]:null;
+  if(newerManual&&(!fact.raw.trim()||(!accepted&&!protocolClockMatches(fact.raw,values[id])))){
+   values[id]='';issues[id]=fact.raw.trim()?'Complete or clarify the Stroke pathway value.':'Cleared in Stroke pathway.';continue;
+  }
+  if(valid!==null&&(!Object.hasOwn(values,id)||newerManual)){
+   values[id]=valid;sources[id]=fact;covered.add(id);
+  }else if(valid!==null&&sameKpiFact(values[id],valid,definition.type))covered.add(id);
+  else if(typed&&protocolKpiMappings[id]?.type==='datetime'&&protocolClockMatches(fact.raw,values[id]))covered.add(id);
+  else if(fact.raw.trim())issues[id]=Object.hasOwn(values,id)&&values[id]!==''?'Review the difference from Stroke pathway.':'Stroke pathway needs a full event date/time or an unambiguous value.';
+ }
+ return {values,covered,issues,sources,form};
 }
 
 export function currentMonthlyValues(data = {}) {

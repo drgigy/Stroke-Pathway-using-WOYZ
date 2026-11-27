@@ -8,7 +8,7 @@ const typed={...data,kpiEntries:{a:{source:kpiSource,version:kpiSchemaVersion,fi
 assert.equal(dashboardInterval(dashboardTimings(typed).values,'arrivalTime','firstSliceTime'),45);assert.equal(dashboardClock(dashboardTimings(typed).values.arrivalTime),'09:00:00');
 assert.equal(dashboardInterval({a:'23:55',b:'00:10'},'a','b'),null);assert.equal(dashboardInterval({a:'2026-11-27T23:55:00+05:30',b:'2026-11-28T00:10:00+05:30'},'a','b'),15);assert.equal(dashboardInterval({a:'2026-11-27T09:00:00+05:30',b:'09:30'},'a','b'),null);
 assert.equal(dashboardTimings({protocolDictations:{page2:{a:entry({door_imaging:'15 min',door_first_pass:'70 min'})}}}).values.firstSliceTime,'');
-console.log('PASS: existing typed times, protocol-reference fallback, explicit clears, no KPI promotion, no mutations and date/midnight ambiguity safeguards.');
+console.log('PASS: existing typed times, protocol-reference fallback, explicit clears, no clock-only KPI promotion, no mutations and date/midnight ambiguity safeguards.');
 
 const mixed=dashboardTimings({...data,kpiEntries:{a:{source:kpiSource,version:kpiSchemaVersion,fields:{firstSliceTime:'2026-11-27T09:30:00+05:30'},createdAt:{seconds:4}}}});
 assert.equal(dashboardInterval(mixed.values,'arrivalTime','firstSliceTime',mixed),15);
