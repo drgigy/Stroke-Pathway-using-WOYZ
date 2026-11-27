@@ -31,3 +31,6 @@ console.log('PASS: validated form reuse, dates, source isolation, clinical disti
 const nihssArrival={protocolDictations:{page9:{a:form(9,{arrival:'2026-11-27T09:00:00+05:30'})}}};assert.equal(currentKpiValues(nihssArrival).arrivalTime,'2026-11-27T03:30:00.000Z');
 const latestArrival={...data,protocolDictations:{...data.protocolDictations,page9:{a:form(9,{arrival:'2026-11-27T09:05:00+05:30'},30,'manual-edit')}}};assert.equal(currentKpiValues(latestArrival).arrivalTime,'2026-11-27T03:35:00.000Z');
 console.log('PASS: alternate NIHSS-sheet arrival is reused and latest duplicate-sheet manual correction is respected.');
+
+const fractional={protocolDictations:{page2:{a:form(2,{er_arrival:'2026-11-27T09:00:00.125+05:30',ivt_start:'2026-11-27T10:00:00.126+05:30'})}}};const fv=currentKpiValues(fractional);assert.equal(fv.arrivalTime,'2026-11-27T03:30:00.125Z');assert.equal(fv.ivtTime,'2026-11-27T04:30:00.126Z');assert.equal(calculateKpis([{...fv,ivtGiven:'Yes'}],{})[1].numerator,0,'Do not round a treatment over the exact 60-minute boundary into compliance');
+console.log('PASS: subsecond form timestamps retain exact KPI boundary precision.');

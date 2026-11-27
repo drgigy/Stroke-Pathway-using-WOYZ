@@ -19,7 +19,8 @@ export const protocolKpiMappings=Object.freeze({
  reperfusionTime:{page:2,field:'recanalisation',type:'datetime'},
 });
 const isoTime=value=>{
- const parsed=parseProtocolTime(value);return parsed?.dated?new Date(parsed.seconds*1000).toISOString():null;
+ const parsed=parseProtocolTime(value),fraction=/:\d{2}\.(\d{1,3})(?=\s|[zZ+-]|$)/.exec(value);
+ return parsed?.dated?new Date(parsed.seconds*1000+(fraction?Number('0.'+fraction[1])*1000:0)).toISOString():null;
 };
 function normalize(raw,type){
  if(typeof raw!=='string'||!raw.trim())return null;
