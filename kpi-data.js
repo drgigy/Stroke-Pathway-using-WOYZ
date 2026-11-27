@@ -141,5 +141,5 @@ export function kpiContract(definitions = kpiFields) {
 /** Preserve source cohort exclusions without hiding imported cases from the workspace. */
 export function isKpiReportingCase(data = {}) {
  const value=currentKpiValues(data).includeInReporting;
- return value==='Yes'||(value!=='No'&&!data.importProvenance?.requiresInclusionReview);
+ return value==='Yes';
 }

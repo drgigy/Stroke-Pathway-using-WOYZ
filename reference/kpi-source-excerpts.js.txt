@@ -1,0 +1,345 @@
+// Pure calculation excerpts from the owner-supplied handover. No app initialization, Firebase, auth, UI or device logic.
+// Original source SHA256: 3178af409afb1120e5b8f88fa253ec766a59b3ec652694d7f14210fb394f8943
+function buildNabhKpiReport(cases, admin) {
+  const ischemicCases = cases.filter((item) => ["Ischemic Stroke", "LVO Suspected"].includes(item.suspicion));
+  const inpatientCases = cases.filter((item) => kpiValue(item, "strokePresentationType") === "Inpatient stroke");
+  const strokeUnitPatientDays = cases.reduce((sum, item) => sum + patientStrokeUnitDays(item), 0);
+  const patientFalls = cases.reduce((sum, item) => sum + patientFallCount(item), 0);
+  const diagnosticCases = cases.filter((item) => kpiValue(item, "diagnosticImagingPerformed") === "Yes" || Boolean(kpiValue(item, "diagnosticImagingStartTime")));
+  const brainImagingCases = cases.filter((item) => kpiValue(item, "diagnosticImagingPerformed") === "Yes" || Boolean(firstBrainImagingStartTime(item)));
+  const ivtCases = cases.filter((item) => item.ivt?.eligible === "Yes" || kpiValue(item, "ivtGiven") === "Yes");
+  const evtCases = cases.filter((item) => kpiValue(item, "evtPerformed") === "Yes" || Boolean(stageTime(item, "groinPuncture")));
+  const carotidCases = cases.filter((item) => kpiValue(item, "ceaPerformed") === "Yes" || kpiValue(item, "carotidAngioplastyStentingPerformed") === "Yes");
+  const angiographyCases = cases.filter((item) => kpiValue(item, "diagnosticAngiographyPerformed") === "Yes");
+  const intracranialCases = cases.filter((item) => kpiValue(item, "intracranialAngioplastyStentingPerformed") === "Yes");
+  const reperfusionCases = ischemicCases.filter((item) =>
+    kpiValue(item, "evtPerformed") === "Yes" ||
+    kpiValue(item, "intraArterialThrombolysis") === "Yes" ||
+    Boolean(item.mt?.tici)
+  );
+  return [
+    averageKpi(1, "Time to first brain imaging", brainImagingCases, (item) => minutesBetween(strokeReferenceTime(item), firstBrainImagingStartTime(item)), "Average minutes"),
+    dualIvtComplianceKpi(ivtCases),
+    verifiedOutcomeKpi(3, "sICH after IVT", ivtCases, "sichAfterIvt", (item) => validatedSich(item, "Ivt", stageTime(item, "ivtStarted"))),
+    averageKpi(4, "Time to detailed neurological assessment of inpatients", inpatientCases, (item) => minutesBetween(kpiValue(item, "strokeRecognitionTime"), stageTime(item, "initialOrders")), "Average minutes"),
+    percentageKpi(5, "Dysphagia screening documented", cases, null, (item) => kpiValue(item, "dysphagiaScreening") === "Yes"),
+    percentageKpi(6, "Rehab assessment within 48 hours", cases, null, (item) => withinIsoMinutes(admissionReferenceTime(item), kpiValue(item, "physiotherapyAssessmentTime"), 48 * 60)),
+    verifiedRankinKpi(cases.filter((item) => kpiValue(item, "followup90DayCompleted") === "Yes" || kpiValue(item, "mrs90Days") !== "")),
+    verifiedRatioKpi(8, "Medication errors", cases, "medicationError", medicationErrorTotal(cases), num(admin.medicationErrorOpportunities), "%"),
+    verifiedOutcomeKpi(9, "Death in hospital within 7 days", cases, "deathWithin7Days", verifiedDeathWithin7Days),
+    verifiedOutcomeKpi(10, "CEA/carotid procedure stroke or death within 30 days", carotidCases, "strokeDeath30DaysAfterCea", (item) => verifiedWithinWindow(item, "carotidProcedureTime", "carotidStrokeDeathTime", 30 * 24 * 60)),
+    verifiedOutcomeKpi(11, "Stroke/death within 24 hours after diagnostic angiography", angiographyCases, "strokeDeath24HoursAfterAngiography", (item) => verifiedWithinWindow(item, "diagnosticAngiographyTime", "diagnosticAngiographyStrokeDeathTime", 24 * 60)),
+    verifiedRatioKpi(12, "Hospital-associated pressure ulcer", cases, "pressureUlcerNewWorsening", pressureUlcerCount(cases), strokeUnitPatientDays, "%", (item) =>
+      kpiValue(item, "pressureUlcerNewWorsening") === "No" || Boolean(kpiValue(item, "pressureUlcerStage"))
+    ),
+    verifiedOutcomeKpi(13, "DVT after admission", cases, "dvtAfterAdmission", (item) => kpiValue(item, "dvtAfterAdmission") === "Yes"),
+    averageKpi(14, "Waiting time for imaging services", diagnosticCases, diagnosticWaitingMinutes, "Average minutes"),
+    ratioKpi(15, "Thrombolytic-agent stock-outs", num(admin.thrombolyticStockouts), num(admin.thrombolyticFormularyDrugs), "%"),
+    verifiedRateKpi(16, "Patient falls", cases, "patientFall", patientFalls, strokeUnitPatientDays, 1000, "per 1000 patient days"),
+    percentageKpi(17, "EVT within defined timeframe", ischemicCases.filter((item) => kpiValue(item, "evtIndicated") === "Yes"), null, evtWithinTarget),
+    verifiedOutcomeKpi(18, "sICH after EVT", evtCases, "sichAfterEvt", (item) => validatedSich(item, "Evt", stageTime(item, "firstPass") || stageTime(item, "groinPuncture"))),
+    percentageKpi(19, "Speech therapy dysphagia reassessment within 24 hours", cases, null, (item) => withinIsoMinutes(admissionReferenceTime(item), kpiValue(item, "speechTherapyAssessmentTime"), 24 * 60)),
+    verifiedOutcomeKpi(20, "Intracranial angioplasty/stenting stroke or death within 30 days", intracranialCases, "strokeDeath30DaysAfterAngioplastyStenting", (item) => verifiedWithinWindow(item, "intracranialProcedureTime", "intracranialStrokeDeathTime", 30 * 24 * 60)),
+    percentageKpi(21, "Ventriculitis among patients who underwent EVD", ischemicCases.filter((item) => kpiValue(item, "evdInserted") === "Yes"), null, (item) => kpiValue(item, "ventriculitisAfterEvd") === "Yes"),
+    verifiedTiciKpi(reperfusionCases),
+    percentageKpi(23, "LVO EVT first pass within 150 minutes and TICI 2B+", cases.filter((item) => kpiValue(item, "largeVesselOcclusion") === "Yes" && (kpiValue(item, "evtPerformed") === "Yes" || Boolean(stageTime(item, "firstPass")))), null, (item) => withinMinutes(item, "arrival", "firstPass", 150) && ticiGood(item)),
+    percentageKpi(24, "EVT patients achieving TICI 2B+ within 60 minutes of groin puncture", evtCases, null, (item) => withinMinutes(item, "groinPuncture", "recanalisation", 60) && ticiGood(item))
+  ];
+}
+
+function dualIvtComplianceKpi(cases) {
+  const within45 = cases.filter((item) => withinMinutes(item, "arrival", "ivtStarted", 45)).length;
+  const within60 = cases.filter((item) => withinMinutes(item, "arrival", "ivtStarted", 60)).length;
+  const denominator = cases.length;
+  return {
+    no: 2,
+    title: "IVT within defined timeframes",
+    value: denominator ? `${Math.round((within60 / denominator) * 100)}% within 60 min` : "--",
+    numerator: within60,
+    denominator,
+    chartValue: denominator ? (within60 / denominator) * 100 : null,
+    meta: `45 min: ${within45}/${denominator} | 60 min: ${within60}/${denominator}`,
+    frequency: "Continuous"
+  };
+}
+
+function verifiedOutcomeKpi(no, titleText, eligibleCases, answerKey, positiveFn) {
+  const completedCases = eligibleCases.filter((item) => {
+    const answer = kpiValue(item, answerKey);
+    return answer === "No" || (answer === "Yes" && positiveFn(item) !== null);
+  });
+  const numerator = completedCases.filter((item) => kpiValue(item, answerKey) === "Yes" && positiveFn(item) === true).length;
+  const denominator = eligibleCases.length;
+  const complete = completedCases.length;
+  const provisional = complete < denominator;
+  return {
+    no,
+    title: titleText,
+    value: denominator && !provisional ? `${Math.round((numerator / denominator) * 100)}%` : denominator ? "Pending" : "--",
+    numerator,
+    denominator,
+    chartValue: denominator ? (numerator / denominator) * 100 : null,
+    provisional,
+    meta: `${numerator}/${denominator} | complete ${complete}/${denominator}`,
+    frequency: "Monthly"
+  };
+}
+
+function verifiedRatioKpi(no, titleText, cases, answerKey, numerator, denominator, suffix, evidenceComplete = () => true) {
+  const complete = cases.filter((item) => ["Yes", "No"].includes(kpiValue(item, answerKey)) && evidenceComplete(item)).length;
+  const provisional = complete < cases.length;
+  return {
+    no,
+    title: titleText,
+    value: denominator && !provisional ? `${Math.round((numerator / denominator) * 100)}${suffix}` : denominator ? "Pending" : "--",
+    numerator,
+    denominator,
+    chartValue: denominator ? (numerator / denominator) * 100 : null,
+    provisional,
+    meta: `${numerator || 0}/${denominator || 0} | complete ${complete}/${cases.length}`
+  };
+}
+
+function verifiedRateKpi(no, titleText, cases, answerKey, numerator, denominator, multiplier, suffix) {
+  const complete = cases.filter((item) => ["Yes", "No"].includes(kpiValue(item, answerKey))).length;
+  const provisional = complete < cases.length;
+  return {
+    no,
+    title: titleText,
+    value: denominator && !provisional ? `${((numerator / denominator) * multiplier).toFixed(1)}` : denominator ? "Pending" : "--",
+    numerator,
+    denominator,
+    chartValue: denominator ? (numerator / denominator) * multiplier : null,
+    provisional,
+    meta: `${numerator || 0}/${denominator || 0} ${suffix} | complete ${complete}/${cases.length}`
+  };
+}
+
+function verifiedTiciKpi(cases) {
+  const complete = cases.filter((item) => Boolean(item.mt?.tici)).length;
+  const numerator = cases.filter(ticiGood).length;
+  const denominator = cases.length;
+  const provisional = complete < denominator;
+  return {
+    no: 22,
+    title: "TICI 2B or higher after reperfusion therapy",
+    value: denominator && !provisional ? `${Math.round((numerator / denominator) * 100)}%` : denominator ? "Pending" : "--",
+    numerator,
+    denominator,
+    chartValue: denominator ? (numerator / denominator) * 100 : null,
+    provisional,
+    meta: `${numerator}/${denominator} | TICI recorded ${complete}/${denominator}`
+  };
+}
+
+function verifiedRankinKpi(cases) {
+  const complete = cases.filter((item) => kpiValue(item, "mrs90Days") !== "").length;
+  const numerator = cases.filter((item) => rankinGood(kpiValue(item, "mrs90Days"))).length;
+  const denominator = cases.length;
+  const provisional = complete < denominator;
+  return {
+    no: 7,
+    title: "mRS 0-2 at 90 days",
+    value: denominator && !provisional ? `${Math.round((numerator / denominator) * 100)}%` : denominator ? "Pending" : "--",
+    numerator,
+    denominator,
+    chartValue: denominator ? (numerator / denominator) * 100 : null,
+    provisional,
+    meta: `${numerator}/${denominator} | mRS recorded ${complete}/${denominator}`
+  };
+}
+
+function percentageKpi(no, titleText, denominatorCases, included, numeratorFn, frequency = "Monthly") {
+  const denominator = denominatorCases.filter((item) => !included || included(item)).length;
+  const numerator = denominatorCases.filter((item) => (!included || included(item)) && numeratorFn(item)).length;
+  return {
+    no,
+    title: titleText,
+    value: denominator ? `${Math.round((numerator / denominator) * 100)}%` : "--",
+    numerator,
+    denominator,
+    chartValue: denominator ? (numerator / denominator) * 100 : null,
+    meta: `${numerator}/${denominator}`,
+    frequency
+  };
+}
+
+function averageKpi(no, titleText, cases, minutesFn, label) {
+  const values = cases.map(minutesFn).filter((value) => value != null);
+  const total = values.reduce((sum, value) => sum + value, 0);
+  const average = values.length ? Math.round(total / values.length) : null;
+  const provisional = values.length < cases.length;
+  return {
+    no,
+    title: titleText,
+    value: average == null ? "--" : provisional ? "Pending" : `${average} min`,
+    numerator: total,
+    denominator: cases.length,
+    chartValue: average,
+    provisional,
+    meta: `${label} | timed ${values.length}/${cases.length}`
+  };
+}
+
+function averageAdminKpi(no, titleText, numerator, denominator, label) {
+  return {
+    no,
+    title: titleText,
+    value: denominator ? `${Math.round(numerator / denominator)} min` : "--",
+    numerator,
+    denominator,
+    chartValue: denominator ? numerator / denominator : null,
+    meta: `${label} | ${numerator || 0}/${denominator || 0}`
+  };
+}
+
+function ratioKpi(no, titleText, numerator, denominator, suffix) {
+  return {
+    no,
+    title: titleText,
+    value: denominator ? `${Math.round((numerator / denominator) * 100)}${suffix}` : "--",
+    numerator,
+    denominator,
+    chartValue: denominator ? (numerator / denominator) * 100 : null,
+    meta: `${numerator || 0}/${denominator || 0}`
+  };
+}
+
+function rateKpi(no, titleText, numerator, denominator, multiplier, suffix) {
+  return {
+    no,
+    title: titleText,
+    value: denominator ? `${((numerator / denominator) * multiplier).toFixed(1)}` : "--",
+    numerator,
+    denominator,
+    chartValue: denominator ? (numerator / denominator) * multiplier : null,
+    meta: `${numerator || 0}/${denominator || 0} ${suffix}`
+  };
+}
+
+function countCases(cases, key) {
+  return cases.filter((item) => kpiValue(item, key) === "Yes").length;
+}
+
+function strokeReferenceTime(item) {
+  return kpiValue(item, "strokePresentationType") === "Inpatient stroke"
+    ? kpiValue(item, "strokeRecognitionTime")
+    : stageTime(item, "arrival");
+}
+
+function admissionReferenceTime(item) {
+  return kpiValue(item, "hospitalAdmissionTime") || item.arrivalTime;
+}
+
+function medicationErrorTotal(cases) {
+  return cases.reduce((total, item) => {
+    const count = num(kpiValue(item, "medicationErrorCount"));
+    if (count > 0) return total + count;
+    return total + (kpiValue(item, "medicationError") === "Yes" ? 1 : 0);
+  }, 0);
+}
+
+function pressureUlcerCount(cases) {
+  return cases.filter((item) => {
+    const stage = kpiValue(item, "pressureUlcerStage");
+    return kpiValue(item, "pressureUlcerNewWorsening") === "Yes" && stage && stage !== "No ulcer";
+  }).length;
+}
+
+function verifiedDeathWithin7Days(item) {
+  if (!["Yes", "No"].includes(kpiValue(item, "deathInHospital")) || !kpiValue(item, "deathTime")) return null;
+  if (kpiValue(item, "deathInHospital") !== "Yes") return false;
+  return withinIsoMinutes(admissionReferenceTime(item), kpiValue(item, "deathTime"), 7 * 24 * 60);
+}
+
+function verifiedWithinWindow(item, startKey, endKey, limitMinutes) {
+  if (!kpiValue(item, startKey) || !kpiValue(item, endKey)) return null;
+  return withinIsoMinutes(kpiValue(item, startKey), kpiValue(item, endKey), limitMinutes);
+}
+
+function validatedSich(item, suffix, treatmentTime) {
+  const eventTime = kpiValue(item, `sichAfter${suffix}Time`);
+  const nihssAnswer = kpiValue(item, `sichAfter${suffix}NihssIncrease`);
+  const imagingAnswer = kpiValue(item, `sichAfter${suffix}ImagingConfirmed`);
+  if (!treatmentTime || !eventTime || !["Yes", "No"].includes(nihssAnswer) || !["Yes", "No"].includes(imagingAnswer)) return null;
+  return nihssAnswer === "Yes" &&
+    imagingAnswer === "Yes" &&
+    withinIsoMinutes(treatmentTime, eventTime, 24 * 60);
+}
+
+function num(value) {
+  const parsed = Number(value || 0);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function stageTime(item, id) {
+  return item.stages?.[id]?.time || "";
+}
+
+function firstRecordedTime(item, stageIds) {
+  return stageIds
+    .map((stageId) => stageTime(item, stageId))
+    .filter(Boolean)
+    .sort((a, b) => new Date(a) - new Date(b))[0] || "";
+}
+
+function firstBrainImagingStartTime(item) {
+  return firstRecordedTime(item, ["ncctStarted", "mriStarted"]);
+}
+
+function firstImagingPresentationTime(item) {
+  return firstRecordedTime(item, ["reachedCt", "reachedMri"]);
+}
+
+function minutesBetween(start, end) {
+  if (!start || !end) return null;
+  const minutes = Math.round((new Date(end) - new Date(start)) / 60000);
+  return Number.isFinite(minutes) && minutes >= 0 ? minutes : null;
+}
+
+function withinIsoMinutes(start, end, limit) {
+  const minutes = minutesBetween(start, end);
+  return minutes != null && minutes <= limit;
+}
+
+function withinMinutes(item, startStage, endStage, limit) {
+  return withinIsoMinutes(stageTime(item, startStage), stageTime(item, endStage), limit);
+}
+
+function rankinGood(value) {
+  return value !== "" && Number(value) <= 2;
+}
+
+function ticiGood(item) {
+  return ["2B", "2C", "3"].includes(item.mt?.tici || "");
+}
+
+function evtWithinTarget(item) {
+  const arrivalType = kpiValue(item, "evtArrivalType");
+  const limit = arrivalType === "Transfer" ? 60 : 90;
+  return (kpiValue(item, "evtPerformed") === "Yes" || Boolean(stageTime(item, "firstPass"))) && withinMinutes(item, "arrival", "firstPass", limit);
+}
+
+function patientStrokeUnitDays(item) {
+  const start = kpiValue(item, "strokeUnitAdmissionTime");
+  const end = kpiValue(item, "strokeUnitDischargeTime");
+  if (!start || !end) return 0;
+  const milliseconds = new Date(end) - new Date(start);
+  if (!Number.isFinite(milliseconds) || milliseconds < 0) return 0;
+  return Math.max(1, Math.ceil(milliseconds / (24 * 60 * 60 * 1000)));
+}
+
+function patientFallCount(item) {
+  if (kpiValue(item, "patientFall") !== "Yes") return 0;
+  return Math.max(1, num(kpiValue(item, "patientFallCount")));
+}
+
+function diagnosticWaitingMinutes(item) {
+  const start = kpiValue(item, "diagnosticImagingPresentationTime");
+  const end = kpiValue(item, "diagnosticImagingStartTime") || firstBrainImagingStartTime(item);
+  return minutesBetween(start, end);
+}
+
+
+// Test adapter: fixtures supply explicit answers; do not run the original derived defaults.
+function kpiValue(item,key){return item.kpi?.[key]??"";}

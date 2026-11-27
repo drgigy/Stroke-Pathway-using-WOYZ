@@ -42,26 +42,19 @@ Existing shared collection and authentication rules are retained. Case documents
 
 Existing PDF facts are preserved. Legacy clinical PDF entries are not automatically relabeled as verified KPI evidence. New form dictation extracts two separately validated maps in one Gemini request: fields belonging to the selected PDF page and explicitly spoken typed KPI facts. Both append to the same case in one Firestore transaction. Retrying an acknowledged-lost save returns the existing entries without changing their timestamps. Common patient identity corrections synchronize between the form and KPI capture. The original nine-page PDF/SVG source is retained for compatibility; the six clinical sheets are available in page selection and zoom. Review pages can edit the form directly; user fields are filled by dictation.
 
-Shared hospital monthly inputs are stored as reserved documents `workspaces/stroke/notes/kpi-month-YYYY-MM`, with `noteType: kpi-monthly`. They use the same approved shared-access boundary and are excluded from patient lists. Monthly values are medication-error opportunities, thrombolytic stock-out instances, number of formulary thrombolytics and stroke-unit patient-days. They are not duplicated in individual patient records or saved only in browser storage. Concurrent creation uses a transaction and preserves the first creator.
+Shared hospital monthly inputs are stored as reserved documents `workspaces/stroke/notes/kpi-month-YYYY-MM`, with `noteType: kpi-monthly`. They use the same approved shared-access boundary and are excluded from patient lists. Monthly values are medication-error opportunities, thrombolytic stock-out instances, number of formulary thrombolytics and an optional stroke-unit patient-day override. They are not duplicated in individual patient records or saved only in browser storage. Concurrent creation uses a transaction and preserves the first creator.
 
 Monthly reports group records by admission month, otherwise arrival month, in Asia/Kolkata. A draft with no episode timestamp provisionally uses its creation visit date; unknown eligibility is not silently counted as a confirmed admission. Later outcomes update the original episode cohort. The reporting screen discloses this cohort policy; agree a different institutional reporting policy before changing date allocation. Genuine relevant admissions/procedure cases must be entered even when there was no Code 7 activation; a draft alone never establishes denominator membership.
 
-## NABH definition limits
+## KPI calculation reference
 
-The mapping is based on the user-supplied nine-page *NABH Certification Standards for Stroke Centre*, first edition September 2023, Annexure 1, printed pages 61-69. Source key: `nabh-stroke-2023-v1`.
+The owner supplied Stroke-Clone-Handover-2026-11-24.zip to resolve the earlier document-definition ambiguities. The current calculation profile is `rajagiri-handover-20261124-v1`; all 24 formulas, denominators, parameters, source fingerprint and intentional safeguards are documented in [KPI-REFERENCE.md](KPI-REFERENCE.md) and `kpi-policy.js`. Reports, analysis and CSV exports show the chosen definition/profile. This is a hospital operational reference, not a claim of new NABH certification.
 
-The supplied document is internally ambiguous for indicators 1, 3, 4, 6, 13, 16, 18, 23 and 24. These display provisional counts and a Definition needs clarification status with no final rate. The application does not silently substitute assumptions from the handover app:
+Key definitions: imaging/neurological assessment/waiting averages are minutes without ×100; inpatient neurological assessment starts at recognition; rehabilitation assessment is ≤48 hours; DVT uses ×100; falls use ×1000 per stroke-unit patient-days; EVD ventriculitis uses ischemic EVD patients; LVO first-pass success uses ≤150 minutes in the numerator; puncture-to-reperfusion success uses an EVT-treated denominator and ≤60 minutes. The owner explicitly confirmed that sICH after IVT uses IVT-treated patients only, correcting the archived code's eligible-or-treated union for this complication measure.
 
-- KPI 1 prints a time average multiplied by 100.
-- KPIs 3/18 say 24 hours in the formula but 36 hours in remarks.
-- KPI 4 does not define the initial timing baseline.
-- KPI 6 mixes referral with assessment and an organization-defined referral window.
-- KPI 13 omits a ratio/percentage multiplier.
-- KPI 16 omits its denominator.
-- KPI 23 mixes 120/150 minutes and eligibility/denominator language.
-- KPI 24's printed denominator is all ischemic strokes, while its narrative describes treated LVO; its formula also prints =60 versus narrative <=60.
+Only explicit Include in KPI reporting = Yes enters the cohort. Unknown inclusion remains visible as pending in Cases. Missing clinical facts remain pending rather than No/zero; strict timestamps and completed negative follow-up remain required. No LVO suspicion or treatment timestamp is used to invent an ischemic diagnosis, treatment or eligibility. Exact time boundaries are checked before display rounding. Older clinical/audit fields and existing case entries remain readable; no Firestore migration or patient-record rewrite is performed.
 
-KPI 21 follows the printed denominator of all ischemic stroke patients, not only patients receiving EVD. Exact time boundaries use milliseconds before rate display rounding; timestamp inputs and displayed values retain seconds. Explicit follow-up completeness is required for negative time-window outcomes. NIHSS/imaging evidence is captured for qualifying symptomatic hemorrhage. The 90-day outcome records the actual follow-up date and onset date; no onset clock time is requested solely for that KPI. no undictated score is inferred.
+Stroke-unit patient-days derive from documented unit admission/discharge timestamps (ceiling days, minimum one per stay); the existing monthly total remains an explicit override. Empty stay timestamps are not treated as zero. New fields support voice input and direct review corrections. A 90-day mRS explicitly recorded as such belongs in the 90-day assessment denominator without an additional exact-calendar-day restriction.
 
 ## Access and PWA
 
@@ -76,6 +69,7 @@ Run:
 ```sh
 node scripts/check-syntax.mjs
 node scripts/check-kpi.mjs
+node scripts/check-kpi-reference.mjs
 node scripts/check-kpi-data.mjs
 node scripts/check-protocol-fields.mjs
 node scripts/check-dictation-output.mjs

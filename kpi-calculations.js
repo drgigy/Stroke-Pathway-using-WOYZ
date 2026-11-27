@@ -3,8 +3,10 @@
  * Later outcomes update that original cohort. Unknown values are never No/0.
  * Datetimes require an explicit ISO offset or Z. All intervals use instants;
  * date-only follow-up is checked against onset's supplied local calendar date.
- * Ambiguous source formulae have value:null and provisional numerator/denominator.
+ * Hospital reference formulas are from the owner-supplied Stroke app handover.
+ * Missing evidence remains pending; source provenance is separate from patient schema.
  */
+import { kpiCalculationProfile, kpiDefinitions } from './kpi-policy.js';
 import { kpiFields } from './kpi-schema.js';
 
 const fields = new Map(kpiFields.map(field => [field.id, field]));
@@ -16,9 +18,9 @@ const titles = [
   'Time to first slice of brain imaging for acute stroke',
   'IV thrombolysis within the defined time frame',
   'Symptomatic intracranial haemorrhage within 24 hours after IVT',
-  'Time to detailed initial neurological assessment of admitted patients',
+  'Time to detailed neurological assessment of inpatient strokes',
   'Initial dysphagia screening documented at admission',
-  'Timely physiotherapy / rehabilitation referral or assessment',
+  'Rehabilitation assessment within 48 hours',
   'Favorable functional outcome at 90-day follow-up',
   'Incidence of medication errors',
   'In-hospital mortality within 7 days of admission for acute stroke',
@@ -33,22 +35,12 @@ const titles = [
   'Symptomatic intracranial haemorrhage within 24 hours after EVT',
   'Speech therapist dysphagia reassessment within 24 hours of admission',
   'Stroke or death within 30 days after intracranial angioplasty / stenting',
-  'Ventriculitis after EVD among all ischemic stroke patients',
+  'Ventriculitis among ischemic stroke patients with EVD',
   'Post-treatment reperfusion grade TICI 2B or higher',
-  'LVO mechanical reperfusion: timely first pass / device and TICI 2B or higher',
-  'LVO mechanical reperfusion: TICI 2B or higher within 60 minutes of puncture',
+  'LVO EVT first pass within 150 minutes and TICI 2B or higher',
+  'EVT reperfusion TICI 2B or higher within 60 minutes of puncture',
 ];
-const ambiguities = {
-  1: 'Source multiplies a time average by 100 while targeting <30 minutes. Provisional numerator is summed minutes; multiplier requires clarification. ER uses arrival; inpatient cases provisionally use recognition.',
-  3: 'Formula/title specify 24 hours; remarks specify ≤36 hours. Provisional numerator uses ≤24 hours. Qualifying sICH requires NIHSS deterioration ≥4 plus the specified imaging finding.',
-  4: 'Source does not define the timing baseline. Provisional numerator uses admission to detailed initial neurological assessment in minutes.',
-  6: 'Formula counts referral within an organization-defined window; narrative counts specialist assessment within 48 hours. Provisional numerator uses assessment ≤48 hours; do not certify referral compliance.',
-  13: 'Source prints a numerator/denominator without a multiplier. Provisional counts are shown; rate versus percentage requires clarification.',
-  16: 'Source prints falls ×1000 but omits the denominator. No patient-day denominator is assumed.',
-  18: 'Formula/title specify 24 hours; remarks specify ≤36 hours. Provisional numerator uses ≤24 hours. Qualifying sICH requires NIHSS deterioration ≥4 plus the specified imaging finding.',
-  23: 'Source conflicts between 120 and 150 minutes; formula denominator is timely treated LVO patients, while narrative describes LVO patients more broadly. Provisional numerator/denominator use treated LVO with device ≤120 minutes and final TICI ≥2B.',
-  24: 'Formula denominator is all ischemic stroke patients; narrative describes treated LVO. Numerator formula prints =60 while narrative says ≤60 minutes. Provisional denominator remains all ischemic stroke patients; numerator uses ≤60 minutes.',
-};
+
 
 function blank(value) { return value === undefined || value === null || value === ''; }
 function validChoice(record, id) {
@@ -80,13 +72,6 @@ function timestamp(value) {
   }
   return date.getTime() - offset;
 }
-function calendarDate(value) {
-  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
-  return timestamp(`${value}T00:00:00Z`);
-}
-
-// Three-valued predicates allow a known exclusion to override unrelated blanks.
-// Missing criteria survive when eligibility really cannot be established.
 const pred = (value, missing = []) => ({ value, missing });
 const is = (record, id, values = [yes]) => {
   const value = validChoice(record, id);
@@ -105,10 +90,6 @@ function diagnosis(record, allowed) {
   return value === null || value === 'Undetermined' ? pred(null, ['diagnosis']) : pred(allowed.includes(value));
 }
 const ischemic = r => diagnosis(r, ['Ischemic Stroke']);
-const stroke = r => diagnosis(r, ['Ischemic Stroke', 'Hemorrhagic Stroke']);
-const admitted = r => is(r, 'admitted');
-const acute = r => is(r, 'acuteStroke');
-const admittedStroke = r => all(admitted(r), stroke(r));
 
 /** @returns {Array<{no:number,title:string,numerator:number,denominator:number|null,value:number|null,status:string,missing:string[],eligibilityPending:number,note?:string,unit?:string}>} */
 export function calculateKpis(records, monthlyInputs = {}) {
@@ -118,9 +99,9 @@ export function calculateKpis(records, monthlyInputs = {}) {
   records = records.map(record => record && typeof record === 'object' && !Array.isArray(record) ? record : {});
   const results = titles.map((title, index) => ({
     no: index + 1, title, numerator: 0, denominator: 0, value: null,
-    status: 'not-applicable', missing: [], eligibilityPending: 0,
+    status: 'not-applicable', missing: [], eligibilityPending: 0, calculationProfile:kpiCalculationProfile.id, formula:kpiDefinitions[index].formula, parameters:[...kpiDefinitions[index].parameters],
   }));
-  const state = results.map(result => ({ result, missing: new Set(), notes: [], clarification: Boolean(ambiguities[result.no]) }));
+  const state = results.map(result => ({ result, missing: new Set(), notes: [] }));
   function miss(ctx, index, id) { ctx.missing.add(`records[${index}].${id}`); }
   function choice(ctx, r, i, id) {
     const value = validChoice(r, id);
@@ -171,16 +152,26 @@ export function calculateKpis(records, monthlyInputs = {}) {
     return duration;
   }
   function door(ctx, r, i) {
-    const presentation = choice(ctx, r, i, 'presentation');
-    if (presentation === 'ER arrival') return 'arrivalTime';
-    if (presentation === 'Inpatient stroke') {
-      if (ctx.result.no !== 1) {
-        ctx.clarification = true;
-        ctx.notes.push('Source does not define a door baseline for inpatient stroke. Recognition time is provisional.');
+    const presentation=choice(ctx,r,i,'presentation');return presentation==='Inpatient stroke'?'recognitionTime':presentation==='ER arrival'?'arrivalTime':null;
+  }
+  const included=()=>pred(true);
+  function documented(r,flag,id){
+    const answer=validChoice(r,flag);
+    if(answer==='No'&&!blank(r[id]))return pred(null,[flag+' (No conflicts with recorded event time)']);
+    if(answer===yes)return pred(true);if(answer==='No')return pred(false);
+    return !blank(r[id])&&timestamp(r[id])!==null?pred(true):pred(null,[flag]);
+  }
+  const admissionReference=r=>!blank(r.admissionTime)?'admissionTime':'arrivalTime';
+  function patientDays(ctx){
+    if(!blank(monthlyInputs.strokeUnitPatientDays))return monthly(ctx,'strokeUnitPatientDays');
+    let total=0;
+    records.forEach((r,i)=>{
+      if(validChoice(r,'strokeUnitStay')==='No'){
+        if(!blank(r.strokeUnitAdmissionTime)||!blank(r.strokeUnitDischargeTime))miss(ctx,i,'strokeUnitStay (No conflicts with recorded stay)');
+        return;
       }
-      return 'recognitionTime';
-    }
-    return null;
+      const duration=elapsed(ctx,r,i,'strokeUnitAdmissionTime','strokeUnitDischargeTime');if(duration!==null)total+=Math.max(1,Math.ceil(duration/DAY));
+    });return total;
   }
   function monthly(ctx, id) {
     const value = numeric(monthlyInputs[id]);
@@ -188,25 +179,23 @@ export function calculateKpis(records, monthlyInputs = {}) {
     return value;
   }
 
-  const c1 = cohort(1, r => all(acute(r), is(r, 'brainImaging')), (ctx, r, i) => {
+  const c1 = cohort(1, r => documented(r,'brainImaging','firstSliceTime'), (ctx, r, i) => {
     const start = door(ctx, r, i);
     if (start) {
       const duration = elapsed(ctx, r, i, start, 'firstSliceTime');
       if (duration !== null) ctx.result.numerator += duration / MINUTE;
     }
   });
-  c1.result.unit = 'minutes (multiplier unresolved)';
+  c1.result.unit = 'minutes';
 
   let ivt45 = 0;
-  const c2 = cohort(2, r => all(acute(r), ischemic(r), is(r, 'ivtIndicated')), (ctx, r, i) => {
+  const c2 = cohort(2, r => any(is(r, 'ivtIndicated'),is(r,'ivtGiven')), (ctx, r, i) => {
     if (choice(ctx, r, i, 'ivtGiven') !== yes) return;
-    const start = door(ctx, r, i);
-    if (!start) return;
-    const duration = elapsed(ctx, r, i, start, 'ivtTime');
+    const duration = elapsed(ctx, r, i, 'arrivalTime', 'ivtTime');
     if (duration !== null && duration <= 60 * MINUTE) ctx.result.numerator++;
     if (duration !== null && duration <= 45 * MINUTE) ivt45++;
   });
-  c2.notes.push(`Primary window ≤60 min; known ≤45 min numerator: ${ivt45}. Denominator follows the formula: acute ischemic cases with IVT indicated, including untreated cases. Remarks benchmark treated patients (>75%/≥75% wording differs); do not infer target compliance.`);
+  c2.notes.push(`Primary window ≤60 min; known ≤45 min numerator: ${ivt45}. Denominator is the union of IVT indicated and IVT given, counted once.`);
 
   for (const [no, treatment, event, start, end, complete, nihss, imaging] of [
     [3, 'ivtGiven', 'ivtSich', 'ivtTime', 'ivtSichTime', 'ivt36HourFollowupComplete', 'ivtNihssIncrease4', 'ivtQualifyingImaging'],
@@ -222,43 +211,27 @@ export function calculateKpis(records, monthlyInputs = {}) {
           return;
         }
       }
-      const duration = windowEvent(c, r, i, event, start, end, DAY, complete);
+      const reference=no===18?(!blank(r.evtDeviceTime)?'evtDeviceTime':!blank(r.skinPunctureTime)?'skinPunctureTime':'evtStartTime'):start;
+      const duration = windowEvent(c, r, i, event, reference, end, DAY, complete);
       if (duration !== null && duration <= 36 * HOUR) within36++;
     });
     ctx.notes.push(`Known qualifying events within ≤36 h: ${within36}.`);
   }
 
-  const c4 = cohort(4, admitted, (ctx, r, i) => {
-    const duration = elapsed(ctx, r, i, 'admissionTime', 'neurologicalAssessmentTime');
+  const c4 = cohort(4, r=>is(r,'presentation',['Inpatient stroke']), (ctx, r, i) => {
+    const duration = elapsed(ctx, r, i, 'recognitionTime', 'neurologicalAssessmentTime');
     if (duration !== null) ctx.result.numerator += duration / MINUTE;
   });
-  c4.result.unit = 'minutes (baseline unresolved)';
-  cohort(5, admitted, (ctx, r, i) => flag(ctx, r, i, 'dysphagiaDocumented'));
-  let knownReferrals = 0;
-  const c6 = cohort(6, admittedStroke, (ctx, r, i) => {
-    const referral = choice(ctx, r, i, 'rehabReferred');
-    if (referral === yes && elapsed(ctx, r, i, 'admissionTime', 'rehabReferralTime') !== null) knownReferrals++;
-    if (choice(ctx, r, i, 'rehabAssessed') === yes) {
-      const duration = elapsed(ctx, r, i, 'admissionTime', 'rehabAssessmentTime');
-      if (duration !== null && duration <= 48 * HOUR) ctx.result.numerator++;
-    }
+  c4.result.unit = 'minutes';
+  cohort(5, included, (ctx, r, i) => flag(ctx, r, i, 'dysphagiaDocumented'));
+  cohort(6, included, (ctx,r,i)=>{
+    if(choice(ctx,r,i,'rehabAssessed')===yes){const duration=elapsed(ctx,r,i,admissionReference(r),'rehabAssessmentTime');if(duration!==null&&duration<=48*HOUR)ctx.result.numerator++;}
   });
-  c6.notes.push(`Known referrals with a valid admission-to-referral interval: ${knownReferrals}; referral window is not defined by source.`);
-  cohort(7, r => {
-    // No means follow-up not yet completed, not a known clinical exclusion.
-    const followed = validChoice(r, 'followup90Days') === yes ? pred(true) : pred(null, ['followup90Days']);
-    const onsetDay = calendarDate(r.onsetDate);
-    const visit = calendarDate(r.followupDate);
-    const dateMissing = [];
-    if (onsetDay === null) dateMissing.push('onsetDate');
-    if (visit === null) dateMissing.push('followupDate');
-    if (onsetDay !== null && visit !== null && visit - onsetDay !== 90 * DAY) dateMissing.push('followupDate (not 90 days after onset)');
-    const dated = dateMissing.length ? pred(null, dateMissing) : pred(true);
-    return all(stroke(r), followed, followed.value ? dated : pred(true));
-  }, (ctx, r, i) => {
-    const mrs = number(ctx, r, i, 'mrs90Days', { max: 6 });
-    if (mrs !== null && mrs <= 2) ctx.result.numerator++;
-  });
+  cohort(7,r=>{
+    const completed=validChoice(r,'followup90Days'),score=numeric(r.mrs90Days,{max:6});
+    if(completed==='No')return !blank(r.mrs90Days)?pred(null,['followup90Days (No conflicts with recorded 90-day score)']):pred(false);
+    return completed===yes||score!==null?pred(true):pred(null,['followup90Days']);
+  },(ctx,r,i)=>{const score=number(ctx,r,i,'mrs90Days',{max:6});if(score!==null&&score<=2)ctx.result.numerator++;});
 
   const c8 = state[7];
   records.forEach((r, i) => {
@@ -266,27 +239,27 @@ export function calculateKpis(records, monthlyInputs = {}) {
     if (count !== null) c8.result.numerator += count;
   });
   c8.result.denominator = monthly(c8, 'medicationOpportunities');
-  cohort(9, r => all(acute(r), admitted(r)), (ctx, r, i) =>
-    windowEvent(ctx, r, i, 'diedInHospital', 'admissionTime', 'deathTime', 7 * DAY, 'inHospital7DayFollowupComplete'));
+  cohort(9, included, (ctx, r, i) =>
+    windowEvent(ctx, r, i, 'diedInHospital', admissionReference(r), 'deathTime', 7 * DAY, 'inHospital7DayFollowupComplete'));
   for (const [no, eligible, flagId, startId, endId, window, complete] of [
     [10, 'carotidProcedure', 'carotidStrokeDeath', 'carotidProcedureTime', 'carotidStrokeDeathTime', 30 * DAY, 'carotid30DayFollowupComplete'],
     [11, 'cerebralAngiography', 'angiographyStrokeDeath', 'cerebralAngiographyTime', 'angiographyStrokeDeathTime', DAY, 'angiography24HourFollowupComplete'],
     [20, 'intracranialProcedure', 'intracranialStrokeDeath', 'intracranialProcedureTime', 'intracranialStrokeDeathTime', 30 * DAY, 'intracranial30DayFollowupComplete'],
   ]) cohort(no, r => is(r, eligible), (ctx, r, i) => windowEvent(ctx, r, i, flagId, startId, endId, window, complete));
 
-  const c12 = cohort(12, admitted, (ctx, r, i) => {
+  const c12 = cohort(12, included, (ctx, r, i) => {
     const outcome = choice(ctx, r, i, 'pressureUlcer');
     if (outcome === null) return;
     // Stages substantiate a positive outcome. For an explicit negative they
     // are optional, but any supplied values still undergo conflict checks.
-    const stage = id => outcome === yes || !blank(r[id]) ? choice(ctx, r, i, id) : null;
+    const stage = id => id==='pressureUlcerCurrentStage'&&outcome===yes || !blank(r[id]) ? choice(ctx, r, i, id) : null;
     const initial = stage('pressureUlcerInitialStage');
     const current = stage('pressureUlcerCurrentStage');
-    if (outcome === yes && (initial === null || current === null)) return;
+    if (outcome === yes && current === null) return;
     const initialStage = /^Stage ([1-4])$/.exec(initial);
     const currentStage = /^Stage ([1-4])$/.exec(current);
     const increasedStage = initialStage && currentStage && Number(currentStage[1]) > Number(initialStage[1]);
-    if (outcome === yes && initial === 'No pressure ulcer' && current === 'No pressure ulcer') {
+    if (outcome === yes && current === 'No pressure ulcer') {
       miss(ctx, i, 'pressureUlcer (positive outcome conflicts with absent ulcer stages)');
     } else if (outcome === 'No' && initial === 'No pressure ulcer' && current !== null && current !== 'No pressure ulcer') {
       miss(ctx, i, 'pressureUlcer (negative outcome conflicts with new ulcer)');
@@ -294,14 +267,14 @@ export function calculateKpis(records, monthlyInputs = {}) {
       miss(ctx, i, 'pressureUlcer (negative outcome conflicts with increased stage)');
     } else if (outcome === yes) ctx.result.numerator++;
     // No numeric ordering is invented for unstageable or deep tissue injuries;
-    // worsening is the explicit documented clinical outcome, with both stages.
+    // worsening is the explicit documented clinical outcome, with a recorded current stage.
   });
-  c12.result.denominator = monthly(c12, 'strokeUnitPatientDays');
+  c12.result.denominator = patientDays(c12);
   c12.result.unit = 'per 100 stroke-unit patient days';
-  const c13 = cohort(13, admitted, (ctx, r, i) => flag(ctx, r, i, 'dvtAfterAdmission'));
-  c13.result.unit = 'ratio or % (multiplier unresolved)';
-  const c14 = cohort(14, r => is(r, 'diagnosticImaging'), (ctx, r, i) => {
-    const duration = elapsed(ctx, r, i, 'imagingServiceTime', 'imagingStartTime');
+  const c13 = cohort(13, included, (ctx, r, i) => flag(ctx, r, i, 'dvtAfterAdmission'));
+  c13.result.unit = '%';
+  const c14 = cohort(14, r => documented(r,'diagnosticImaging','imagingStartTime'), (ctx, r, i) => {
+    const duration = elapsed(ctx, r, i, 'imagingServiceTime', !blank(r.imagingStartTime)?'imagingStartTime':'firstSliceTime');
     if (duration !== null) ctx.result.numerator += duration / MINUTE;
   });
   c14.result.unit = 'minutes';
@@ -309,29 +282,27 @@ export function calculateKpis(records, monthlyInputs = {}) {
   const c15 = state[14];
   c15.result.numerator = monthly(c15, 'stockouts');
   c15.result.denominator = monthly(c15, 'formularyDrugs');
-  c15.result.unit = 'stockout instances per 100 formulary thrombolytic drugs';
+  c15.result.unit = '%';
   const c16 = state[15];
-  c16.result.denominator = null;
-  c16.result.unit = 'falls ×1000 / unresolved denominator';
+  c16.result.denominator = patientDays(c16);
+  c16.result.unit = 'per 1000 stroke-unit patient days';
   records.forEach((r, i) => {
     const count = number(c16, r, i, 'falls');
     if (count !== null) c16.result.numerator += count;
   });
-  cohort(17, r => all(acute(r), ischemic(r), is(r, 'evtIndicated')), (ctx, r, i) => {
+  cohort(17, r => all(ischemic(r), is(r, 'evtIndicated')), (ctx, r, i) => {
     if (choice(ctx, r, i, 'evtGiven') !== yes) return;
     const mode = choice(ctx, r, i, 'arrivalMode');
-    const start = door(ctx, r, i);
-    if (!mode || !start) return;
-    const duration = elapsed(ctx, r, i, start, 'evtDeviceTime');
+    if (!mode) return;
+    const duration = elapsed(ctx, r, i, 'arrivalTime', 'evtDeviceTime');
     if (duration !== null && duration <= (mode === 'Transfer' ? 60 : 90) * MINUTE) ctx.result.numerator++;
   });
-  cohort(19, admitted, (ctx, r, i) => {
+  cohort(19, included, (ctx, r, i) => {
     if (choice(ctx, r, i, 'speechReassessed') !== yes) return;
-    const duration = elapsed(ctx, r, i, 'admissionTime', 'speechReassessmentTime');
+    const duration = elapsed(ctx, r, i, admissionReference(r), 'speechReassessmentTime');
     if (duration !== null && duration <= DAY) ctx.result.numerator++;
   });
-  cohort(21, ischemic, (ctx, r, i) => {
-    if (choice(ctx, r, i, 'evd') !== yes) return;
+  cohort(21, r=>all(ischemic(r),is(r,'evd')), (ctx, r, i) => {
     // The explicit outcome means AFTER EVD; source defines no latency window.
     flag(ctx, r, i, 'ventriculitis');
   });
@@ -342,44 +313,24 @@ export function calculateKpis(records, monthlyInputs = {}) {
   cohort(22, r => all(ischemic(r), any(is(r, 'iaThrombolysis'), is(r, 'evtGiven'))), (ctx, r, i) => {
     if (tici(ctx, r, i) === true) ctx.result.numerator++;
   });
-  // KPI 23's printed formula has a time-dependent denominator. Unknown timing
-  // means unknown eligibility, not an eligible failure or a silent exclusion.
-  const c23 = state[22];
-  records.forEach((r, i) => {
-    const eligibility = all(ischemic(r), is(r, 'largeVesselOcclusion'), is(r, 'evtGiven'));
-    if (eligibility.value === false) return;
-    if (eligibility.value === null) {
-      c23.result.eligibilityPending++;
-      eligibility.missing.forEach(id => miss(c23, i, id));
-      return;
-    }
-    const duration = elapsed(c23, r, i, 'arrivalTime', 'evtDeviceTime');
-    if (duration === null) { c23.result.eligibilityPending++; return; }
-    if (duration <= 120 * MINUTE) {
-      c23.result.denominator++;
-      if (tici(c23, r, i) === true) c23.result.numerator++;
-    }
+  cohort(23,r=>all(is(r,'largeVesselOcclusion'),is(r,'evtGiven')),(ctx,r,i)=>{
+    const duration=elapsed(ctx,r,i,'arrivalTime','evtDeviceTime'),grade=tici(ctx,r,i);
+    if(duration!==null&&duration<=150*MINUTE&&grade===true)ctx.result.numerator++;
   });
-  cohort(24, ischemic, (ctx, r, i) => {
-    const eligible = all(is(r, 'largeVesselOcclusion'), is(r, 'evtGiven'));
-    if (eligible.value === false) return;
-    if (eligible.value === null) { eligible.missing.forEach(id => miss(ctx, i, id)); return; }
-    const reperfused = tici(ctx, r, i);
-    if (reperfused !== true) return;
-    const duration = elapsed(ctx, r, i, 'skinPunctureTime', 'reperfusionTime');
-    if (duration !== null && duration <= 60 * MINUTE) ctx.result.numerator++;
+  cohort(24,r=>is(r,'evtGiven'),(ctx,r,i)=>{
+    if(tici(ctx,r,i)!==true)return;
+    const duration=elapsed(ctx,r,i,'skinPunctureTime','reperfusionTime');if(duration!==null&&duration<=60*MINUTE)ctx.result.numerator++;
   });
 
   for (const ctx of state) {
     const r = ctx.result;
     r.missing = [...ctx.missing].sort();
-    const notes = [ambiguities[r.no], ...new Set(ctx.notes)].filter(Boolean);
+    const notes = [kpiDefinitions[r.no-1].note, ...new Set(ctx.notes)].filter(Boolean);
     if (r.eligibilityPending) notes.push(`Eligibility pending for ${r.eligibilityPending} episode(s); known denominator is provisional.`);
     if (r.missing.length) notes.push('Counts are provisional until missing eligibility / outcomes / monthly inputs are resolved.');
     if (notes.length) r.note = notes.join(' ');
     r.unit ??= '%';
-    if (ctx.clarification) r.status = 'clarification';
-    else if (r.missing.length) r.status = 'pending';
+    if (r.missing.length) r.status = 'pending';
     else if (r.denominator === 0) {
       r.status = r.numerator > 0 ? 'pending' : 'not-applicable';
       if (r.numerator > 0) {
@@ -388,7 +339,7 @@ export function calculateKpis(records, monthlyInputs = {}) {
       }
     } else {
       r.status = 'complete';
-      r.value = r.no === 14 ? r.numerator / r.denominator : r.numerator / r.denominator * 100;
+      r.value = r.numerator / r.denominator * ([1,4,14].includes(r.no)?1:r.no===16?1000:100);
     }
   }
   return results;

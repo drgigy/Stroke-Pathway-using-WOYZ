@@ -12,10 +12,10 @@ const M = 60_000, H = 60 * M, D = 24 * H;
 const base = Date.parse('2026-01-01T00:00:00+05:30');
 const at = ms => `${new Date(base + ms + 330 * M).toISOString().slice(0, -1)}+05:30`;
 const monthly = { medicationOpportunities: 100, stockouts: 2, formularyDrugs: 4, strokeUnitPatientDays: 1000 };
-const clarification = new Set([1, 3, 4, 6, 13, 16, 18, 23, 24]);
+const clarification = new Set();
 const r = {
   name: 'Synthetic boundary case', uhid: 'TEST', age: 50,
-  acuteStroke: 'Yes', diagnosis: 'Ischemic Stroke', admitted: 'Yes', presentation: 'ER arrival',
+  acuteStroke: 'Yes', diagnosis: 'Ischemic Stroke', admitted: 'Yes', presentation: 'Inpatient stroke',
   arrivalTime: at(0), admissionTime: at(0), onsetDate: '2026-01-01', recognitionTime: at(0),
   brainImaging: 'Yes', firstSliceTime: at(20 * M), neurologicalAssessmentTime: at(10 * M), dysphagiaDocumented: 'Yes',
   diagnosticImaging: 'Yes', imagingServiceTime: at(5 * M), imagingStartTime: at(20 * M),
@@ -78,12 +78,12 @@ test('all 24 results, counts, status, and units', () => {
     assert.equal(result.no, no);
     assert(result.title.length);
     assert.equal(result.numerator, numerators[index], `numerator ${no}`);
-    assert.equal(result.denominator, ({ 8: 100, 12: 1000, 15: 4, 16: null })[no] ?? (no === 16 ? null : 1), `denominator ${no}`);
+    assert.equal(result.denominator, ({ 8: 100, 12: 1000, 15: 4, 16: 1000 })[no] ?? 1, `denominator ${no}`);
     assert.equal(result.status, clarification.has(no) ? 'clarification' : 'complete', `status ${no}`);
     assert.deepEqual(result.missing, []);
     assert.equal(result.eligibilityPending, 0);
     if (clarification.has(no)) { assert.equal(result.value, null); assert(result.note.length); }
-    else assert.equal(result.value, ({ 8: 2, 12: 0.1, 14: 15, 15: 50 })[no] ?? 100, `value ${no}`);
+    else assert.equal(result.value, ({1:20,4:10,8:2,12:0.1,14:15,15:50,16:1})[no] ?? 100, `value ${no}`);
   }
 });
 
@@ -93,21 +93,9 @@ test('pure: no mutations, no current-clock dependency, reproducible', () => {
   assert.deepEqual(calculateKpis(Object.freeze([record]), inputs), calculateKpis([record], inputs));
 });
 
-test('empty cohort has no eligible cases; empty draft is not an admission', () => {
-  const empty = calculateKpis([], monthly);
-  for (const result of empty) {
-    if (clarification.has(result.no)) assert.equal(result.status, 'clarification');
-    else if (result.no === 15 || result.no === 8 || result.no === 12) assert.equal(result.status, 'complete');
-    else assert.equal(result.status, 'not-applicable');
-  }
-  const draft = calculateKpis([{}], monthly);
-  for (const no of [1, 2, 3, 4, 5, 6, 7, 9, 10, 11, 13, 14, 17, 18, 19, 20, 21, 22, 23, 24]) {
-    assert.equal(draft[no - 1].denominator, 0, `draft denominator ${no}`);
-    assert.equal(draft[no - 1].eligibilityPending, 1, `draft eligibility ${no}`);
-    assert(draft[no - 1].missing.length);
-    assert.equal(draft[no - 1].value, null);
-  }
-  for (const no of [8, 12, 16]) assert(draft[no - 1].missing.length);
+test('empty cohort and selected-but-incomplete case do not invent outcomes',()=>{
+ const empty=calculateKpis([],monthly);for(const result of empty)assert.equal(result.status,[8,12,15,16].includes(result.no)?'complete':'not-applicable');
+ const draft=calculateKpis([{}],monthly);for(const result of draft)if(result.no!==15){assert.equal(result.value,null);assert.equal(result.status,'pending');}
 });
 
 test('all 24 missing capture paths', () => {
@@ -115,7 +103,7 @@ test('all 24 missing capture paths', () => {
     [1, 'firstSliceTime'], [2, 'ivtGiven'], [3, 'ivtSich'], [4, 'neurologicalAssessmentTime'],
     [5, 'dysphagiaDocumented'], [6, 'rehabAssessed'], [7, 'mrs90Days'], [8, 'medicationErrors'],
     [9, 'diedInHospital'], [10, 'carotidStrokeDeath'], [11, 'angiographyStrokeDeath'], [12, 'pressureUlcer'],
-    [13, 'dvtAfterAdmission'], [14, 'imagingStartTime'], [16, 'falls'], [17, 'evtGiven'], [18, 'evtSich'],
+    [13, 'dvtAfterAdmission'], [14, 'imagingServiceTime'], [16, 'falls'], [17, 'evtGiven'], [18, 'evtSich'],
     [19, 'speechReassessed'], [20, 'intracranialStrokeDeath'], [21, 'evd'], [22, 'finalTici'],
     [23, 'evtDeviceTime'], [24, 'skinPunctureTime'],
   ];
@@ -123,19 +111,14 @@ test('all 24 missing capture paths', () => {
   missing(get(15, {}, { ...monthly, stockouts: '' }), 'stockouts');
 });
 
-test('missing eligibility cannot silently exclude; explicit exclusions work', () => {
-  for (const [no, id] of [[2, 'ivtIndicated'], [17, 'evtIndicated'], [5, 'admitted'], [21, 'diagnosis'], [22, 'evtGiven']]) {
-    const changes = { [id]: '', ...(no === 22 ? { iaThrombolysis: 'No' } : {}) };
-    const result = get(no, changes);
-    assert.equal(result.denominator, 0);
-    assert.equal(result.eligibilityPending, 1);
-    missing(result, id);
-  }
-  assert.equal(get(2, { acuteStroke: 'No', diagnosis: '', ivtIndicated: '' }).status, 'not-applicable');
-  assert.equal(get(21, { diagnosis: 'TIA', evd: '' }).status, 'not-applicable');
-  assert.equal(get(21, { diagnosis: 'Undetermined' }).status, 'pending');
-  const mixed = calculateKpis([r, {}], monthly)[4];
-  assert.equal(mixed.denominator, 1); assert.equal(mixed.eligibilityPending, 1); assert.equal(mixed.status, 'pending');
+test('missing eligibility stays pending; explicit exclusions and IVT union work',()=>{
+ missing(get(1,{brainImaging:'',firstSliceTime:''}),'brainImaging');
+ assert.equal(get(1,{brainImaging:'No',firstSliceTime:''}).denominator,0);
+ assert.equal(get(4,{presentation:'ER arrival'}).denominator,0);
+ assert.equal(get(2,{ivtIndicated:'No',ivtGiven:'Yes'}).denominator,1);
+ assert.equal(get(2,{ivtIndicated:'No',ivtGiven:'No',ivtTime:''}).denominator,0);
+ assert.equal(get(21,{evd:'No',ventriculitis:''}).denominator,0);
+ missing(get(17,{diagnosis:'Undetermined'}),'diagnosis');
 });
 
 for (const [no, start, end, limit] of [
@@ -143,7 +126,7 @@ for (const [no, start, end, limit] of [
   [6, 'admissionTime', 'rehabAssessmentTime', 48 * H], [9, 'admissionTime', 'deathTime', 7 * D],
   [10, 'carotidProcedureTime', 'carotidStrokeDeathTime', 30 * D],
   [11, 'cerebralAngiographyTime', 'angiographyStrokeDeathTime', D],
-  [17, 'arrivalTime', 'evtDeviceTime', 90 * M], [18, 'evtStartTime', 'evtSichTime', D],
+  [17, 'arrivalTime', 'evtDeviceTime', 90 * M], [18, 'evtDeviceTime', 'evtSichTime', D],
   [19, 'admissionTime', 'speechReassessmentTime', D],
   [20, 'intracranialProcedureTime', 'intracranialStrokeDeathTime', 30 * D],
   [24, 'skinPunctureTime', 'reperfusionTime', 60 * M],
@@ -166,7 +149,7 @@ test('IVT ≤45 secondary count, direct ≤90 and transfer ≤60 EVT', () => {
 });
 
 test('sICH 24/36 hour conflict, auditable evidence, unknown is not negative', () => {
-  for (const [no, prefix, start] of [[3, 'ivt', 'ivtTime'], [18, 'evt', 'evtStartTime']]) {
+  for (const [no, prefix, start] of [[3, 'ivt', 'ivtTime'], [18, 'evt', 'evtDeviceTime']]) {
     const later = get(no, { [start]: at(0), [`${prefix}SichTime`]: at(36 * H) });
     assert.equal(later.numerator, 0); assert.match(later.note, /≤36 h: 1/);
     assert.match(get(no, { [start]: at(0), [`${prefix}SichTime`]: at(36 * H + 1) }).note, /≤36 h: 0/);
@@ -196,22 +179,17 @@ test('negative outcome requires explicit completed observation', () => {
   }
 });
 
-test('90-day actual follow-up date and mRS boundaries', () => {
-  assert.equal(get(7, { mrs90Days: 0 }).value, 100);
-  assert.equal(get(7, { mrs90Days: 2 }).value, 100);
-  assert.equal(get(7, { mrs90Days: 3 }).value, 0);
-  assert.equal(get(7, { mrs90Days: 6 }).value, 0);
-  for (const value of [-1, 7, 1.5, '', true]) missing(get(7, { mrs90Days: value }), 'mrs90Days');
-  for (const value of ['', '2026-03-31', '2026-04-02', '2026-02-30', '2026-04-01T00:00:00+05:30']) missing(get(7, { followupDate: value }), 'followupDate');
-  missing(get(7, { onsetDate: '' }), 'onsetDate');
-  const early = get(7, { followup90Days: 'No', followupDate: '', mrs90Days: '' });
-  assert.equal(early.denominator, 0); assert.equal(early.eligibilityPending, 1); assert.equal(early.status, 'pending');
-  // Leap-year day and local calendar date (not UTC calendar date).
-  assert.equal(get(7, { onsetDate: '2024-02-29', followupDate: '2024-05-29' }).value, 100);
+test('90-day score denominator follows completed or explicitly recorded assessment, not exact date',()=>{
+ for(const [score,value]of [[0,100],[2,100],[3,0],[6,0]])assert.equal(get(7,{mrs90Days:score}).value,value);
+ for(const value of [-1,7,1.5,'',true])missing(get(7,{mrs90Days:value}),'mrs90Days');
+ assert.equal(get(7,{onsetDate:'',followupDate:''}).value,100);
+ assert.equal(get(7,{followup90Days:'No',followupDate:'',mrs90Days:''}).denominator,0);
+ missing(get(7,{followup90Days:'No',mrs90Days:2}),'followup90Days');
+ assert.equal(get(7,{followup90Days:'',mrs90Days:2}).value,100);
 });
 
 test('positive pressure-ulcer stages are required and nonordinal stages preserved', () => {
-  for (const id of ['pressureUlcerInitialStage', 'pressureUlcerCurrentStage']) missing(get(12, { [id]: '' }), id);
+  missing(get(12,{pressureUlcerCurrentStage:''}),'pressureUlcerCurrentStage');assert.equal(get(12,{pressureUlcerInitialStage:''}).numerator,1);
   missing(get(12, { pressureUlcer: 'No' }), 'pressureUlcer');
   missing(get(12, { pressureUlcerCurrentStage: 'No pressure ulcer' }), 'pressureUlcer');
   missing(get(12, { pressureUlcer: 'No', pressureUlcerInitialStage: 'Stage 1', pressureUlcerCurrentStage: 'Stage 2' }), 'pressureUlcer');
@@ -244,12 +222,9 @@ test('ulcer stages and final TICI use conditional capture', () => {
   ]);
 });
 
-test('KPI 21 denominator is all ischemic cases, not only EVD cases', () => {
-  const result = calculateKpis([r, { diagnosis: 'Ischemic Stroke', evd: 'No' }, { diagnosis: 'Hemorrhagic Stroke' }], monthly)[20];
-  assert.equal(result.numerator, 1); assert.equal(result.denominator, 2); assert.equal(result.value, 50);
-  assert.equal(get(21, { ventriculitis: 'No' }).value, 0);
-  assert.equal(get(21, { evd: 'No', ventriculitis: '' }).value, 0);
-  missing(get(21, { ventriculitis: '' }), 'ventriculitis');
+test('KPI 21 denominator is ischemic EVD cases, not all ischemic strokes',()=>{
+ const result=calculateKpis([r,{diagnosis:'Ischemic Stroke',evd:'No'},{diagnosis:'Hemorrhagic Stroke',evd:'Yes'}],monthly)[20];
+ assert.equal(result.denominator,1);assert.equal(result.value,100);assert.equal(get(21,{ventriculitis:'No'}).value,0);missing(get(21,{ventriculitis:''}),'ventriculitis');
 });
 
 test('KPI 21 explicit post-EVD outcome needs no timestamps', () => {
@@ -270,20 +245,14 @@ test('TICI threshold and IA/EVT union count patients once', () => {
   assert.equal(get(22, { iaThrombolysis: 'No', evtGiven: 'No', finalTici: '' }).status, 'not-applicable');
 });
 
-test('KPI 23 ambiguity preserves 120-minute provisional denominator', () => {
-  for (const [duration, denominator] of [[0, 1], [120 * M, 1], [120 * M + 1, 0], [150 * M, 0], [150 * M + 1, 0]]) {
-    const result = get(23, { evtDeviceTime: at(duration) });
-    assert.equal(result.denominator, denominator); assert.equal(result.status, 'clarification'); assert.equal(result.value, null);
-  }
-  const unknownTime = get(23, { evtDeviceTime: '' });
-  assert.equal(unknownTime.denominator, 0); assert.equal(unknownTime.eligibilityPending, 1);
-  missing(unknownTime, 'evtDeviceTime');
+test('KPI 23 uses 150-minute numerator with all LVO EVT cases in denominator',()=>{
+ for(const [duration,numerator]of [[0,1],[120*M,1],[120*M+1,1],[150*M,1],[150*M+1,0]]){const result=get(23,{evtDeviceTime:at(duration)});assert.equal(result.denominator,1);assert.equal(result.numerator,numerator);assert.equal(result.status,'complete');}
+ missing(get(23,{evtDeviceTime:''}),'evtDeviceTime');
 });
 
-test('KPI 24 retains all-ischemic denominator and exact reperfusion interval', () => {
-  const result = calculateKpis([r, { diagnosis: 'Ischemic Stroke', evtGiven: 'No' }], monthly)[23];
-  assert.equal(result.denominator, 2); assert.equal(result.numerator, 1); assert.equal(result.status, 'clarification'); assert.equal(result.value, null);
-  missing(get(24, { reperfusionTime: '' }), 'reperfusionTime');
+test('KPI 24 denominator is EVT-treated cases; exact reperfusion interval retained',()=>{
+ const result=calculateKpis([r,{diagnosis:'Ischemic Stroke',evtGiven:'No'}],monthly)[23];assert.equal(result.denominator,1);assert.equal(result.value,100);
+ missing(get(24,{reperfusionTime:''}),'reperfusionTime');
 });
 
 test('strict ISO-offset instants; reject invalid and unzoned datetime strings', () => {
@@ -301,10 +270,10 @@ test('averages retain sub-minute precision and report the proper waiting baselin
   missing(get(14, { imagingStartTime: at(4 * M) }), 'imagingStartTime');
 });
 
-test('inpatient imaging recognition is provisional; inpatient door metrics clarified', () => {
-  assert.equal(get(1, { presentation: 'Inpatient stroke', recognitionTime: at(5 * M) }).numerator, 15);
-  missing(get(1, { presentation: 'Inpatient stroke', recognitionTime: '' }), 'recognitionTime');
-  for (const no of [2, 17]) assert.equal(get(no, { presentation: 'Inpatient stroke' }).status, 'clarification');
+test('inpatient imaging/assessment use recognition; treatment doors use hospital arrival',()=>{
+ assert.equal(get(1,{presentation:'Inpatient stroke',recognitionTime:at(5*M)}).value,15);
+ missing(get(1,{recognitionTime:''}),'recognitionTime');
+ assert.equal(get(2,{recognitionTime:at(100*M)}).status,'complete');assert.equal(get(17,{recognitionTime:at(100*M)}).status,'complete');
 });
 
 test('numeric blanks, booleans, negative values and zero denominators', () => {
@@ -317,7 +286,7 @@ test('numeric blanks, booleans, negative values and zero denominators', () => {
   assert.equal(get(8, { medicationErrors: 0 }, { ...monthly, medicationOpportunities: 0 }).status, 'not-applicable');
   assert.equal(get(8, {}, { ...monthly, medicationOpportunities: 0 }).status, 'pending');
   for (const [no, id] of [[8, 'medicationOpportunities'], [12, 'strokeUnitPatientDays'], [15, 'formularyDrugs']]) {
-    missing(get(no, {}, { ...monthly, [id]: '' }), id);
+    missing(get(no, {}, { ...monthly, [id]: '' }), no===12?'strokeUnitAdmissionTime':id);
     assert.equal(get(no, {}, { ...monthly, [id]: 0 }).status, 'pending');
   }
 });
@@ -328,7 +297,7 @@ test('no treatment inferred from timing or evidence; no automatic clinical eligi
   assert.equal(get(3, { ivtGiven: 'No' }).denominator, 0);
   assert.equal(get(3, { ivtSich: 'No' }).numerator, 0);
   assert.equal(get(17, { evtGiven: 'No' }).numerator, 0);
-  missing(get(2, { ivtIndicated: '' }), 'ivtIndicated');
+  assert.equal(get(2,{ivtIndicated:'',ivtGiven:'Yes'}).denominator,1);
   assert.equal(get(2, { age: 10 }).numerator, 1);
 });
 
@@ -340,4 +309,4 @@ test('monthly inputs are independent of case eligibility and filtered by caller'
   assert.throws(() => calculateKpis([], null), TypeError);
 });
 
-console.log(`PASS: ${checks} KPI schema/calculation checks; all 24 indicators, strict offset timestamps, exact boundaries, missing eligibility, follow-up completeness, and source ambiguities.`);
+console.log(`PASS: ${checks} KPI schema/calculation checks; all 24 indicators, strict offset timestamps, exact boundaries, missing eligibility, follow-up completeness, and hospital reference formulas.`);

@@ -1,3 +1,4 @@
+import { kpiCalculationProfile } from './kpi-policy.js';
 import { onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js';
 import { isReviewPage } from './page-mode.js';
 import { kpiSections, kpiFields, hospitalFields, kpiSource, kpiSchemaVersion } from './kpi-schema.js';
@@ -168,7 +169,7 @@ function build(){
 function refresh(){
  if(!root?.isConnected||archive||!active||parameterHome)return;
  const values=currentKpiValues(caseData),identity=[values.name,values.age?(/^\d+(?:\.\d+)?$/.test(values.age)?values.age+' years':values.age):'',values.uhid?'UHID '+values.uhid:''].filter(Boolean).join(' · ');
- const identityNode=root.querySelector('.kpi-case-identity');if(identityNode)identityNode.textContent=standalone?'All shared cases':identity||'New shared case';
+ const identityNode=root.querySelector('.kpi-case-identity');if(identityNode)identityNode.textContent=standalone?'Cases marked for KPI reporting':identity||'New shared case';
  let shown=0;
  for(const wrap of root.querySelectorAll('.kpi-field')){
   const monthly=wrap.dataset.monthly==='true',defs=monthly?hospitalFields:kpiFields,field=defs.find(f=>f.id===wrap.dataset.field),control=wrap.querySelector('[data-kpi-field]'),read=wrap.querySelector('.kpi-read-value');
@@ -188,7 +189,7 @@ function refresh(){
 function buildReport(parent){
  const controls=el('div','kpi-report-controls'),label=el('label','','Reporting month'),input=el('input');input.type='month';input.value=reportMonth;input.setAttribute('aria-label','Reporting month');input.addEventListener('change',()=>{if(busy()){input.value=reportMonth;return;}if(validMonth(input.value)){reportMonth=input.value;window.dispatchEvent(new CustomEvent('kpi-report-month-changed',{detail:{month:reportMonth}}));refresh();}});label.append(input);controls.append(label);
  const download=el('button','','Export CSV');download.type='button';download.addEventListener('click',exportReport);controls.append(download);parent.append(controls);
- parent.append(el('p','kpi-report-policy','Cases are grouped by admission/arrival month. Imported exclusions and cases awaiting inclusion confirmation are omitted from KPI calculations; all remain available in Cases. Later outcomes update that original cohort. Missing eligibility remains pending. Conflicting definitions in the supplied NABH document are flagged for clarification.'));
+ parent.append(el('p','kpi-report-policy','Reports use admission/arrival month and only cases marked for KPI reporting. Open Formula and parameters under an indicator to see its hospital reference definition and required data. Missing facts remain pending.'));
  const summary=el('p','kpi-report-summary');parent.append(summary);
  const monthly=el('details','kpi-monthly');monthly.open=isReviewPage;monthly.append(el('summary','','Shared hospital monthly inputs'));const grid=el('div','kpi-fields');for(const f of hospitalFields)grid.append(fieldRow(f,true));monthly.append(grid);parent.append(monthly);
  parent.append(el('div','kpi-results'));
@@ -200,9 +201,9 @@ function reportData(){
  return {records:recordsForMonth,results:calculateKpis(recordsForMonth,monthly)};
 }
 function refreshReport(){
- const {records,results}=reportData(),summary=root.querySelector('.kpi-report-summary');summary.textContent=`${records.length} shared cases · ${results.filter(r=>r.status==='complete').length} complete indicators · ${results.filter(r=>r.status==='clarification').length} definitions need clarification`;
+ const {records,results}=reportData(),summary=root.querySelector('.kpi-report-summary');summary.textContent=`${records.length} included case${records.length===1?'':'s'} · ${results.filter(r=>r.status==='complete').length} complete indicators`;
  const box=root.querySelector('.kpi-results');box.replaceChildren();
- for(const result of results){const card=el('article','kpi-result');card.dataset.kpiNumber=result.no;card.dataset.status=result.status;const top=el('div','kpi-result-head');top.append(el('span','kpi-number',String(result.no)),el('h2','',result.title));card.append(top);const labels={complete:'Complete',pending:'Pending data',clarification:'Definition needs clarification','not-applicable':'No eligible cases'};card.append(el('span','kpi-result-status',labels[result.status]||result.status));card.append(el('strong','kpi-result-value',result.value==null?'Awaiting data / definition':typeof result.value==='number'?`${Number(result.value.toFixed(2))}${result.unit==='%'?'%':result.unit?' '+result.unit:''}`:String(result.value)));card.append(el('p','kpi-counts',`Numerator: ${result.numerator??'—'} · Denominator: ${result.denominator??'—'}`));if(result.note)card.append(el('p','kpi-result-note',result.note));if(result.missing?.length){const details=el('details');details.append(el('summary','',`${result.missing.length} missing details`));const list=el('ul');for(const item of result.missing)list.append(el('li','',describeMissing(item,records)));details.append(list);card.append(details);}box.append(card);}
+ for(const result of results){const card=el('article','kpi-result');card.dataset.kpiNumber=result.no;card.dataset.status=result.status;const top=el('div','kpi-result-head');top.append(el('span','kpi-number',String(result.no)),el('h2','',result.title));card.append(top);const labels={complete:'Complete',pending:'Pending data',clarification:'Definition needs clarification','not-applicable':'No eligible cases'};card.append(el('span','kpi-result-status',labels[result.status]||result.status));card.append(el('strong','kpi-result-value',result.value==null?'Awaiting data':typeof result.value==='number'?`${Number(result.value.toFixed(2))}${result.unit==='%'?'%':result.unit?' '+result.unit:''}`:String(result.value)));card.append(el('p','kpi-counts',`Numerator: ${result.numerator??'—'} · Denominator: ${result.denominator??'—'}`));const definition=el('details','kpi-definition');definition.append(el('summary','','Formula and parameters'),el('p','',result.formula),el('p','',kpiCalculationProfile.title),el('p','','Parameters depend on the applicable treatment/outcome and the stated fallbacks.'));const parameters=el('ul');for(const id of result.parameters){const key=id.replace('monthlyInputs.',''),field=[...kpiFields,...hospitalFields].find(f=>f.id===key);parameters.append(el('li','',field?.label||id));}definition.append(parameters);card.append(definition);if(result.note)definition.append(el('p','kpi-result-note',result.note));if(result.missing?.length){const details=el('details');details.append(el('summary','',`${result.missing.length} missing details`));const list=el('ul');for(const item of result.missing)list.append(el('li','',describeMissing(item,records)));details.append(list);card.append(details);}box.append(card);}
 }
 function describeMissing(value,records){
  const text=String(value),match=/^records\[(\d+)\]\.([A-Za-z0-9]+)(.*)$/.exec(text);
@@ -210,7 +211,7 @@ function describeMissing(value,records){
  if(text.startsWith('monthlyInputs.'))return hospitalFields.find(f=>f.id===text.slice(14))?.label||'Monthly hospital input';
  return text;
 }
-function exportReport(){const {results}=reportData(),quote=v=>'"'+String(v??'').replaceAll('"','""')+'"';const rows=[['KPI','Indicator','Result','Status','Numerator','Denominator','Missing','Definition note'],...results.map(r=>[r.no,r.title,r.value,r.status,r.numerator,r.denominator,(r.missing||[]).join('; '),r.note])];const blob=new Blob(['\uFEFF'+rows.map(r=>r.map(quote).join(',')).join('\r\n')],{type:'text/csv;charset=utf-8'}),url=URL.createObjectURL(blob),a=el('a');a.href=url;a.download='stroke-kpi-'+reportMonth+'.csv';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
+function exportReport(){const {results}=reportData(),quote=v=>'"'+String(v??'').replaceAll('"','""')+'"';const rows=[['KPI','Indicator','Result','Unit','Status','Numerator','Denominator','Calculation profile','Formula','Parameters','Missing','Definition note'],...results.map(r=>[r.no,r.title,r.value,r.unit,r.status,r.numerator,r.denominator,r.calculationProfile,r.formula,r.parameters.join('; '),(r.missing||[]).join('; '),r.note])];const blob=new Blob(['\uFEFF'+rows.map(r=>r.map(quote).join(',')).join('\r\n')],{type:'text/csv;charset=utf-8'}),url=URL.createObjectURL(blob),a=el('a');a.href=url;a.download='stroke-kpi-'+reportMonth+'.csv';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
 export function showProtocolCase(container,id,options={}){
  ensureToolbar();if(caseId&&caseId!==id&&busy())return;
  const opening=!active||caseId!==id||standalone;standalone=false;

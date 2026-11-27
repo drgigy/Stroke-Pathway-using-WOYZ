@@ -19,5 +19,5 @@ const imported={importProvenance:{requiresInclusionReview:true},kpiEntries:{}};
 assert.equal(isKpiReportingCase(imported),false);
 assert.equal(isKpiReportingCase({...imported,kpiEntries:{a:take({includeInReporting:'No'})}}),false);
 assert.equal(isKpiReportingCase({...imported,kpiEntries:{a:take({includeInReporting:'Yes'})}}),true);
-assert.equal(isKpiReportingCase({}),true);
+assert.equal(isKpiReportingCase({}),false);
 console.log('PASS: Imported cohort exclusions, pending inclusion and explicit review approval.');
