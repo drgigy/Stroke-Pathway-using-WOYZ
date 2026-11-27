@@ -1,4 +1,4 @@
-import {kpiParameterGuide} from './kpi-parameter-guide.js';
+import {kpiParameterGuide,kpiSupportingGuide,kpiLaterFieldVisible} from './kpi-parameter-guide.js';
 import { kpiCalculationProfile, kpiDefinitions } from './kpi-policy.js';
 import { onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js';
 import { isReviewPage } from './page-mode.js';
@@ -25,7 +25,7 @@ const busy=()=>saveBusy||!!failed||jobs.length>0||dirty.size>0||protocolDictatio
 const el=(tag,className,text)=>{const node=document.createElement(tag);if(className)node.className=className;if(text!==undefined)node.textContent=text;return node;};
 const validMonth=value=>/^\d{4}-(0[1-9]|1[0-2])$/.test(value);
 const indianMonth=value=>{if(!value)return '';const date=new Date(value);if(!Number.isFinite(date.getTime()))return '';const p=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Kolkata',year:'numeric',month:'2-digit'}).formatToParts(date);return p.find(x=>x.type==='year').value+'-'+p.find(x=>x.type==='month').value;};
-function updateStatus(){for(const node of statusNodes){node.firstChild.textContent=failed?'Save failed':saveBusy||jobs.length?'Saving…':dirty.size?'Unsaved changes':localSaved?'Saved':'';node.lastChild.hidden=!failed;}if(root?.isConnected)for(const button of root.querySelectorAll('.kpi-section-foot button'))button.disabled=busy()||(button.textContent==='Previous section'?section===0:section>=caseSections.length-1);updateNavigation();window.dispatchEvent(new Event('case-workspace-state'));}
+function updateStatus(){for(const node of statusNodes){node.firstChild.textContent=failed?'Save failed':saveBusy||jobs.length?'Saving…':dirty.size?'Unsaved changes':localSaved?'Saved':'';node.lastChild.hidden=!failed;}const head=root?.querySelector('.kpi-case-head');if(head&&parameterHome&&!isReviewPage)head.hidden=!(failed||saveBusy||jobs.length||dirty.size||localSaved);if(root?.isConnected)for(const button of root.querySelectorAll('.kpi-section-foot button'))button.disabled=busy()||(button.textContent==='Previous section'?section===0:section>=caseSections.length-1);updateNavigation();window.dispatchEvent(new Event('case-workspace-state'));}
 export function configureKpiWorkspace(config){
  if(configured)return;configured=true;storeConfig=config;configureKpiStore(config);configureProtocolFormEditing(config);
  window.addEventListener('offline',parkOfflineInput);
@@ -98,26 +98,21 @@ function changeSection(index){if(standalone||busy()||index<0||index>=caseSection
 function humanDate(value){if(!value)return 'Not recorded';const date=new Date(value);return Number.isFinite(date.getTime())?new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Kolkata',day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:true}).format(date):value;}
 function localDateTime(value){if(!value)return '';const d=new Date(value);if(!Number.isFinite(d.getTime()))return '';const p=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Kolkata',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23'}).formatToParts(d),v=key=>p.find(x=>x.type===key)?.value;return `${v('year')}-${v('month')}-${v('day')}T${v('hour')}:${v('minute')}:${v('second')}`;}
 function visible(field,values){if(parameterHome&&field.id==='admissionTime')return true;const conditions=field.showIf?Array.isArray(field.showIf)?field.showIf:[field.showIf]:[];return conditions.every(test=>test.values.includes(values[test.field]))&&(!field.showIfAny||field.showIfAny.some(test=>test.values.includes(values[test.field])));}
-function cueVisible(field,values){
- const unknown=id=>values[id]===undefined||values[id]==='';
- const conditions=(field.showIf?(Array.isArray(field.showIf)?field.showIf:[field.showIf]):[]).filter(test=>test.field!=='admitted');
- if(!conditions.every(test=>unknown(test.field)||test.values.includes(values[test.field])))return false;
- if(field.showIfAny&&!field.showIfAny.some(test=>unknown(test.field)||test.values.includes(values[test.field])))return false;
- if(field.id==='imagingStartTime'&&values.firstSliceTime&&!values.imagingStartTime)return false;
- if(field.id==='brainImaging'&&values.firstSliceTime&&values.brainImaging!=='No')return false;
- if(field.id==='followup90Days'&&values.mrs90Days!==undefined&&values.mrs90Days!==''&&values.followup90Days!=='No')return false;
- if(field.id==='evtStartTime'&&(values.evtDeviceTime||values.skinPunctureTime))return false;
- if(field.id==='ivtIndicated'&&values.ivtGiven==='Yes')return false;
- return true;
-}
 function fieldRow(field,monthly=false){
- const wrap=el('label','kpi-field');wrap.dataset.field=field.id;wrap.dataset.monthly=String(monthly);
+ const wrap=el('div','kpi-field');wrap.dataset.field=field.id;wrap.dataset.monthly=String(monthly);
  const label=el('span','kpi-field-label',field.label);wrap.append(label);
  let control;
- if(field.type==='choice'){control=el('select');for(const value of ['',...(field.choices||[])]){const option=el('option','',value||'Not recorded');option.value=value;control.append(option);}}
+ if(field.type==='choice'){control=el('select');for(const value of ['',...(field.choices||[])]){const option=el('option','',value||(field.choices.length===2&&field.choices.includes('Yes')?'Not yet known':'Not recorded'));option.value=value;control.append(option);}}
  else{control=el('input');control.type=field.type==='datetime'?'datetime-local':field.type==='date'?'date':field.type==='number'?'number':'text';if(control.type==='number'){control.min='0';control.step='1';}if(field.type==='datetime')control.step='1';if(field.id==='uhid')control.inputMode='text';}
- control.dataset.kpiField=field.id;control.autocomplete='off';control.setAttribute('aria-label',field.label);control.disabled=!isReviewPage;wrap.append(control);
- const read=el('span','kpi-read-value');read.hidden=isReviewPage;control.hidden=!isReviewPage;wrap.append(read);
+ const editable=isReviewPage||(!monthly&&parameterHome&&!standalone),binary=field.type==='choice'&&field.choices.length===2&&field.choices.includes('Yes');
+ control.dataset.kpiField=field.id;control.autocomplete='off';control.setAttribute('aria-label',field.label);control.disabled=!editable;wrap.append(control);
+ if(binary&&editable){
+  control.hidden=true;const choices=el('div','kpi-binary');choices.setAttribute('role','group');choices.setAttribute('aria-label',field.label);
+  for(const [value,text]of [['Yes','Yes'],['No','No'],['','Not yet known']]){const choice=el('button','',text);choice.type='button';choice.dataset.kpiChoice=value;choice.addEventListener('click',()=>{if(control.disabled)return;control.value=value;control.dispatchEvent(new Event('input',{bubbles:true}));control.dispatchEvent(new Event('change',{bubbles:true}));});choices.append(choice);}wrap.append(choices);
+ }
+ if(field.type==='number'){control.step='1';if(field.max!==undefined)control.max=String(field.max);if(/mrs/i.test(field.id))control.max='6';}
+
+ const read=el('span','kpi-read-value');read.hidden=editable;if(!binary)control.hidden=!editable;wrap.append(read);
  const key=(monthly?'monthly:':'')+field.id;
  control.addEventListener('input',()=>{dirty.set(key,control.value);localSaved=false;updateStatus();});
  const commit=()=>{
@@ -160,21 +155,21 @@ function switchCaseMode(form){
 function buildParameterMenu(){
  root.classList.add('kpi-continuous','kpi-one-page');
  const head=el('header','kpi-section-head kpi-case-head');head.hidden=!isReviewPage;
- if(isReviewPage){const review=el('button','kpi-source-button','Review dictation');review.type='button';review.addEventListener('click',reviewSources);head.append(review);
+ if(isReviewPage){const review=el('button','kpi-source-button','Review dictation');review.type='button';review.addEventListener('click',reviewSources);head.append(review);}
   const status=el('div','protocol-edit-status'),text=el('span'),retry=el('button','','Retry save');text.setAttribute('role','status');retry.type='button';retry.hidden=true;retry.addEventListener('click',()=>{if(failed){jobs.unshift(failed);failed=null;flush();}});status.append(text,retry);head.append(status);statusNodes=statusNodes.filter(node=>node.isConnected);statusNodes.push(status);
- }root.append(head);
+ root.append(head);
  const tools=el('div','kpi-guide-tools'),reused=el('p','kpi-reuse-summary');tools.append(reused);
  const toggle=el('button','kpi-show-captured','Show captured');toggle.type='button';toggle.setAttribute('aria-expanded','false');toggle.addEventListener('click',()=>{root.dataset.showCaptured=root.dataset.showCaptured==='true'?'false':'true';toggle.setAttribute('aria-expanded',root.dataset.showCaptured);toggle.textContent=root.dataset.showCaptured==='true'?'Hide captured':'Show captured';refresh();});tools.append(toggle);root.append(tools);
  const readiness=el('details','kpi-readiness');readiness.append(el('summary'),el('ul'));root.append(readiness);
  const list=el('div','kpi-guide');list.setAttribute('aria-label','KPI parameters');
- kpiParameterGuide.forEach((group,index)=>{
+ [...kpiParameterGuide,kpiSupportingGuide].forEach((group,index)=>{
   const block=el('details','kpi-parameter-group');block.dataset.guideGroup=group.id;
-  const summary=el('summary'),number=el('span','kpi-guide-number',String(index+1)),content=el('span','kpi-guide-content');content.append(el('strong','',group.title),el('span','kpi-guide-cue',group.cue),el('span','kpi-guide-state'));summary.append(number,content);block.append(summary);
+  const summary=el('summary'),number=el('span','kpi-guide-number',index<9?String(index+1):'+'),content=el('span','kpi-guide-content');content.append(el('strong','',group.title),el('span','kpi-guide-cue',group.cue),el('span','kpi-guide-state'));summary.append(number,content);block.append(summary);
   const grid=el('div','kpi-fields');
   for(const id of group.fields){const field=parameterFields.find(item=>item.id===id);if(field)grid.append(fieldRow(field));}
-  if(group.id==='safety'&&isReviewPage&&currentKpiValues(caseData).pressureUlcerInitialStage){const row=fieldRow(kpiFields.find(field=>field.id==='pressureUlcerInitialStage'));row.dataset.storedOptional='true';grid.append(row);}
+  if(group.id==='complications'&&isReviewPage&&currentKpiValues(caseData).pressureUlcerInitialStage){const row=fieldRow(kpiFields.find(field=>field.id==='pressureUlcerInitialStage'));row.dataset.storedOptional='true';grid.append(row);}
   if(group.monthly){const note=el('p','kpi-month-note','Hospital totals for '+reportMonth+' - quality team, once per month.');grid.append(note);for(const field of hospitalFields)grid.append(fieldRow(field,true));}
-  block.append(grid);list.append(block);
+  block.append(grid);if(group.id==='supporting'){block.classList.add('kpi-supporting');readiness.append(block);}else list.append(block);
  });
  root.append(list);target.replaceChildren(root);updateNavigation();setVoiceContext();refresh();
 }
@@ -207,23 +202,26 @@ function refresh(){
  for(const wrap of root.querySelectorAll('.kpi-field')){
   const monthly=wrap.dataset.monthly==='true',defs=monthly?hospitalFields:kpiFields,field=defs.find(f=>f.id===wrap.dataset.field),control=wrap.querySelector('[data-kpi-field]'),read=wrap.querySelector('.kpi-read-value');
   const source=monthly?currentMonthlyValues(allData.get('kpi-month-'+reportMonth)||{}):values;
-  wrap.hidden=!monthly&&((parameterHome&&reuse.covered.has(field.id)&&root.dataset.showCaptured!=='true')||!(parameterHome&&!isReviewPage?cueVisible(field,values):visible(field,values)));if(wrap.dataset.storedOptional==='true')wrap.hidden=root.dataset.showCaptured!=='true';if(!wrap.hidden)shown++;
-  control.disabled=!isReviewPage||!!parked;
+  wrap.hidden=!monthly&&((parameterHome&&reuse.covered.has(field.id)&&root.dataset.showCaptured!=='true')||!(parameterHome?kpiLaterFieldVisible(field,values,{review:isReviewPage}):visible(field,values)));if(wrap.dataset.storedOptional==='true')wrap.hidden=root.dataset.showCaptured!=='true';if(!wrap.hidden)shown++;
+  control.disabled=!(isReviewPage||(!monthly&&parameterHome&&!standalone))||!!parked;
   const key=(monthly?'monthly:':'')+field.id,value=source[field.id]??'';
   let note=wrap.querySelector('.kpi-field-reuse');const fact=parameterHome&&reuse.form[field.id],issue=parameterHome&&reuse.issues[field.id];
   if(fact||issue){if(!note){note=el('span','kpi-field-reuse');wrap.append(note);}note.textContent=issue?(issue+' Saved form value: '+(fact?.raw||'blank')):'Already captured in Stroke pathway.';}else note?.remove();
   if(!dirty.has(key)&&document.activeElement!==control)control.value=field.type==='datetime'?localDateTime(value):value;
   read.textContent=value===''?'Not recorded':field.type==='datetime'?humanDate(value):value;read.classList.toggle('kpi-pending',value==='');
+  for(const choice of wrap.querySelectorAll('[data-kpi-choice]')){choice.setAttribute('aria-pressed',String(choice.dataset.kpiChoice===value));choice.disabled=control.disabled;}
+
  }
  let warnings=root.querySelector('.kpi-warnings');const uncertain=Object.values(caseData.kpiEntries||{}).filter(entry=>(parameterHome||entry.sectionId===kpiSections[section].id)&&entry.warnings?.length).flatMap(entry=>entry.warnings);if(uncertain.length){if(!warnings){warnings=el('details','kpi-warnings');root.querySelector('.kpi-section-head').after(warnings);}warnings.replaceChildren(el('summary','','Dictated details needing clarification'));const list=el('ul');for(const message of uncertain)list.append(el('li','',message));warnings.append(list);}else warnings?.remove();
  const empty=root.querySelector('.kpi-empty-section');if(empty)empty.hidden=shown>0;
  if(parameterHome){
   const reusedCount=parameterFields.filter(field=>reuse.covered.has(field.id)).length;
-  root.querySelector('.kpi-reuse-summary').textContent=`${reusedCount} captured in Stroke pathway.`;
+  root.querySelector('.kpi-reuse-summary').textContent=`${reusedCount} reused from Stroke pathway.`;
   root.querySelector('.kpi-show-captured').hidden=reusedCount===0&&!root.querySelector('[data-stored-optional]');
   const monthly=currentMonthlyValues(allData.get('kpi-month-'+reportMonth)||{}),results=calculateKpis([values],monthly),pending=results.filter(item=>item.status==='pending'),resolved=results.filter(item=>['complete','not-applicable'].includes(item.status));
   for(const group of root.querySelectorAll('.kpi-parameter-group')){
    const relevant=[...group.querySelectorAll('.kpi-field')].filter(row=>!row.hidden),missing=relevant.filter(row=>{const id=row.dataset.field,source=row.dataset.monthly==='true'?monthly:values;return source[id]===undefined||source[id]==='';}).length;
+   if(group.dataset.guideGroup==='supporting')group.hidden=!relevant.length;
    group.querySelector('.kpi-guide-state').textContent=missing?`${missing} not recorded`:relevant.length?'Recorded':'Already captured / not applicable';
   }
   const ready=root.querySelector('.kpi-readiness');ready.querySelector('summary').textContent=`24 KPI checks: ${resolved.length} resolved, ${pending.length} pending`;
