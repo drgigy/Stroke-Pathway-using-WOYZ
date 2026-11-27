@@ -59,3 +59,7 @@
 .protocol-dictation[hidden],.protocol-edit-status[hidden]{display:none!important;}
 
 .kpi-case-head { display:flow-root; border:0; padding:0; margin-bottom:14px; }
+
+.kpi-continuous .kpi-fields { grid-template-columns:minmax(0,1fr); }
+.kpi-continuous .kpi-field { padding:12px 16px;gap:5px; }
+.kpi-field-condition { font-size:12px;line-height:1.4;color:#536d62; }

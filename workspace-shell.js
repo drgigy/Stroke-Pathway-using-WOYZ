@@ -96,7 +96,7 @@ function dashboard(){
  const body=node('tbody');let references=0;
  list.forEach((r,index)=>{
   const displayed=dashboardTimings(r._data),v=displayed.values;if(displayed.hasFormReference)references++;
-  const duration=(start,end)=>minutes(dashboardInterval(v,start,end));
+  const duration=(start,end)=>minutes(dashboardInterval(v,start,end,displayed));
   const row=node('tr');row.append(node('td','',String(list.length-index)),node('td','',episodeDate(r)));const name=node('td');name.append(button(fullName(r),()=>openCase(r.id),'table-case-button'));row.append(name);
   for(const value of [r.uhid||'—',r.age||'—',dashboardClock(v.arrivalTime),duration('arrivalTime','firstSliceTime'),r.ivtGiven==='No'?'N/A':duration('arrivalTime','ivtTime'),r.evtGiven==='No'?'N/A':duration('arrivalTime','evtDeviceTime'),r.evtGiven==='No'?'N/A':duration('arrivalTime','skinPunctureTime'),r.evtGiven==='No'?'N/A':duration('arrivalTime','reperfusionTime'),r.evtGiven==='No'?'N/A':duration('skinPunctureTime','reperfusionTime'),v.finalTici||'—'])row.append(node('td','',value));
   if(displayed.hasFormReference)row.title='Includes saved protocol-form times as reference. Missing or ambiguous dates remain pending; these values do not become KPI evidence.';
