@@ -1,3 +1,4 @@
+import {dashboardTimings,dashboardClock,dashboardInterval} from './dashboard-data.js';
 import { watchAccountLogout, logoutAccount } from './account-session.js';
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-app.js';
 import { getAuth, browserLocalPersistence, setPersistence, signInWithEmailAndPassword } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js';
@@ -24,6 +25,7 @@ let pendingDraft=null,creating=false,printing=false,accessDetails=null;
 let documents=[],stopNotes,uid=null,generation=0,view='home',selectedId=null,query='',rangeMode='all',from='',to='',ivtOnly=false,evtOnly=false,analysisMode='',indicator=1;
 const india=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Kolkata',year:'numeric',month:'2-digit',day:'2-digit'});
 const dateKey=value=>{const d=new Date(value);if(!value||!Number.isFinite(d.getTime()))return '';const parts=india.formatToParts(d),part=type=>parts.find(x=>x.type===type).value;return `${part('year')}-${part('month')}-${part('day')}`;};
+const viewFilters={cases:{rangeMode:'all',ivtOnly:false,evtOnly:false,from:'',to:''},dashboard:{rangeMode:'all',ivtOnly:false,evtOnly:false,from:'',to:''}};
 let month=dateKey(new Date()).slice(0,7);
 const node=(tag,className,text)=>{const el=document.createElement(tag);if(className)el.className=className;if(text!==undefined)el.textContent=text;return el;};
 const button=(text,fn,className='review-action')=>{const el=node('button',className,text);el.type='button';el.addEventListener('click',fn);return el;};
@@ -33,15 +35,19 @@ const stamp=d=>d.createdAt?.seconds?d.createdAt.seconds*1000:Date.parse(d.visitD
 const episodeDate=r=>dateKey(r.admissionTime||r.arrivalTime)||r._data.visitDate||'';
 const fullName=r=>r.name||'Code 7 draft';
 const meta=r=>[r.uhid?'UHID '+r.uhid:'',r.age?(/^\d+(?:\.\d+)?$/.test(r.age)?r.age+' years':r.age):'',episodeDate(r)].filter(Boolean).join(' · ');
-const clock=value=>{const d=new Date(value);return value&&Number.isFinite(d.getTime())?new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Kolkata',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false}).format(d):'—';};
 const dateTime=value=>{const d=new Date(value);return value&&Number.isFinite(d.getTime())?new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Kolkata',day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit',second:'2-digit'}).format(d):'Not recorded';};
-const elapsed=(r,start,end)=>{if(!r[start]||!r[end])return null;const ms=new Date(r[end])-new Date(r[start]);return Number.isFinite(ms)&&ms>=0?ms/60000:null;};
 const minutes=value=>value===null?'Pending':`${Number(value.toFixed(1))} min`;
 const monthly=m=>currentMonthlyValues(documents.find(d=>d.id==='kpi-month-'+m)||{});
 const report=m=>calculateKpis(records().filter(r=>isKpiReportingCase(r._data)&&episodeDate(r).slice(0,7)===m),monthly(m));
 function message(text,kind='info'){let el=$('navigationMessage');if(!el){el=node('p','review-top-message');el.id='navigationMessage';el.setAttribute('role','status');shell.querySelector('.topbar').after(el);}el.dataset.kind=kind;el.textContent=text;}
 function canNavigate(){if(kpiWorkspaceBusy()||creating||printing){message('Finish saving or retry the pending change before leaving this view.','busy');return false;}$('navigationMessage')?.remove();return true;}
-function navigate(next){if(!canNavigate())return;cancelProtocolPrint();view=next;selectedId=null;analysisMode='';query='';if(next==='dashboard')rangeMode='month';hideProtocolViewer();window.scrollTo(0,0);render();}
+function navigate(next){
+ if(!canNavigate())return;
+ if(viewFilters[view])viewFilters[view]={rangeMode,ivtOnly,evtOnly,from,to};
+ cancelProtocolPrint();view=next;selectedId=null;analysisMode='';query='';
+ if(viewFilters[next])({rangeMode,ivtOnly,evtOnly,from,to}=viewFilters[next]);
+ hideProtocolViewer();window.scrollTo(0,0);render();
+}
 function openCase(id){if(!canNavigate())return;cancelProtocolPrint();const r=records().find(r=>r.id===id);if(!r)return;selectedId=id;hideProtocolViewer();window.scrollTo(0,0);render();}
 function title(text,sub=''){const head=node('div');head.append(node('h2','review-title',text));if(sub)head.append(node('p','review-intro',sub));return head;}
 function empty(text){return node('div','review-empty',text);}
@@ -83,11 +89,20 @@ function home(){
 function cases(){screen.append(title('Cases'),search(),filters());const list=filtered();for(const r of list)screen.append(card(r));if(!list.length)screen.append(empty('No cases match these filters.'));}
 function dashboard(){
  screen.append(title('Dashboard','Shared case timings and treatment overview'),filters());const list=filtered();
- screen.append(node('p','review-intro',`${list.length} cases · All times Asia/Kolkata · Pending means a required time is not recorded.`));
+ screen.append(node('p','review-intro',`${list.length} of ${records().length} cases · All times Asia/Kolkata · Pending means a required time is not recorded.`));
  if(!list.length){screen.append(empty('No cases recorded for the selected period.'));return;}
  const wrap=node('div','table-wrap'),table=node('table','dashboard-case-table'),head=node('thead'),tr=node('tr');
- for(const label of ['#','Date','Name','UHID','Age','Arrival','D → Imaging','D → IVT','D → Device','D → Puncture','Puncture → Reperfusion','Final TICI'])tr.append(node('th','',label));head.append(tr);table.append(head);
- const body=node('tbody');list.forEach((r,index)=>{const row=node('tr');row.append(node('td','',String(list.length-index)),node('td','',episodeDate(r)));const name=node('td');name.append(button(fullName(r),()=>openCase(r.id),'table-case-button'));row.append(name);for(const value of [r.uhid||'—',r.age||'—',clock(r.arrivalTime),minutes(elapsed(r,'arrivalTime','firstSliceTime')),r.ivtGiven==='No'?'N/A':minutes(elapsed(r,'arrivalTime','ivtTime')),r.evtGiven==='No'?'N/A':minutes(elapsed(r,'arrivalTime','evtDeviceTime')),r.evtGiven==='No'?'N/A':minutes(elapsed(r,'arrivalTime','skinPunctureTime')),r.evtGiven==='No'?'N/A':minutes(elapsed(r,'skinPunctureTime','reperfusionTime')),r.finalTici||'—'])row.append(node('td','',value));body.append(row);});table.append(body);wrap.append(table);screen.append(wrap);
+ for(const label of ['#','Date','Name','UHID','Age','Arrival','D → Imaging','D → IVT','D → First pass / device','D → Puncture','D → Recanalization','Puncture → Reperfusion','Final TICI'])tr.append(node('th','',label));head.append(tr);table.append(head);
+ const body=node('tbody');let references=0;
+ list.forEach((r,index)=>{
+  const displayed=dashboardTimings(r._data),v=displayed.values;if(displayed.hasFormReference)references++;
+  const duration=(start,end)=>minutes(dashboardInterval(v,start,end));
+  const row=node('tr');row.append(node('td','',String(list.length-index)),node('td','',episodeDate(r)));const name=node('td');name.append(button(fullName(r),()=>openCase(r.id),'table-case-button'));row.append(name);
+  for(const value of [r.uhid||'—',r.age||'—',dashboardClock(v.arrivalTime),duration('arrivalTime','firstSliceTime'),r.ivtGiven==='No'?'N/A':duration('arrivalTime','ivtTime'),r.evtGiven==='No'?'N/A':duration('arrivalTime','evtDeviceTime'),r.evtGiven==='No'?'N/A':duration('arrivalTime','skinPunctureTime'),r.evtGiven==='No'?'N/A':duration('arrivalTime','reperfusionTime'),r.evtGiven==='No'?'N/A':duration('skinPunctureTime','reperfusionTime'),v.finalTici||'—'])row.append(node('td','',value));
+  if(displayed.hasFormReference)row.title='Includes saved protocol-form times as reference. Missing or ambiguous dates remain pending; these values do not become KPI evidence.';
+  body.append(row);
+ });table.append(body);wrap.append(table);screen.append(wrap);
+ if(references)screen.append(node('p','review-intro',`${references} case${references===1?'':'s'} include saved form timings as reference. Missing or ambiguous times remain Pending; KPI evidence is unchanged.`));
 }
 function monthControl(callback){const label=node('label','review-date-row','Reporting month'),input=node('input','review-month');input.type='month';input.value=month;input.setAttribute('aria-label','Analysis month');input.addEventListener('change',()=>{if(/^\d{4}-(0[1-9]|1[0-2])$/.test(input.value)){month=input.value;callback();}});label.append(input);return label;}
 function analyses(){
