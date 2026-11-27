@@ -33,7 +33,7 @@ const record=doc=>({id:doc.id,...currentKpiValues(doc),_data:doc});
 const records=()=>documents.filter(d=>d.noteType==='code7'&&!d.deleted).map(record).sort((a,b)=>stamp(b._data)-stamp(a._data));
 const stamp=d=>d.createdAt?.seconds?d.createdAt.seconds*1000:Date.parse(d.visitDate||'')||0;
 const episodeDate=r=>dateKey(r.admissionTime||r.arrivalTime)||r._data.visitDate||'';
-const fullName=r=>r.name||'Code 7 draft';
+const fullName=r=>r.name||(r._data?.entryWorkflow==='stroke-admission'?'Stroke admission draft':'Code 7 draft');
 const meta=r=>[r.uhid?'UHID '+r.uhid:'',r.age?(/^\d+(?:\.\d+)?$/.test(r.age)?r.age+' years':r.age):'',episodeDate(r)].filter(Boolean).join(' · ');
 const dateTime=value=>{const d=new Date(value);return value&&Number.isFinite(d.getTime())?new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Kolkata',day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit',second:'2-digit'}).format(d):'Not recorded';};
 const minutes=value=>value===null?'Pending':`${Number(value.toFixed(1))} min`;
@@ -65,23 +65,25 @@ function filters(){
 function filtered(){return records().filter(r=>{const date=episodeDate(r);return (!query||[r.name,r.uhid,r.id].some(v=>String(v||'').toLowerCase().includes(query.toLowerCase())))&&(!ivtOnly||r.ivtGiven==='Yes')&&(!evtOnly||r.evtGiven==='Yes')&&(rangeMode==='all'||rangeMode==='month'&&date.slice(0,7)===dateKey(new Date()).slice(0,7)||rangeMode==='custom'&&(!from||date>=from)&&(!to||date<=to));});}
 function search(){const input=node('input','review-search');input.type='search';input.placeholder='Search patient name or UHID';input.setAttribute('aria-label','Search cases');input.value=query;input.addEventListener('input',()=>{query=input.value;const start=input.selectionStart;render();const next=screen.querySelector('.review-search');next.focus();next.setSelectionRange(start,start);});return input;}
 function card(r){const b=button('',()=>openCase(r.id),'review-case-card'),head=node('div','card-head'),identity=node('div');identity.append(node('h3','',fullName(r)),node('p','',meta(r)));head.append(identity,node('span','tag grey',!isKpiReportingCase(r._data)?(r.includeInReporting==='No'?'Excluded from KPI':'KPI inclusion pending'):r.diagnosis||'Diagnosis pending'));b.append(head);const count=kpiFields.filter(f=>r[f.id]!==undefined&&r[f.id]!=='').length;b.append(node('p','',`${count} recorded KPI fields`));const progress=node('div','progress'),bar=node('i');bar.style.width=`${Math.min(100,count/kpiFields.length*100)}%`;progress.append(bar);b.append(progress);return b;}
-async function createCase(){
- if(isReviewPage||!uid||!canNavigate())return;
+async function createCase(workflow='code7'){
+ if(isReviewPage||!uid||creating||!canNavigate())return;
+ if(!['code7','stroke-admission'].includes(workflow))return;
  const author=uid;
- if(!pendingDraft||pendingDraft.uid!==author){const id='case_'+crypto.randomUUID().replaceAll('-','');pendingDraft={id,uid:author,data:{noteType:'code7',kpiWorkflowVersion:1,heading:'Code 7 draft',selectedMode:'Code 7',transcription:'',patientData:{name:'',age:'',uhid:''},visitDate:dateKey(new Date()),visitType:'OP',isDraft:true,everSaved:false,kind:'generated',createdBy:author,createdByName:accessDetails?.name||auth.currentUser?.email||'Approved user',createdAt:serverTimestamp(),updatedBy:author,updatedAt:serverTimestamp()}};}
+ if(pendingDraft&&pendingDraft.uid===author&&pendingDraft.workflow!==workflow)return;
+ if(!pendingDraft||pendingDraft.uid!==author){const id='case_'+crypto.randomUUID().replaceAll('-','');pendingDraft={id,uid:author,workflow,data:{noteType:'code7',entryWorkflow:workflow,kpiWorkflowVersion:1,heading:workflow==='stroke-admission'?'Stroke admission draft':'Code 7 draft',selectedMode:workflow==='stroke-admission'?'Stroke admission':'Code 7',transcription:'',patientData:{name:'',age:'',uhid:''},visitDate:dateKey(new Date()),visitType:workflow==='stroke-admission'?'IP':'OP',isDraft:true,everSaved:false,kind:'generated',createdBy:author,createdByName:accessDetails?.name||auth.currentUser?.email||'Approved user',createdAt:serverTimestamp(),updatedBy:author,updatedAt:serverTimestamp()}};}
  const operation=pendingDraft,current=generation;creating=true;render();
  try{
   const ref=doc(db,'workspaces','stroke','notes',operation.id);
-  await runTransaction(db,async transaction=>{const snapshot=await transaction.get(ref);if(auth.currentUser?.uid!==author)throw new Error('access-changed');if(snapshot.exists()){const existing=snapshot.data();if(existing.createdBy!==author||existing.noteType!=='code7'||existing.deleted)throw new Error('draft-conflict');return;}transaction.set(ref,operation.data);});
+  await runTransaction(db,async transaction=>{const snapshot=await transaction.get(ref);if(auth.currentUser?.uid!==author)throw new Error('access-changed');if(snapshot.exists()){const existing=snapshot.data();if(existing.createdBy!==author||existing.noteType!=='code7'||existing.entryWorkflow!==operation.workflow||existing.deleted)throw new Error('draft-conflict');return;}transaction.set(ref,operation.data);});
   if(pendingDraft===operation)pendingDraft=null;
   if(uid!==author||current!==generation)return;
   if(!documents.some(d=>d.id===operation.id))documents.push({id:operation.id,...operation.data});
   selectedId=operation.id;view='cases';query='';window.scrollTo(0,0);
- }catch{if(uid===author&&current===generation)message('Could not confirm the new draft. Reconnect and choose Retry new Code 7.');}
+ }catch{if(uid===author&&current===generation)message('Could not confirm the new draft. Reconnect and retry the same draft.');}
  finally{creating=false;if(uid===author&&current===generation)render();}
 }
 function home(){
- if(!isReviewPage){const start=button(pendingDraft?'Retry new Code 7':'Start New Code 7',createCase,'primary-cta');start.dataset.startCode7='';start.disabled=creating;screen.append(start);return;}
+ if(!isReviewPage){for(const [workflow,label]of [['code7','Start New Code 7'],['stroke-admission','New Stroke Admission']]){const retry=pendingDraft?.workflow===workflow,start=button(retry?'Retry '+(workflow==='code7'?'new Code 7':'stroke admission'):label,()=>createCase(workflow),'primary-cta');if(workflow==='code7')start.dataset.startCode7='';else start.dataset.startAdmission='';start.disabled=creating||!!pendingDraft&&!retry;screen.append(start);}return;}
  const all=records();
  if(all.length&&isReviewPage)screen.append(button('REVIEW LATEST CASE',()=>openCase(all[0].id),'primary-cta'));
  screen.append(title('Recent cases'));for(const r of all.slice(0,8))screen.append(card(r));if(!all.length)screen.append(empty('No shared cases have been recorded yet.'));

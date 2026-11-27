@@ -1,0 +1,13 @@
+import assert from 'node:assert/strict';
+import {strokeAdmissionSections,strokeAdmissionValues,strokeAdmissionFieldVisible,strokeAdmissionClinicalFacts} from '../stroke-admission.js';
+import {kpiFields,kpiSource,kpiSchemaVersion} from '../kpi-schema.js';
+import {protocolFieldSource,protocolFieldVersion} from '../protocol-fields.js';
+const ids=strokeAdmissionSections.flatMap(s=>s.fields);assert.equal(new Set(ids).size,ids.length);for(const id of ids)assert(kpiFields.some(f=>f.id===id),id);
+const form=(pageNumber,fields,seconds=10)=>({pageNumber,fieldSource:protocolFieldSource,fieldVersion:protocolFieldVersion,text:'Synthetic admission only',fields,createdAt:{seconds}});
+const data={protocolDictations:{page1:{a:form(1,{name:'Fixture Person',age:'56 years',uhid:'001234',diagnosis:'Ischemic stroke',nihss:'7',dm:'No'})},page2:{a:form(2,{er_arrival:'2026-11-27T09:00:00+05:30',scan_start:'09:15 AM'})}}};
+const before=JSON.stringify(data),v=strokeAdmissionValues(data);assert.equal(v.name,'Fixture Person');assert.equal(v.age,'56');assert.equal(v.uhid,'001234');assert.equal(v.diagnosis,'Ischemic Stroke');assert.equal(v.arrivalTime,'2026-11-27T03:30:00.000Z');assert.equal(v.firstSliceTime,undefined);assert.equal(v.includeInReporting,undefined);assert.equal(v.ivtGiven,undefined);assert.equal(JSON.stringify(data),before);
+const facts=strokeAdmissionClinicalFacts(data);assert(facts.some(f=>f.id==='nihss'&&f.value==='7'));assert(facts.some(f=>f.id==='dm'&&f.value==='No'));assert(facts.some(f=>f.id==='scan_start'&&f.value==='09:15 AM'));
+const corrected={...data,kpiEntries:{manual:{source:kpiSource,version:kpiSchemaVersion,kind:'manual-edit',text:'',fields:{arrivalTime:'',name:'Corrected Fixture'},createdAt:{seconds:30}}}};assert.equal(strokeAdmissionValues(corrected).arrivalTime,'');assert.equal(strokeAdmissionValues(corrected).name,'Corrected Fixture');
+const field=id=>kpiFields.find(f=>f.id===id);assert(!strokeAdmissionFieldVisible(field('ivtTime'),{ivtGiven:'No'}));assert(strokeAdmissionFieldVisible(field('ivtTime'),{ivtGiven:'Yes'}));assert(!strokeAdmissionFieldVisible(field('mrs90Days'),{followup90Days:'No'}));assert(strokeAdmissionFieldVisible(field('mrs90Days'),{followup90Days:'Yes'}));
+assert.deepEqual(strokeAdmissionValues({}),{});assert.deepEqual(strokeAdmissionClinicalFacts({}),[]);
+console.log('PASS: admission schema, shared form reuse, dates, age, UHID, unknown outcomes, manual clears, conditional fields and no mutation.');

@@ -1,5 +1,16 @@
 # WOYZ Stroke - shared KPI workspace
 
+### Stroke Admission workflow (2026-11-27)
+
+User Home offers **Start New Code 7** and **New Stroke Admission**. The first opens the acute protocol; the second opens **Stroke admission and outcomes** for general admissions. Both create one record in the existing shared `workspaces/stroke/notes` collection. General admissions use `entryWorkflow: 'stroke-admission'`; internal `noteType: 'code7'` stays compatible with the existing background worker, rules, reports and shared-record subscriptions. No clinical answers, treatment eligibility or reporting inclusion are defaulted by either creation action.
+
+Every case has Stroke admission, Stroke pathway / Stroke Protocol Form, and KPI parameters / Other Parameters tabs. The admission tab is available on user, index and dashboard pages; switching views never creates a second case. Admission sections cover patient/admission, assessment/imaging, applicable treatment, stroke-unit stay, inpatient outcomes, procedures, rehabilitation/follow-up and reporting inclusion. Patient controls reuse the existing validated save contract; user voice still uses case-wide background extraction. Review pages remain free of dictation controls.
+
+`stroke-admission.js` projects existing typed KPI values and validated protocol evidence at read time. Matching pathway identity, diagnosis, event timestamps and treatment facts appear automatically; live shared updates refresh the open admission form. Additional explicitly recorded clinical facts (including NIHSS, risk factors and consultant comments) appear in an expandable read-only reference. Clock-only/ambiguous times remain reference text rather than invented dated KPI timestamps. Manual corrections and explicit clears retain their existing precedence. Admission identity edits also update matching protocol identity fields through `kpi-store.js`.
+
+Existing cases do not need migration or copying. New general admissions open their admission view; Code 7 and legacy cases still open their protocol by default. Explicit reporting inclusion and indicator-specific eligibility remain required; monthly hospital denominators and pharmacy inputs stay separate. No calculation formula, Firebase rule, approval mechanism or server extraction contract changed for this addition. `scripts/check-stroke-admission.mjs` checks shared projection, conditional controls, source handling and no-mutation behavior.
+
+
 Repository: `drgigy/Stroke-Pathway-using-WOYZ`.
 Firebase project: `minutes-woyz-3`.
 Production: https://code7.codestroke.in/
@@ -85,7 +96,7 @@ After approval, the PWA warms a versioned local cache of the six active blank pr
 
 Admin review pages offer Print filled form for the selected shared case. It prints only the six clinical protocol pages (original pages 1, 2, 3, 4, 6 and 9) in A4 portrait with saved values and vector ticks. Counselling and both consent pages are excluded from printing. Values fit inside their original form cells; no continuation or extra summary sheet is appended. Unsaved/pending work blocks printing. Prepared print data stays in memory, is removed after printing or navigation/access loss, and is not stored in the static cache.
 
-On the user page, Home contains only Start New Code 7. Inside an opened case, Stroke pathway and KPI parameters switch the content; Pages opens the six-page overlay, including when invoked from the parameter view. The user form has no separate previous/next navigator row or floating green selector. Admin navigation and printing remain available. The compact recorder places Pause/Resume, timer-over-waveform and Stop in one row. Drag the waveform/timer area to move it; arrow keys move it and Home resets its position. Positions are held only in memory and clamped on viewport changes. Stop still transcribes and saves the same captured case/page.
+On the user page, Home contains Start New Code 7 and New Stroke Admission. Inside an opened case, Stroke pathway and KPI parameters switch the content; Pages opens the six-page overlay, including when invoked from the parameter view. The user form has no separate previous/next navigator row or floating green selector. Admin navigation and printing remain available. The compact recorder places Pause/Resume, timer-over-waveform and Stop in one row. Drag the waveform/timer area to move it; arrow keys move it and Home resets its position. Positions are held only in memory and clamped on viewport changes. Stop still transcribes and saves the same captured case/page.
 
 User case workspace: the brand header is hidden while a case is open. Stroke pathway, KPI parameters and Pages form the top row. A persistent, movable bottom recorder starts with Start, switches to Pause/Resume + live waveform/timer + Stop, and returns to Start after saving. Home and review pages retain their existing header.
 

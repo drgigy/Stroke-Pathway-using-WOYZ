@@ -115,3 +115,6 @@
 .kpi-binary button[aria-pressed='true']{background:#b5121b;border-color:#b5121b;color:white;}.kpi-binary button:focus-visible{outline:2px solid #b5121b;outline-offset:2px;}
 .kpi-supporting{grid-column:1/-1;border-style:dashed;}.kpi-supporting>summary{padding:5px 8px;}.kpi-supporting .kpi-guide-number{background:#eef2f6;color:#536174;}
 .kpi-guide .kpi-field input,.kpi-guide .kpi-field select{font-size:16px;}
+
+.stroke-admission-title{font-size:24px;line-height:1.2;margin:0 0 10px}.stroke-admission-summary,.stroke-admission-reporting-note{font-size:14px;line-height:1.5;color:#626e80;margin:0 0 20px}.stroke-admission-section{margin:0 0 24px}.stroke-admission-section h2{font-size:18px;line-height:1.35;color:#182137;margin:0 0 12px}.stroke-admission-facts{margin:16px 0 24px;padding:16px;border:1px solid #d4e1db;border-radius:12px;background:white}.stroke-admission-facts summary{font-weight:700;cursor:pointer}.stroke-admission-facts dl{display:grid;grid-template-columns:minmax(100px,1fr) minmax(0,3fr);gap:12px;margin:16px 0 0}.stroke-admission-facts dt{font-weight:700}.stroke-admission-facts dd{margin:0;white-space:pre-wrap;overflow-wrap:anywhere}
+@media(max-width:600px){.stroke-admission-facts dl{grid-template-columns:minmax(0,1fr)}.stroke-admission-facts dd{margin-bottom:10px}}
