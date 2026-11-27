@@ -19,8 +19,8 @@ export const protocolPages = [
     "height": 1684,
     "pdfWidthPoints": 594.95996,
     "pdfHeightPoints": 841.91998,
-    "sha256": "807c3f00f620488e9e3ef73e948d946957cdd4672de301d8403d45a6ae7dfc71",
-    "sourceTextCharacters": 907
+    "sha256": "1aaf2be2232dee6df822b45b50855e8cc2833d406d45ac55735240b8808ad459",
+    "sourceTextCharacters": 952
   },
   {
     "number": 3,

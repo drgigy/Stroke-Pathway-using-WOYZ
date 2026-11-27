@@ -35,7 +35,7 @@ function render() {
   observers.forEach(fn=>fn());
 }
 function validField(id,value) {
-  const field=protocolFields[context?.pageNumber-1]?.find(field=>field.id===id&&field.box);
+  const field=protocolFields[context?.pageNumber-1]?.find(field=>field.id===id&&field.box&&!field.calculated);
   if(!field||typeof value!=='string'||value.length>(context?.pageNumber===3&&id==='consultant_comments'?60000:12000))return false;
   if(value && ['binary','yesno','check'].includes(field.kind) && !['Yes','No'].includes(value))return false;
   if(value&&field.kind==='choice'&&!field.options.some(option=>option.value===value))return false;

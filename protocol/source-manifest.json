@@ -1,7 +1,7 @@
 {
   "pageCount": 9,
   "sourceFileName": "Stroke_Protocol_Form.pdf",
-  "sourcePdfSha256": "28146b3079e05e54e8363d752ff81052a32a0bceca031ed68b75b6370f5fe3bb",
+  "sourcePdfSha256": "e191e7e836f92443783bd6beec418b22772e1b04c1b9655754e88dd1ae2c0c9d",
   "pdfByteIdentical": false,
   "sourceType": "text-based-pdf",
   "vectorPageExports": true,
@@ -25,8 +25,8 @@
       "height": 1684,
       "pdfWidthPoints": 594.95996,
       "pdfHeightPoints": 841.91998,
-      "sha256": "807c3f00f620488e9e3ef73e948d946957cdd4672de301d8403d45a6ae7dfc71",
-      "sourceTextCharacters": 907
+      "sha256": "1aaf2be2232dee6df822b45b50855e8cc2833d406d45ac55735240b8808ad459",
+      "sourceTextCharacters": 952
     },
     {
       "number": 3,
@@ -107,7 +107,7 @@
     }
   ],
   "originalSourcePdfSha256": "4a1d6157a582d92a14c8fa9eaa49f3d850950057526d25095b1965d219e54eed",
-  "templateRevision": 2,
+  "templateRevision": 3,
   "modifications": [
     {
       "page": 1,
@@ -116,6 +116,10 @@
     {
       "page": 6,
       "change": "Add Patient on anticoagulation in the final non-treatment row"
+    },
+    {
+      "page": 2,
+      "change": "Add First Pass and Recanalization event times; calculate four door intervals from ER arrival."
     }
   ]
 }

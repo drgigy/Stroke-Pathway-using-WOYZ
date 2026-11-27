@@ -7,6 +7,7 @@ const idOK=v=>typeof v==='string'&&/^[A-Za-z0-9_-]{1,128}$/.test(v);
 export function failure(code){const error=new Error(code);error.code=code;return error;}
 export function audioPath(uid,id){if(!idOK(uid)||!idOK(id))throw failure('invalid-argument');return `stroke-dictation/${uid}/${id}/audio`;}
 export function jobFromPath(path){const m=/^stroke-dictation\/([A-Za-z0-9_-]{1,128})\/([A-Za-z0-9_-]{1,128})\/audio$/.exec(path||'');return m?{uid:m[1],id:m[2]}:null;}
+const supportedRevision=(source,version)=>(source===protocolFieldSource&&version===protocolFieldVersion)||(source==='28146b3079e05e54e8363d752ff81052a32a0bceca031ed68b75b6370f5fe3bb'&&version===2);
 export function createDictationService({db,auth,bucket,now,stamp,serverTime,transcribe}){
  const jobRef=id=>{if(!idOK(id))throw failure('invalid-argument');return db.doc(JOB+id);};
  async function userAccess(uid,provider,tx){
@@ -21,7 +22,7 @@ export function createDictationService({db,auth,bucket,now,stamp,serverTime,tran
   const uid=request.auth?.uid,provider=request.auth?.token?.firebase?.sign_in_provider||'';
   if(!uid)throw failure('unauthenticated');
   const data=request.data||{};
-  if(!idOK(data.id)||!idOK(data.caseId)||data.source!==protocolFieldSource||data.version!==protocolFieldVersion
+  if(!idOK(data.id)||!idOK(data.caseId)||!supportedRevision(data.source,data.version)
    ||typeof data.recordedAt!=='string'||!/^\d{4}-\d{2}-\d{2}T.*(?:Z|[+-]\d{2}:\d{2})$/.test(data.recordedAt)||!Number.isFinite(Date.parse(data.recordedAt)))throw failure('invalid-argument');
   await userAccess(uid,provider);
   const ref=jobRef(data.id);
@@ -80,7 +81,7 @@ export function createDictationService({db,auth,bucket,now,stamp,serverTime,tran
   const path=audioPath(claimed.createdBy,id),file=bucket.file(path);
   if(claimed.alreadyDone){await file.delete({ignoreNotFound:true});return;}
   try{
-   if(claimed.source!==protocolFieldSource||claimed.version!==protocolFieldVersion)throw failure('form-version-changed');
+   if(!supportedRevision(claimed.source,claimed.version))throw failure('form-version-changed');
    await userAccess(claimed.createdBy,claimed.provider);
    const note=await db.doc(CASE+claimed.caseId).get();if(!note.exists||note.data().deleted||note.data().noteType!=='code7')throw failure('case-unavailable');
    const [metadata]=await file.getMetadata();if(Number(metadata.size)>MAX_BYTES||String(metadata.generation)!==String(claimed.audioGeneration))throw failure('invalid-audio');

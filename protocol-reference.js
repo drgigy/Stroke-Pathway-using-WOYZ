@@ -25,11 +25,13 @@ Transfer to CT scan; Stroke Nurse Name; Signature; Time & Date.`,
 11. Large Vessel Occlusion: Yes / No.
 12. Cath Lab Arrival Time.
 13. Groin Puncture Time.
-14. Door to First pass.
-15. Mechanical Thrombectomy Outcome (TICI) Score; TICI Grade; Modified TICI With 2c. Record dictated grade/reperfusion description only.
-16. Door to Recanalisation.
-17. 24 Hour CT Scan; SICH Yes / No.
-18. Decompressive Craniectomy: Yes / No.
+14. First Pass Time (event timestamp).
+15. Door to First Pass (application-calculated).
+16. Mechanical Thrombectomy Outcome (TICI) Score; TICI Grade; Modified TICI With 2c. Record dictated grade/reperfusion description only.
+17. Recanalization Time (event timestamp).
+18. Door to Recanalization (application-calculated).
+19. 24 Hour CT Scan; SICH Yes / No.
+20. Decompressive Craniectomy: Yes / No.
 Preserve dates, times and intervals exactly as dictated; do not calculate missing intervals or infer delays.`,
   `Page 3 — RADIOLOGY FORM
 Patient label; Radiologist Opinion.

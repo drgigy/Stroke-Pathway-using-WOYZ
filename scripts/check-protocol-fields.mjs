@@ -16,7 +16,7 @@ for(const [index,fields] of protocolFields.entries()){
  const id=fields[0].id;
  assert.deepEqual(validateFieldOutput({text:' Patient details ',fields:[{id,value:' explicit only '}]},index+1),{text:'Patient details',fields:{[id]:'explicit only'}});
  for(const invalid of [null,{text:'',fields:[]},{text:'x',fields:[{id:'not_a_form_field',value:'x'}]},{text:'x',fields:[{id,value:'x'},{id,value:'y'}]},{text:'x',fields:[{id,value:4}]}])assert.throws(()=>validateFieldOutput(invalid,index+1));
- assert.equal(fieldContract(index+1).length,fields.length);
+ assert.equal(fieldContract(index+1).length,fields.filter(field=>!field.calculated).length);
 }
 assert.throws(()=>validateFieldOutput({text:'No page leakage',fields:[{id:'baseline_loc',value:'2'}]},1));
 const make=(value,time,extra={})=>({text:'Dictated',pageNumber:1,fields:{name:value},fieldSource:protocolFieldSource,fieldVersion:protocolFieldVersion,createdAt:{seconds:time},...extra});

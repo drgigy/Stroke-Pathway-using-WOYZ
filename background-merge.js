@@ -43,7 +43,7 @@ export function backgroundMergePlan(note, job, output, serverTime) {
       if (page==='3'&&id==='consultant_comments'?canAppendConsultant(note.protocolDictations?.[key],currentId,job.baseline.protocol[page]?.[id],job):canApply(currentId,job.baseline.protocol[page]?.[id],existing,job)) fields[id]=value;
       else skipped.push({page:Number(page),field:id});
     }
-    if(Object.keys(fields).length)patch[`protocolDictations.${key}.${job.id}`]={...common,pageNumber:Number(page),pageTitle:'Case-wide dictation',fieldSource:protocolFieldSource,fieldVersion:protocolFieldVersion,fields,...(page==='3'&&Object.hasOwn(fields,'consultant_comments')?{consultantAppend:true}:{})};
+    if(Object.keys(fields).length)patch[`protocolDictations.${key}.${job.id}`]={...common,pageNumber:Number(page),pageTitle:'Case-wide dictation',fieldSource:protocolFieldSource,fieldVersion:protocolFieldVersion,fields,...(page==='3'&&Object.hasOwn(fields,'consultant_comments')?{consultantAppend:true,consultantCommentMode:'explicit-v1'}:{})};
   }
   const current=kpiVersions(note), fields={};
   for(const [id,value]of Object.entries(output.kpiFields)) {

@@ -1,6 +1,6 @@
-// Field placements checked against Stroke_Protocol_Form.pdf, PDF-point coordinates.
-export const protocolFieldSource = "28146b3079e05e54e8363d752ff81052a32a0bceca031ed68b75b6370f5fe3bb";
-export const protocolFieldVersion = 2;
+// PDF-point field placements; prior approved sources remain readable.
+export const protocolFieldSource = "e191e7e836f92443783bd6beec418b22772e1b04c1b9655754e88dd1ae2c0c9d";
+export const protocolFieldVersion = 3;
 export const protocolLegacyRevisions = [
   {
     "source": "4a1d6157a582d92a14c8fa9eaa49f3d850950057526d25095b1965d219e54eed",
@@ -12,7 +12,18 @@ export const protocolLegacyRevisions = [
     },
     "unavailableFields": [
       "urea_creatinine",
-      "reason_anticoagulation"
+      "reason_anticoagulation",
+      "first_pass",
+      "recanalisation"
+    ]
+  },
+  {
+    "source": "28146b3079e05e54e8363d752ff81052a32a0bceca031ed68b75b6370f5fe3bb",
+    "version": 2,
+    "fieldAliases": {},
+    "unavailableFields": [
+      "first_pass",
+      "recanalisation"
     ]
   }
 ];
@@ -803,18 +814,18 @@ export const protocolFields = [
       "kind": "text",
       "box": [
         198,
-        147,
+        145,
         356,
         13
       ]
     },
     {
       "id": "er_arrival",
-      "label": "ER Arrival Time",
+      "label": "ER Arrival Time (preserve the explicitly stated date, clock time and AM/PM)",
       "kind": "text",
       "box": [
         145,
-        178,
+        174,
         409,
         13
       ]
@@ -825,7 +836,7 @@ export const protocolFields = [
       "kind": "text",
       "box": [
         178,
-        209,
+        203,
         376,
         13
       ]
@@ -836,7 +847,7 @@ export const protocolFields = [
       "kind": "text",
       "box": [
         264,
-        241,
+        232,
         290,
         13
       ]
@@ -847,54 +858,56 @@ export const protocolFields = [
       "kind": "text",
       "box": [
         194,
-        272,
+        261,
         360,
         13
       ]
     },
     {
       "id": "scan_start",
-      "label": "MRI/CT Scan Start Time",
+      "label": "MRI/CT Scan Start Time (preserve the explicitly stated date, clock time and AM/PM)",
       "kind": "text",
       "box": [
         187,
-        303,
+        290,
         367,
         13
       ]
     },
     {
       "id": "door_imaging",
-      "label": "Door to Imaging Time",
+      "label": "Door to Imaging Time (calculated by application from event timestamps; do not extract or calculate this interval)",
       "kind": "text",
       "box": [
-        174,
-        334,
-        380,
+        205,
+        319,
+        349,
         13
-      ]
+      ],
+      "calculated": true
     },
     {
       "id": "ivt_start",
-      "label": "IVT Start Time",
+      "label": "IVT Start Time (preserve the explicitly stated date, clock time and AM/PM)",
       "kind": "text",
       "box": [
         140,
-        365,
+        348,
         414,
         13
       ]
     },
     {
       "id": "door_needle",
-      "label": "Door to Needle",
+      "label": "Door to Needle (calculated by application from event timestamps; do not extract or calculate this interval)",
       "kind": "text",
       "box": [
-        144,
-        397,
-        410,
+        174,
+        377,
+        380,
         13
-      ]
+      ],
+      "calculated": true
     },
     {
       "id": "delay_reason",
@@ -902,7 +915,7 @@ export const protocolFields = [
       "kind": "text",
       "box": [
         332,
-        428,
+        403,
         222,
         13
       ]
@@ -913,7 +926,7 @@ export const protocolFields = [
       "kind": "text",
       "box": [
         174,
-        490,
+        461,
         380,
         13
       ]
@@ -924,21 +937,22 @@ export const protocolFields = [
       "kind": "text",
       "box": [
         170,
-        521,
+        490,
         384,
         13
       ]
     },
     {
       "id": "door_first_pass",
-      "label": "Door to First pass",
+      "label": "Door to First pass (calculated by application from event timestamps; do not extract or calculate this interval)",
       "kind": "text",
       "box": [
-        157,
-        553,
-        397,
+        182,
+        548,
+        372,
         13
-      ]
+      ],
+      "calculated": true
     },
     {
       "id": "tici",
@@ -946,21 +960,22 @@ export const protocolFields = [
       "kind": "text",
       "box": [
         304,
-        584,
+        577,
         250,
         13
       ]
     },
     {
       "id": "door_recanalisation",
-      "label": "Door to Recanalisation",
+      "label": "Door to Recanalisation (calculated by application from event timestamps; do not extract or calculate this interval)",
       "kind": "text",
       "box": [
-        180,
-        718,
-        374,
+        211,
+        733,
+        343,
         13
-      ]
+      ],
+      "calculated": true
     },
     {
       "id": "wake_unknown",
@@ -968,9 +983,9 @@ export const protocolFields = [
       "kind": "text",
       "box": [
         310,
-        115,
+        112,
         154,
-        14
+        13
       ]
     },
     {
@@ -984,7 +999,7 @@ export const protocolFields = [
       ],
       "box": [
         192,
-        462,
+        432,
         10,
         10
       ]
@@ -995,23 +1010,23 @@ export const protocolFields = [
       "kind": "text",
       "box": [
         164,
-        750,
+        762,
         95,
-        14
+        13
       ]
     },
     {
       "id": "sich",
       "label": "SICH",
       "kind": "yesno",
-      "noX": 318,
+      "noX": 342,
       "choices": [
         "Yes",
         "No"
       ],
       "box": [
-        274.5,
-        752.2,
+        297,
+        762,
         10,
         10
       ]
@@ -1027,7 +1042,7 @@ export const protocolFields = [
       ],
       "box": [
         216.7,
-        783.7,
+        791,
         10,
         10
       ]
@@ -1036,6 +1051,28 @@ export const protocolFields = [
       "id": "other_details",
       "label": "Other dictated details with no matching blank; also preserve units / findings / uncertainties that cannot fit a checkbox. Never omit them.",
       "kind": "text"
+    },
+    {
+      "id": "first_pass",
+      "label": "First Pass Time (event timestamp, not a door interval; preserve the explicitly stated date, clock time and AM/PM)",
+      "kind": "text",
+      "box": [
+        149,
+        519,
+        405,
+        13
+      ]
+    },
+    {
+      "id": "recanalisation",
+      "label": "Recanalization Time (event timestamp, not a door interval; preserve the explicitly stated date, clock time and AM/PM)",
+      "kind": "text",
+      "box": [
+        170,
+        704,
+        384,
+        13
+      ]
     }
   ],
   [
@@ -2407,7 +2444,7 @@ export const protocolFields = [
     },
     {
       "id": "name",
-      "label": "ശ്രീ./ശ്രീമതി. Patient name",
+      "label": "\u0d36\u0d4d\u0d30\u0d40./\u0d36\u0d4d\u0d30\u0d40\u0d2e\u0d24\u0d3f. Patient name",
       "kind": "text",
       "box": [
         101,
@@ -2429,7 +2466,7 @@ export const protocolFields = [
     },
     {
       "id": "age",
-      "label": "വയസ്സ് Age",
+      "label": "\u0d35\u0d2f\u0d38\u0d4d\u0d38\u0d4d Age",
       "kind": "text",
       "box": [
         406,
@@ -2451,7 +2488,7 @@ export const protocolFields = [
     },
     {
       "id": "guardian",
-      "label": "രോഗി / കുടുംബാംഗം / രക്ഷകർത്താവ് പേര് (Patient / guardian name)",
+      "label": "\u0d30\u0d4b\u0d17\u0d3f / \u0d15\u0d41\u0d1f\u0d41\u0d02\u0d2c\u0d3e\u0d02\u0d17\u0d02 / \u0d30\u0d15\u0d4d\u0d37\u0d15\u0d7c\u0d24\u0d4d\u0d24\u0d3e\u0d35\u0d4d \u0d2a\u0d47\u0d30\u0d4d (Patient / guardian name)",
       "kind": "text",
       "box": [
         298,
@@ -2462,7 +2499,7 @@ export const protocolFields = [
     },
     {
       "id": "specialist",
-      "label": "സ്ട്രോക്ക് സ്പെഷ്യലിസ്റ്റ് പേര് (Stroke specialist name)",
+      "label": "\u0d38\u0d4d\u0d1f\u0d4d\u0d30\u0d4b\u0d15\u0d4d\u0d15\u0d4d \u0d38\u0d4d\u0d2a\u0d46\u0d37\u0d4d\u0d2f\u0d32\u0d3f\u0d38\u0d4d\u0d31\u0d4d\u0d31\u0d4d \u0d2a\u0d47\u0d30\u0d4d (Stroke specialist name)",
       "kind": "text",
       "box": [
         298,
@@ -2473,7 +2510,7 @@ export const protocolFields = [
     },
     {
       "id": "date",
-      "label": "തീയതി Date",
+      "label": "\u0d24\u0d40\u0d2f\u0d24\u0d3f Date",
       "kind": "text",
       "box": [
         88,
@@ -2484,7 +2521,7 @@ export const protocolFields = [
     },
     {
       "id": "sex",
-      "label": "സ്ത്രീ/പുരുഷൻ Sex (dictated only)",
+      "label": "\u0d38\u0d4d\u0d24\u0d4d\u0d30\u0d40/\u0d2a\u0d41\u0d30\u0d41\u0d37\u0d7b Sex (dictated only)",
       "kind": "text"
     },
     {

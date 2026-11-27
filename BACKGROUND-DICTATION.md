@@ -44,3 +44,5 @@ Runtime key stays in the existing `runtimeSecrets/gemini` record; never place cr
 Disable the frontend flag and publish a new app-cache version to return to foreground dictation. Already acknowledged jobs remain durable and should finish; do not delete their audio or jobs as part of UI rollback. Restore only backed-up rules/resources for this feature after pending work is resolved. Never alter another repository or Firebase project.
 
 Account access: all entry points require the same approved email/password account (or the existing owner identity). Anonymous device grants cannot prepare, upload or commit dictation. Master Admin remains restricted to the existing owner UID and admin claim.
+
+Revision 3 preserves approved revision-2 queued/in-flight jobs during deployment. Consultant comments are explicitly attributed passages only, tagged consultantCommentMode:explicit-v1; the full narrative remains separately saved. Calculated door intervals are excluded from Gemini field IDs; the model extracts only event timestamps.

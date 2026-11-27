@@ -1,0 +1,12 @@
+import assert from 'node:assert/strict';
+import {calculateDoorTimings,parseProtocolTime} from '../protocol-timings.js';
+const compute=values=>Object.fromEntries(Object.entries(calculateDoorTimings(values)).map(([k,v])=>[k,v.value]));
+assert.deepEqual(compute({er_arrival:'9:15 AM',scan_start:'09:30',ivt_start:'10 AM',first_pass:'10:25 am',recanalisation:'11:00'}),{door_imaging:'15 min',door_needle:'45 min',door_first_pass:'70 min',door_recanalisation:'105 min'});
+assert.equal(compute({er_arrival:'2026-11-27T23:50:00+05:30',scan_start:'2026-11-28T00:10:00+05:30'}).door_imaging,'20 min');
+assert.equal(compute({er_arrival:'27/11/2026 09:15',ivt_start:'27 November 2026 10 AM'}).door_needle,'45 min');
+assert.equal(compute({er_arrival:'2026-11-27T09:00:00+05:30',first_pass:'2026-11-27T04:00:00Z'}).door_first_pass,'30 min');
+assert.equal(compute({er_arrival:'9:00:30',scan_start:'9:02:00'}).door_imaging,'1.5 min');
+for(const values of [{},{er_arrival:'9 AM'},{er_arrival:'unknown',scan_start:'10 AM'},{er_arrival:'23:50',scan_start:'00:10'},{er_arrival:'2026-11-27 09:00',scan_start:'10:00'}])assert.equal(compute(values).door_imaging,'');
+for(const raw of ['25:10','13 PM','2026-02-30 12:00','2026-13-01 12:00','2026-11-27 9:60','2026-11-27 09:00+15:00','9','morning'])assert.equal(parseProtocolTime(raw),null,raw);
+assert.equal(compute({er_arrival:'12 am',scan_start:'12:05 AM'}).door_imaging,'5 min');
+console.log('PASS: four derived intervals, exact minute/second handling, explicit dates and timezones, midnight rollover with dates, missing/ambiguous/invalid input safety.');

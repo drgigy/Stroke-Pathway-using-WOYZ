@@ -89,15 +89,19 @@ test('silence is a terminal no-speech result, never writes case fields or offers
  assert.deepEqual(f.docs.get('workspaces/stroke/notes/patientA'),{noteType:'code7'});assert.equal((await f.service.confirm(f.request())).uploaded,true);await assert.rejects(f.service.retry(f.request()));
 });
 
-test('consultant comments use the complete transcript unchanged while structured fields remain mapped',()=>{
- const text='Patient came at 8. BP 140/90. No headache.\nPlan: CT first, then reassess. Not sure about onset.';
- const result=validateCaseWideOutput({speechDetected:true,text,pages:[{pageNumber:'1',fields:[{id:'bp',value:'140/90'}]},{pageNumber:'3',fields:[{id:'consultant_comments',value:'A shortened and reworded summary.'}]}],kpiFields:[]});
- assert.equal(result.text,text);assert.equal(result.pages[3].consultant_comments,text);assert.equal(result.pages[1].bp,'140/90');
- assert.equal(validateCaseWideOutput({speechDetected:true,text:'Yes, not sure.',pages:[],kpiFields:[]}).pages[3].consultant_comments,'Yes, not sure.');
+test('consultant comments contain only the explicitly mapped passage, never the whole transcript',()=>{
+ const text='Patient arrived at 8. BP 140/90. Consultant comments: CT first, then reassess.';
+ const result=validateCaseWideOutput({speechDetected:true,text,pages:[{pageNumber:'1',fields:[{id:'bp',value:'140/90'}]},{pageNumber:'3',fields:[{id:'consultant_comments',value:'CT first, then reassess.'}]}],kpiFields:[]});
+ assert.equal(result.text,text);assert.equal(result.pages[3].consultant_comments,'CT first, then reassess.');assert.equal(result.pages[1].bp,'140/90');
+ assert.equal(validateCaseWideOutput({speechDetected:true,text:'Patient came at 8.',pages:[],kpiFields:[]}).pages[3],undefined);
+ const old=entry({consultant_comments:text},10,{pageNumber:3,text,kind:'dictation',consultantAppend:true,processingMode:'server-case-wide-v1'}),before=JSON.stringify(old);
+ assert.equal(currentFieldValues({old},3).consultant_comments,undefined);assert.equal(JSON.stringify(old),before);
+ assert.equal(currentFieldValues({manual:{...old,kind:'manual-edit'}},3).consultant_comments.value,text);
+ assert.equal(currentFieldValues({explicit:{...old,consultantCommentMode:'explicit-v1'}},3).consultant_comments.value,text);
  assert.deepEqual(validateCaseWideOutput({speechDetected:false,text:'',pages:[],kpiFields:[]}).pages,{});
 });
 test('consultant narrative appends in recording order, with manual replacements and clears protected',()=>{
- const narrative=text=>validateCaseWideOutput({speechDetected:true,text,pages:[],kpiFields:[]});
+ const narrative=text=>validateCaseWideOutput({speechDetected:true,text,pages:[{pageNumber:'3',fields:[{id:'consultant_comments',value:text}]}],kpiFields:[]});
  for(const order of [[0,1],[1,0]]){
   const note={},baseline=captureCaseBaseline(note),takes=[job('a',100,baseline),job('b',200,baseline)];
   for(const i of order)apply(note,backgroundMergePlan(note,takes[i],narrative(i?'Second dictation, no headache.':'First dictation: arrived at 8.'),time(400+i)).patch);
@@ -120,7 +124,20 @@ test('consultant narrative appends in recording order, with manual replacements 
 test('page-specific schema constrains IDs and accepts both current and in-flight response formats',async()=>{
  const {caseWideResponseSchema}=await import('../shared/case-wide-dictation.js');const schema=caseWideResponseSchema(),pages=schema.properties.pages.properties;
  assert(pages.page1.items.properties.id.enum.includes('name'));assert(!pages.page1.items.properties.id.enum.includes('er_arrival'));assert(pages.page2.items.properties.id.enum.includes('er_arrival'));assert.equal(pages.page5,undefined);
- const result=validateCaseWideOutput({speechDetected:true,text:'Original dictated words.',pages:{page1:[{id:'name',value:'Test'}],page2:[],page3:[],page4:[],page6:[],page9:[]},kpiFields:[]});assert.equal(result.pages[1].name,'Test');assert.equal(result.pages[3].consultant_comments,'Original dictated words.');
+ const result=validateCaseWideOutput({speechDetected:true,text:'Original dictated words.',pages:{page1:[{id:'name',value:'Test'}],page2:[],page3:[],page4:[],page6:[],page9:[]},kpiFields:[]});assert.equal(result.pages[1].name,'Test');assert.equal(result.pages[3],undefined);
  assert.equal(validateCaseWideOutput({speechDetected:false,text:'',pages:{page1:[],page2:[],page3:[],page4:[],page6:[],page9:[]},kpiFields:[]}).noSpeech,true);
  assert.throws(()=>validateCaseWideOutput({speechDetected:true,text:'x',pages:{page5:[]},kpiFields:[]}));
+});
+
+test('timing contract extracts the new event timestamps and excludes calculated durations',async()=>{
+ const {fieldContract}=await import('../shared/protocol-field-output.js');const ids=fieldContract(2).map(f=>f.id);
+ assert(ids.includes('first_pass'));assert(ids.includes('recanalisation'));assert(!ids.includes('door_first_pass'));assert(!ids.includes('door_imaging'));
+ assert.throws(()=>validateCaseWideOutput({text:'Explicit times',pages:[{pageNumber:'2',fields:[{id:'door_needle',value:'30 min'}]}],kpiFields:[]}));
+});
+
+test('approved revision-2 in-flight jobs finish against the new contract without losing their case',async()=>{
+ const f=fixture(),request=f.request();request.data.source='28146b3079e05e54e8363d752ff81052a32a0bceca031ed68b75b6370f5fe3bb';request.data.version=2;
+ await f.service.prepare(request);const job=f.docs.get('workspaces/stroke/dictationJobs/take1');job.source=request.data.source;job.version=2;
+ await f.upload();await f.service.process('take1');assert.equal(job.status,'completed');
+ assert.equal(f.docs.get('workspaces/stroke/notes/patientA').protocolDictations.page1.take1.fieldVersion,3);
 });

@@ -1,3 +1,4 @@
+import { calculateDoorTimings } from './protocol-timings.js';
 import { protocolFields } from './protocol-fields.js';
 import { currentFieldValues } from './protocol-field-output.js';
 import { isReviewPage } from './page-mode.js';
@@ -52,14 +53,14 @@ export function renderFilledProtocolForm(sheet,pageNumber,dictations,{readOnly=f
     for(const field of fields){
       if(field.kind==='yesno'){layer.append(makeControl(field,field.box,'Yes',editable),makeControl(field,[field.noX,...field.box.slice(1)],'No',editable));}
       else if(field.kind==='choice')for(const option of field.options)layer.append(makeControl(field,option.box,option.value,editable));
-      else layer.append(makeControl(field,field.box,field.kind==='check'?'Yes':undefined,editable));
+      else layer.append(makeControl(field,field.box,field.kind==='check'?'Yes':undefined,editable&&!field.calculated));
     }
     canvas.append(layer);
   }
   const values=currentFieldValues(dictations,pageNumber),byId=new Map(fields.map(field=>[field.id,field]));
   for(const control of layer.children){
     const field=byId.get(control.dataset.fieldId),stored=values[field.id]?.value||'';
-    if(editable&&(document.activeElement===control||isProtocolFieldDirty(field.id)))continue;
+    if(editable&&!field.calculated&&(document.activeElement===control||isProtocolFieldDirty(field.id)))continue;
     const value=field.kind==='binary'?binaryValue(stored):stored;
     control.dataset.takeId=values[field.id]?.takeId||'';
     control.title=field.label+(stored?': '+stored:'');
@@ -68,5 +69,17 @@ export function renderFilledProtocolForm(sheet,pageNumber,dictations,{readOnly=f
     control.hidden=!editable&&!value;
     if(control.type==='checkbox'&&!editable)control.hidden=!control.checked;
     fit(control);
+  }
+  if(pageNumber===2){
+    layer.timingValues=values;
+    const recalculate=()=>{
+      const inputs={...layer.timingValues};
+      if(editable)for(const control of layer.children)if(!byId.get(control.dataset.fieldId)?.calculated&&control.type!=='checkbox')inputs[control.dataset.fieldId]=control.value;
+      const calculated=calculateDoorTimings(inputs);
+      for(const control of layer.children){const result=calculated[control.dataset.fieldId];if(!result)continue;control.value=result.value;control.readOnly=true;control.hidden=!editable&&!result.value;control.title=result.reason||'Calculated from saved ER arrival and event time.';control.dataset.calculated='true';fit(control);}
+    };
+    layer.recalculateTimings=recalculate;
+    if(!layer.hasTimingListeners){layer.addEventListener('input',()=>layer.recalculateTimings());layer.addEventListener('change',()=>layer.recalculateTimings());layer.hasTimingListeners=true;}
+    recalculate();
   }
 }
